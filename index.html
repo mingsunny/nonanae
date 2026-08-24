@@ -1,0 +1,1205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settle — Click-through Prototype</title>
+<style>
+  :root{
+    --accent:#16A38A;
+    --accent-light:#E6F7F3;
+    --accent-dark:#0F8371;
+    --owe:#E14B4B;
+    --owe-light:#FDECEC;
+    --text:#1F2937;
+    --text-secondary:#6B7280;
+    --border:#EDEFF2;
+    --bg:#FAFAFA;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#EEF0F3;
+    color:var(--text);
+  }
+  .page{
+    display:flex;
+    gap:40px;
+    align-items:flex-start;
+    justify-content:center;
+    flex-wrap:wrap;
+    padding:40px 20px 80px;
+  }
+  .frame-col{display:flex;flex-direction:column;align-items:center;}
+  .frame-caption{
+    font-size:13px;
+    color:var(--text-secondary);
+    margin-bottom:14px;
+    text-align:center;
+  }
+  .frame-caption b{color:var(--text);}
+  .phone{
+    width:390px;
+    height:844px;
+    background:#0B0B0C;
+    border-radius:52px;
+    padding:14px;
+    box-shadow:0 30px 60px rgba(0,0,0,0.25);
+  }
+  .screen-viewport{
+    position:relative;
+    width:100%;
+    height:100%;
+    background:#fff;
+    border-radius:38px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .statusbar{
+    flex-shrink:0;
+    height:40px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 26px;
+    font-size:14px;
+    font-weight:600;
+  }
+  .screen{
+    display:none;
+    flex-direction:column;
+    flex:1;
+    min-height:0;
+  }
+  .screen.active{display:flex;}
+  .topbar{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 16px 14px;
+  }
+  .topbar-title{font-size:17px;font-weight:700;}
+  .topbar-sub{font-size:12px;color:var(--text-secondary);font-weight:500;margin-top:2px;}
+  .icon-btn{
+    background:none;border:none;cursor:pointer;
+    font-size:16px;font-weight:600;color:var(--accent);
+    padding:6px 4px;min-width:44px;
+    display:flex;align-items:center;gap:2px;
+  }
+  .icon-btn.muted{color:var(--text-secondary);font-weight:500;}
+  .icon-btn:disabled{color:#C6CAD1;cursor:not-allowed;}
+  .icon-btn.back{font-size:24px;min-width:32px;justify-content:flex-start;}
+  .spacer44{min-width:44px;}
+  .content{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    padding:4px 20px 28px;
+  }
+  .content::-webkit-scrollbar{width:0;}
+  h1.big{font-size:24px;margin:6px 0 4px;}
+  p.lead{color:var(--text-secondary);font-size:14px;margin:0 0 20px;line-height:1.5;}
+  label.field-label{display:block;font-size:13px;font-weight:600;color:var(--text-secondary);margin:18px 0 6px;}
+  input.field, select.field{
+    width:100%;border:none;border-bottom:1.5px solid var(--border);
+    padding:10px 2px;font-size:16px;color:var(--text);background:transparent;outline:none;
+  }
+  input.field:focus, select.field:focus{border-bottom-color:var(--accent);}
+  .btn-primary{
+    width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;
+    padding:15px;font-size:16px;font-weight:700;cursor:pointer;margin-top:10px;
+  }
+  .btn-primary:disabled{background:#D8DBE0;color:#9AA0AA;cursor:not-allowed;}
+  .btn-secondary{
+    width:100%;background:#fff;color:var(--accent);border:1.5px solid var(--accent);border-radius:14px;
+    padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px;
+  }
+  .btn-ghost{
+    width:100%;background:none;color:var(--text-secondary);border:none;
+    padding:10px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .link-row{text-align:center;margin-top:16px;font-size:13px;color:var(--text-secondary);}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;margin-top:22px;}
+  .toggle-row .label{font-size:15px;font-weight:600;}
+  .switch{position:relative;width:46px;height:26px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:#D8DBE0;border-radius:26px;cursor:pointer;transition:.15s;}
+  .slider:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .switch input:checked + .slider{background:var(--accent);}
+  .switch input:checked + .slider:before{transform:translateX(20px);}
+  .date-row{display:flex;gap:16px;margin-top:14px;}
+  .date-row > div{flex:1;}
+  .help-text{font-size:12px;color:var(--text-secondary);margin-top:6px;line-height:1.5;}
+
+  .invite-row{display:flex;gap:10px;margin-top:18px;}
+  .pill-btn{
+    flex:1;border:none;border-radius:14px;padding:13px 6px;font-size:13px;font-weight:700;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;
+  }
+  .pill-btn.msg{background:var(--accent);color:#fff;}
+  .pill-btn.copy{background:var(--accent-light);color:var(--accent-dark);}
+  .add-friend-row{display:flex;gap:8px;margin-top:20px;}
+  .add-friend-row input{flex:1;}
+  .add-friend-row button{
+    background:var(--accent);color:#fff;border:none;border-radius:10px;
+    padding:0 16px;font-size:14px;font-weight:700;cursor:pointer;
+  }
+  .member-count{font-size:13px;color:var(--text-secondary);margin:22px 0 8px;font-weight:600;}
+  .member-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .member-row:last-child{border-bottom:none;}
+  .member-name{font-size:15px;font-weight:600;flex:1;}
+  .member-tag{font-size:11px;color:var(--text-secondary);font-weight:600;}
+  .avatar{
+    width:38px;height:38px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:14px;
+  }
+  .avatar.sm{width:30px;height:30px;font-size:12px;}
+
+  .group-card{
+    border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;cursor:pointer;
+  }
+  .group-card:active{background:#F7F8FA;}
+  .group-card-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .group-card-name{font-size:16px;font-weight:700;}
+  .group-card-sub{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+  .balance-tag{font-size:13px;font-weight:700;text-align:right;}
+  .balance-tag.owe{color:var(--owe);}
+  .balance-tag.owed{color:var(--accent);}
+  .balance-tag.settled{color:var(--text-secondary);font-weight:600;}
+  .avatar-stack{display:flex;margin-top:12px;}
+  .avatar-stack .avatar{margin-right:-10px;border:2px solid #fff;}
+  .fab{
+    position:absolute;right:20px;bottom:24px;width:56px;height:56px;border-radius:50%;
+    background:var(--accent);color:#fff;border:none;font-size:26px;cursor:pointer;
+    box-shadow:0 8px 20px rgba(22,163,138,.4);display:flex;align-items:center;justify-content:center;
+  }
+  #screen-mygroups .fab{bottom:92px;}
+  .bottom-nav{
+    display:none;flex-shrink:0;border-top:1px solid var(--border);
+    padding:8px 10px 14px;background:#fff;
+  }
+  .nav-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+    cursor:pointer;color:var(--text-secondary);position:relative;padding:4px 0;
+  }
+  .nav-item .nav-icon{font-size:20px;}
+  .nav-item .nav-label{font-size:11px;font-weight:600;}
+  .nav-item.active{color:var(--accent-dark);}
+  .nav-badge{
+    position:absolute;top:-1px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;
+    background:var(--owe);border:1.5px solid #fff;display:none;
+  }
+
+  .progress-banner{
+    background:var(--accent-light);border-radius:14px;padding:14px;margin-bottom:16px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .progress-banner.ready{background:#DFF6EE;}
+  .progress-banner .emoji{font-size:22px;}
+  .progress-banner .txt{flex:1;font-size:13px;font-weight:600;color:var(--accent-dark);line-height:1.4;}
+  .expense-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+  .expense-icon{
+    width:38px;height:38px;border-radius:10px;background:var(--accent-light);color:var(--accent-dark);
+    display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;
+  }
+  .expense-mid{flex:1;min-width:0;}
+  .expense-desc{font-size:14px;font-weight:700;}
+  .expense-sub{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+  .expense-amt{font-size:14px;font-weight:700;white-space:nowrap;}
+  .section-title{font-size:13px;font-weight:700;color:var(--text-secondary);margin:20px 0 4px;text-transform:uppercase;letter-spacing:.02em;}
+  .empty-state{text-align:center;padding:30px 10px;color:var(--text-secondary);font-size:13px;}
+
+  .amount-hero{text-align:center;margin:14px 0 10px;}
+  .amount-hero input{
+    border:none;outline:none;font-size:44px;font-weight:700;text-align:center;width:100%;
+    color:var(--text);background:transparent;
+  }
+  .amount-hero .cur{color:var(--text-secondary);font-size:22px;}
+  .picker-header{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text-secondary);padding:0 4px;margin-top:10px;}
+  .pick-row{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);gap:10px;}
+  .pick-row .member-name{font-size:14px;font-weight:600;}
+  .check{
+    width:26px;height:26px;border-radius:50%;border:2px solid #D8DBE0;flex-shrink:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;
+  }
+  .check.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+  .split-tabs{display:flex;gap:8px;margin:14px 0 20px;}
+  .split-tab{
+    flex:1;border:1.5px solid var(--border);border-radius:12px;padding:12px 4px;text-align:center;
+    cursor:pointer;font-size:18px;color:var(--text-secondary);
+  }
+  .split-tab small{display:block;font-size:10px;margin-top:4px;font-weight:700;}
+  .split-tab.selected{border-color:var(--accent);background:var(--accent-light);color:var(--accent-dark);}
+  .split-desc{font-size:12px;color:var(--text-secondary);text-align:center;line-height:1.5;}
+  .split-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .split-row input{
+    width:78px;text-align:right;border:none;border-bottom:1.5px solid var(--border);
+    font-size:15px;padding:6px 2px;outline:none;
+  }
+  .split-row input:focus{border-bottom-color:var(--accent);}
+  .split-row .unit{font-size:13px;color:var(--text-secondary);width:14px;}
+  .split-summary{font-size:12px;color:var(--text-secondary);text-align:center;margin-top:6px;}
+  .split-summary.bad{color:var(--owe);font-weight:700;}
+
+  .notif-row{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+  .notif-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);margin-top:6px;flex-shrink:0;}
+  .notif-dot.read{background:transparent;}
+  .notif-txt{font-size:13px;line-height:1.5;}
+  .notif-time{font-size:11px;color:var(--text-secondary);margin-top:3px;}
+  .bell-wrap{position:relative;}
+  .bell-badge{
+    position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;
+    background:var(--owe);border:1.5px solid #fff;
+  }
+
+  .settle-header{text-align:center;margin:10px 0 22px;}
+  .settle-header h1{font-size:19px;margin:0 0 4px;}
+  .settle-header p{font-size:12px;color:var(--text-secondary);margin:0;}
+  .tx-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);}
+  .tx-num{width:20px;font-size:13px;font-weight:700;color:var(--text-secondary);}
+  .tx-flow{flex:1;font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  .tx-arrow{color:var(--text-secondary);}
+  .tx-amt{font-size:14px;font-weight:700;color:var(--accent-dark);}
+  .total-row{display:flex;align-items:center;gap:12px;padding:10px 0;}
+  .total-mid{flex:1;}
+  .total-name{font-size:14px;font-weight:700;}
+  .total-sub{font-size:11px;color:var(--text-secondary);margin-top:2px;}
+  .total-amt{font-size:14px;font-weight:700;}
+
+  .sidebar{
+    width:300px;background:#fff;border-radius:16px;padding:22px 22px 26px;
+    box-shadow:0 4px 20px rgba(0,0,0,.06);position:sticky;top:40px;
+  }
+  .sidebar h2{font-size:15px;margin:0 0 4px;}
+  .sidebar p.small{font-size:12px;color:var(--text-secondary);line-height:1.5;margin:0 0 16px;}
+  .sidebar ol{margin:0;padding-left:18px;font-size:13px;line-height:1.9;color:var(--text);}
+  .sidebar .reset-btn{
+    margin-top:18px;width:100%;background:#F3F4F6;border:none;border-radius:10px;padding:10px;
+    font-size:12px;font-weight:700;color:var(--text-secondary);cursor:pointer;
+  }
+  .sidebar .tag{
+    display:inline-block;background:var(--accent-light);color:var(--accent-dark);font-size:11px;
+    font-weight:700;padding:3px 8px;border-radius:6px;margin-bottom:12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="sidebar">
+    <span class="tag">PHASE 1 · CLICK-THROUGH DEMO</span>
+    <h2>Settle — walkthrough</h2>
+    <p class="small">Static prototype, fake data, no backend. Use this script when reviewing with a coworker:</p>
+    <ol>
+      <li>Log in (any info) — or tap Sign up to see that screen too</li>
+      <li>Open the pre-loaded <b>SF Trip</b> group and browse its expenses</li>
+      <li>Tap <b>Settle Up</b> to see the minimized who-pays-whom breakdown</li>
+      <li>Go back to the <b>Trips</b> tab, tap <b>+</b> to create a new trip from scratch</li>
+      <li>Add an expense, try each split type (equal / exact / % / shares)</li>
+      <li>Use <b>+ Invite</b> on the trip screen to add friends any time — it's not required up front</li>
+      <li>Mark yourself done, then use the demo control to mark everyone else done</li>
+      <li>Check the <b>Activity</b> tab for the notification, then view settlement</li>
+      <li>Tap the <b>Profile</b> tab to see the account screen</li>
+    </ol>
+    <button class="reset-btn" onclick="resetDemo()">Reset demo data</button>
+  </div>
+
+  <div class="frame-col">
+    <div class="frame-caption"><b>Settle</b> — trip bill settlement, click-through prototype</div>
+    <div class="phone">
+      <div class="screen-viewport">
+
+        <div class="statusbar">
+          <span id="clock">9:41</span>
+          <span>●●● 🔋</span>
+        </div>
+
+        <!-- LOG IN -->
+        <section class="screen active" id="screen-login">
+          <div class="content">
+            <h1 class="big" style="margin-top:40px;">Settle</h1>
+            <p class="lead">Split trip expenses with friends, and see exactly who to pay — with the fewest payments possible.</p>
+            <label class="field-label">Email</label>
+            <input class="field" id="li-email" placeholder="you@example.com" value="kady@example.com">
+            <label class="field-label">Password</label>
+            <input class="field" type="password" placeholder="••••••••" value="password">
+            <button class="btn-primary" style="margin-top:28px;" onclick="logIn()">Log In</button>
+            <div class="link-row">New to Settle? <b style="color:var(--accent);cursor:pointer;" onclick="go('signup')">Sign up</b></div>
+          </div>
+        </section>
+
+        <!-- SIGN UP -->
+        <section class="screen" id="screen-signup">
+          <div class="topbar">
+            <button class="icon-btn back" onclick="goBack()">‹</button>
+            <div class="topbar-title">Sign Up</div>
+            <span class="spacer44"></span>
+          </div>
+          <div class="content">
+            <label class="field-label" style="margin-top:6px;">Name</label>
+            <input class="field" id="su-name" placeholder="Your name" value="Kady Ju">
+            <label class="field-label">Email</label>
+            <input class="field" id="su-email" placeholder="you@example.com" value="kady@example.com">
+            <label class="field-label">Password</label>
+            <input class="field" type="password" placeholder="••••••••" value="password">
+            <button class="btn-primary" style="margin-top:28px;" onclick="signUp()">Sign Up</button>
+          </div>
+        </section>
+
+        <!-- MY GROUPS -->
+        <section class="screen" id="screen-mygroups">
+          <div class="topbar">
+            <span class="spacer44"></span>
+            <div class="topbar-title">Your Trips</div>
+            <span class="spacer44"></span>
+          </div>
+          <div class="content" id="groups-list"></div>
+          <button class="fab" onclick="startCreateGroup()">+</button>
+        </section>
+
+        <!-- CREATE GROUP -->
+        <section class="screen" id="screen-creategroup">
+          <div class="topbar">
+            <button class="icon-btn muted" onclick="go('mygroups')">Cancel</button>
+            <div class="topbar-title">Create a Trip</div>
+            <button class="icon-btn" id="cg-done" onclick="createGroup()">Done</button>
+          </div>
+          <div class="content">
+            <label class="field-label" style="margin-top:6px;">Trip name</label>
+            <input class="field" id="cg-name" placeholder="e.g. NYC Trip" oninput="validateCreateGroup()">
+            <div class="toggle-row">
+              <div>
+                <div class="label">Add trip dates</div>
+                <div class="help-text" style="margin-top:2px;">Settle used to remind everyone to add expenses and settle up.</div>
+              </div>
+              <label class="switch"><input type="checkbox" id="cg-dates-toggle" onchange="toggleDates()"><span class="slider"></span></label>
+            </div>
+            <div id="cg-dates" style="display:none;">
+              <div class="date-row">
+                <div><label class="field-label">Start</label><input class="field" type="date" id="cg-start"></div>
+                <div><label class="field-label">End</label><input class="field" type="date" id="cg-end"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- INVITE FRIENDS -->
+        <section class="screen" id="screen-invite">
+          <div class="topbar">
+            <button class="icon-btn back" onclick="goBack()">‹</button>
+            <div>
+              <div class="topbar-title" id="inv-title" style="text-align:center;">Trip</div>
+            </div>
+            <button class="icon-btn" onclick="finishInvite()">Done</button>
+          </div>
+          <div class="content">
+            <p class="lead" id="inv-count" style="margin-bottom:4px;"></p>
+            <p class="help-text" style="margin-bottom:6px;">Invite friends any time — in the real app they'd join via the link. No one needs to join before you start adding expenses.</p>
+            <div class="invite-row">
+              <button class="pill-btn msg" onclick="alert('Demo only: this would open Messages / your chat app with an invite link pre-filled.')">💬<span>Invite via Message</span></button>
+              <button class="pill-btn copy" onclick="alert('Demo only: invite link copied to clipboard.')">🔗<span>Copy Invite Link</span></button>
+            </div>
+            <div class="add-friend-row">
+              <input class="field" id="inv-name" placeholder="Add a friend's name (demo)">
+              <button onclick="addFriendDemo()">Add</button>
+            </div>
+            <div class="member-count" id="inv-member-count">Members</div>
+            <div id="inv-member-list"></div>
+          </div>
+        </section>
+
+        <!-- GROUP HOME -->
+        <section class="screen" id="screen-grouphome">
+          <div class="topbar">
+            <button class="icon-btn back" onclick="go('mygroups')">‹</button>
+            <div>
+              <div class="topbar-title" id="gh-title" style="text-align:center;">Group</div>
+              <div class="topbar-sub" id="gh-sub" style="text-align:center;"></div>
+            </div>
+            <button class="icon-btn bell-wrap" onclick="go('notifications')">🔔<span class="bell-badge" id="bell-badge-2" style="display:none;"></span></button>
+          </div>
+          <div class="content" style="position:relative;">
+            <div id="gh-banner"></div>
+            <div class="section-title">Members</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div class="avatar-stack" id="gh-members"></div>
+              <button class="icon-btn" onclick="go('invite')">+ Invite</button>
+            </div>
+            <div class="section-title">Expenses</div>
+            <div id="gh-expenses"></div>
+            <div class="section-title">Your status</div>
+            <div id="gh-status-card"></div>
+            <div style="height:70px;"></div>
+          </div>
+          <button class="fab" onclick="startAddExpense()">+</button>
+        </section>
+
+        <!-- ADD EXPENSE -->
+        <section class="screen" id="screen-addexpense">
+          <div class="topbar">
+            <button class="icon-btn muted" onclick="go('grouphome')">Cancel</button>
+            <div class="topbar-title">Add Expense</div>
+            <span class="spacer44"></span>
+          </div>
+          <div class="content">
+            <label class="field-label" style="margin-top:0;">Description</label>
+            <input class="field" id="ae-desc" placeholder="e.g. Dinner, Hotel, Uber">
+            <div class="amount-hero">
+              <input id="ae-amount" type="number" placeholder="0.00" inputmode="decimal" oninput="onAmountChange()">
+            </div>
+            <div class="picker-header"><span>Who paid</span><span>Paid</span></div>
+            <div id="ae-payers"></div>
+            <div class="picker-header" style="margin-top:16px;"><span>Split between</span><span>Included</span></div>
+            <div id="ae-splitmembers"></div>
+
+            <div class="picker-header" style="margin-top:16px;"><span>Split method</span></div>
+            <div class="split-tabs" id="ae-split-tabs" style="margin:8px 0 6px;">
+              <div class="split-tab" data-type="equal" onclick="setSplitType('equal')">=<small>Equal</small></div>
+              <div class="split-tab" data-type="exact" onclick="setSplitType('exact')">1.23<small>Exact</small></div>
+              <div class="split-tab" data-type="percent" onclick="setSplitType('percent')">%<small>Percent</small></div>
+              <div class="split-tab" data-type="shares" onclick="setSplitType('shares')">▤<small>Shares</small></div>
+            </div>
+            <div class="split-desc" id="ae-split-desc" style="margin:0 0 10px;"></div>
+            <div id="ae-split-rows"></div>
+            <div class="split-summary" id="ae-split-summary"></div>
+
+            <button class="btn-primary" id="ae-save" style="margin-top:14px;" onclick="saveExpense()">Save Expense</button>
+          </div>
+        </section>
+
+        <!-- NOTIFICATIONS -->
+        <section class="screen" id="screen-notifications">
+          <div class="topbar">
+            <button class="icon-btn back" onclick="goBackFromNotif()">‹</button>
+            <div class="topbar-title">Notifications</div>
+            <span class="spacer44"></span>
+          </div>
+          <div class="content" id="notif-list"></div>
+        </section>
+
+        <!-- SETTLEMENT -->
+        <section class="screen" id="screen-settlement">
+          <div class="topbar">
+            <button class="icon-btn muted" onclick="go('grouphome')">Close</button>
+            <span></span>
+            <span class="spacer44"></span>
+          </div>
+          <div class="content">
+            <div class="settle-header">
+              <h1 id="settle-dates">Sep 10 – Sep 14</h1>
+              <p id="settle-name">SF Trip · Settlement</p>
+            </div>
+            <div class="section-title">Who pays whom</div>
+            <div id="settle-tx"></div>
+            <div class="section-title">Per-person total</div>
+            <div id="settle-totals"></div>
+          </div>
+        </section>
+
+        <!-- PROFILE -->
+        <section class="screen" id="screen-profile">
+          <div class="topbar">
+            <span class="spacer44"></span>
+            <div class="topbar-title">Profile</div>
+            <span class="spacer44"></span>
+          </div>
+          <div class="content">
+            <div style="display:flex;flex-direction:column;align-items:center;margin:16px 0 26px;">
+              <div class="avatar" style="width:64px;height:64px;font-size:22px;margin-bottom:12px;" id="profile-avatar"></div>
+              <div style="font-size:18px;font-weight:700;" id="profile-name"></div>
+              <div style="font-size:13px;color:var(--text-secondary);" id="profile-email"></div>
+            </div>
+            <div class="member-row" style="cursor:pointer;" onclick="alert('Demo only: edit profile')">
+              <div class="member-name">Edit profile</div><div class="member-tag">›</div>
+            </div>
+            <div class="member-row" style="cursor:pointer;" onclick="alert('Demo only: notification settings')">
+              <div class="member-name">Notification settings</div><div class="member-tag">›</div>
+            </div>
+            <button class="btn-secondary" style="margin-top:24px;" onclick="logOut()">Log out</button>
+          </div>
+        </section>
+
+        <div class="bottom-nav" id="bottom-nav">
+          <div class="nav-item" data-tab="mygroups" onclick="switchTab('mygroups')">
+            <div class="nav-icon">🧳</div><div class="nav-label">Trips</div>
+          </div>
+          <div class="nav-item" data-tab="notifications" onclick="switchTab('notifications')">
+            <div class="nav-icon">🔔</div><div class="nav-label">Activity</div>
+            <span class="nav-badge" id="nav-badge"></span>
+          </div>
+          <div class="nav-item" data-tab="profile" onclick="switchTab('profile')">
+            <div class="nav-icon">👤</div><div class="nav-label">Profile</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------- state ---------------- */
+const AVATAR_COLORS = ['#16A38A','#8B5CF6','#F59E0B','#3B82F6','#EC4899','#F43F5E','#06B6D4'];
+const EXPENSE_EMOJI = {hotel:'🏨',dinner:'🍽️',uber:'🚗',groceries:'🛒',default:'💸'};
+
+let state = null;
+let currentUserId = 'kady';
+let navStack = [];
+let notifRead = true;
+
+function seedState(){
+  const members = [
+    {id:'kady', name:'Kady Ju'},
+    {id:'jamie', name:'Jamie'},
+    {id:'alex', name:'Alex'},
+    {id:'morgan', name:'Morgan'},
+  ];
+  const sfTrip = {
+    id:'sf-trip', name:'SF Trip', type:'trip',
+    start:'2026-09-10', end:'2026-09-14',
+    members: members,
+    expenses:[
+      {id:'e1', desc:'Hotel (4 nights)', icon:'hotel', amount:480,
+        payers:['kady'], splitType:'equal', splitMembers:['kady','jamie','alex','morgan'],
+        splitValues:{kady:120,jamie:120,alex:120,morgan:120}},
+      {id:'e2', desc:'Dinner at Ferry Building', icon:'dinner', amount:120,
+        payers:['jamie'], splitType:'equal', splitMembers:['kady','jamie','alex'],
+        splitValues:{kady:40,jamie:40,alex:40}},
+      {id:'e3', desc:'Uber to airport', icon:'uber', amount:60,
+        payers:['alex'], splitType:'equal', splitMembers:['kady','jamie','alex','morgan'],
+        splitValues:{kady:15,jamie:15,alex:15,morgan:15}},
+      {id:'e4', desc:'Groceries', icon:'groceries', amount:84,
+        payers:['morgan'], splitType:'percent', splitMembers:['kady','jamie','alex','morgan'],
+        splitValues:{kady:21,jamie:21,alex:21,morgan:21}},
+    ],
+    doneStatus:{kady:true, jamie:true, alex:true, morgan:false},
+  };
+  return {
+    groups:[sfTrip],
+    notifications:[
+      {id:'n1', text:'Jamie added "Dinner at Ferry Building" ($120) to SF Trip', time:'2 days ago', groupId:'sf-trip', read:true},
+    ],
+    currentGroupId:null,
+    currentUser:{name:'Kady Ju', email:'kady@example.com'},
+    draft:null,
+  };
+}
+
+function resetDemo(){
+  state = seedState();
+  navStack = ['login'];
+  render('login');
+}
+resetDemo();
+
+/* ---------------- nav ---------------- */
+function go(id){
+  navStack.push(id);
+  render(id);
+}
+function render(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+  updateBottomNav(id);
+  updateBellBadge();
+  if(id==='mygroups') renderMyGroups();
+  if(id==='grouphome') renderGroupHome();
+  if(id==='addexpense') renderAddExpense();
+  if(id==='notifications') renderNotifications();
+  if(id==='settlement') renderSettlement();
+  if(id==='creategroup') renderCreateGroup();
+  if(id==='invite') renderInvite();
+  if(id==='profile') renderProfile();
+}
+function goBack(){
+  navStack.pop();
+  const prev = navStack[navStack.length-1] || 'mygroups';
+  render(prev);
+}
+function goBackFromNotif(){ goBack(); }
+function switchTab(id){
+  navStack = [id];
+  render(id);
+}
+function updateBottomNav(id){
+  const nav = document.getElementById('bottom-nav');
+  const tabScreens = ['mygroups','notifications','profile'];
+  if(tabScreens.includes(id)){
+    nav.style.display='flex';
+    document.querySelectorAll('.nav-item').forEach(el=>{
+      el.classList.toggle('active', el.dataset.tab===id);
+    });
+  } else {
+    nav.style.display='none';
+  }
+}
+function renderProfile(){
+  document.getElementById('profile-avatar').textContent = initials(state.currentUser.name);
+  document.getElementById('profile-avatar').style.background = AVATAR_COLORS[0];
+  document.getElementById('profile-name').textContent = state.currentUser.name;
+  document.getElementById('profile-email').textContent = state.currentUser.email;
+}
+function logOut(){
+  navStack = ['login'];
+  render('login');
+}
+
+/* ---------------- helpers ---------------- */
+function avatarColor(memberId){
+  const g = currentGroup();
+  const idx = g ? g.members.findIndex(m=>m.id===memberId) : 0;
+  return AVATAR_COLORS[(idx<0?0:idx) % AVATAR_COLORS.length];
+}
+function initials(name){
+  return name.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
+}
+function currentGroup(){
+  return state.groups.find(g=>g.id===state.currentGroupId);
+}
+function memberName(id){
+  const g = currentGroup();
+  const m = g && g.members.find(m=>m.id===id);
+  return m ? m.name : id;
+}
+function fmt(n){
+  return '$' + (Math.round(n*100)/100).toFixed(2);
+}
+function fmtDateRange(g){
+  if(!g.start) return '';
+  const opts = {month:'short', day:'numeric'};
+  const s = new Date(g.start+'T00:00:00').toLocaleDateString('en-US', opts);
+  const e = g.end ? new Date(g.end+'T00:00:00').toLocaleDateString('en-US', opts) : '';
+  return e ? `${s} – ${e}` : s;
+}
+
+/* balances + min cash flow settlement */
+function computeBalances(g){
+  const balances = {};
+  g.members.forEach(m=>balances[m.id]=0);
+  g.expenses.forEach(exp=>{
+    const perPayer = exp.amount / exp.payers.length;
+    exp.payers.forEach(pid=>{ balances[pid] += perPayer; });
+    exp.splitMembers.forEach(mid=>{ balances[mid] -= (exp.splitValues[mid]||0); });
+  });
+  return balances;
+}
+function computeSettlement(g){
+  const balances = computeBalances(g);
+  let creditors=[], debtors=[];
+  Object.entries(balances).forEach(([id,bal])=>{
+    const r = Math.round(bal*100)/100;
+    if(r>0.01) creditors.push({id, amt:r});
+    else if(r<-0.01) debtors.push({id, amt:-r});
+  });
+  creditors.sort((a,b)=>b.amt-a.amt);
+  debtors.sort((a,b)=>b.amt-a.amt);
+  const tx=[];
+  let i=0,j=0;
+  while(i<debtors.length && j<creditors.length){
+    const pay = Math.min(debtors[i].amt, creditors[j].amt);
+    tx.push({from:debtors[i].id, to:creditors[j].id, amount:Math.round(pay*100)/100});
+    debtors[i].amt -= pay;
+    creditors[j].amt -= pay;
+    if(debtors[i].amt<0.01) i++;
+    if(creditors[j].amt<0.01) j++;
+  }
+  return {balances, tx};
+}
+
+/* ---------------- LOG IN / SIGN UP ---------------- */
+function logIn(){
+  const email = document.getElementById('li-email').value.trim() || state.currentUser.email;
+  state.currentUser.email = email;
+  navStack = ['mygroups'];
+  render('mygroups');
+}
+function signUp(){
+  const name = document.getElementById('su-name').value.trim() || 'Kady Ju';
+  const email = document.getElementById('su-email').value.trim() || 'kady@example.com';
+  state.currentUser = {name, email};
+  state.groups.forEach(g=>{
+    const me = g.members.find(m=>m.id==='kady');
+    if(me) me.name = name;
+  });
+  navStack = ['mygroups'];
+  render('mygroups');
+}
+
+/* ---------------- MY GROUPS ---------------- */
+function renderMyGroups(){
+  const list = document.getElementById('groups-list');
+  list.innerHTML = '';
+  updateBellBadge();
+  if(state.groups.length===0){
+    list.innerHTML = '<div class="empty-state">No groups yet. Tap + to create your first trip group.</div>';
+    return;
+  }
+  state.groups.forEach(g=>{
+    const {balances} = computeSettlement(g);
+    const mine = Math.round((balances['kady']||0)*100)/100;
+    let tagHtml;
+    if(mine > 0.01) tagHtml = `<div class="balance-tag owed">you're owed<br>${fmt(mine)}</div>`;
+    else if(mine < -0.01) tagHtml = `<div class="balance-tag owe">you owe<br>${fmt(-mine)}</div>`;
+    else tagHtml = `<div class="balance-tag settled">settled up</div>`;
+
+    const card = document.createElement('div');
+    card.className='group-card';
+    card.onclick = ()=>{ state.currentGroupId = g.id; go('grouphome'); };
+    card.innerHTML = `
+      <div class="group-card-top">
+        <div>
+          <div class="group-card-name">${g.name}</div>
+          <div class="group-card-sub">✈️ Trip${g.start? ' · '+fmtDateRange(g):''}</div>
+        </div>
+        ${tagHtml}
+      </div>
+      <div class="avatar-stack">
+        ${g.members.map(m=>`<div class="avatar sm" style="background:${AVATAR_COLORS[g.members.indexOf(m)%AVATAR_COLORS.length]}">${initials(m.name)}</div>`).join('')}
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+function updateBellBadge(){
+  const unread = state.notifications.some(n=>!n.read);
+  ['bell-badge-2'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = unread ? 'block' : 'none';
+  });
+  const navBadge = document.getElementById('nav-badge');
+  if(navBadge) navBadge.style.display = unread ? 'block' : 'none';
+}
+
+/* ---------------- CREATE GROUP ---------------- */
+let newGroupDraft = null;
+function startCreateGroup(){
+  newGroupDraft = {id:'g'+Date.now(), name:'', type:'trip', start:'', end:'',
+    members:[{id:'kady', name: state.currentUser.name}],
+    expenses:[], doneStatus:{kady:false}};
+  go('creategroup');
+}
+function renderCreateGroup(){
+  document.getElementById('cg-name').value = newGroupDraft.name;
+  document.getElementById('cg-dates-toggle').checked = false;
+  document.getElementById('cg-dates').style.display='none';
+  document.getElementById('cg-start').value='';
+  document.getElementById('cg-end').value='';
+  validateCreateGroup();
+}
+function toggleDates(){
+  document.getElementById('cg-dates').style.display = document.getElementById('cg-dates-toggle').checked ? 'block':'none';
+}
+function validateCreateGroup(){
+  const name = document.getElementById('cg-name').value.trim();
+  document.getElementById('cg-done').disabled = !name;
+}
+function createGroup(){
+  const name = document.getElementById('cg-name').value.trim();
+  if(!name) return;
+  newGroupDraft.name = name;
+  if(document.getElementById('cg-dates-toggle').checked){
+    newGroupDraft.start = document.getElementById('cg-start').value;
+    newGroupDraft.end = document.getElementById('cg-end').value;
+  }
+  state.groups.unshift(newGroupDraft);
+  state.currentGroupId = newGroupDraft.id;
+  navStack = ['mygroups'];
+  go('grouphome');
+}
+
+/* ---------------- INVITE FRIENDS ---------------- */
+function renderInvite(){
+  const g = currentGroup();
+  document.getElementById('inv-title').textContent = g.name;
+  document.getElementById('inv-count').textContent = `${g.members.length} member${g.members.length===1?'':'s'} so far`;
+  document.getElementById('inv-member-count').textContent = `Members (${g.members.length})`;
+  const list = document.getElementById('inv-member-list');
+  list.innerHTML = g.members.map((m,i)=>`
+    <div class="member-row">
+      <div class="avatar" style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]}">${initials(m.name)}</div>
+      <div class="member-name">${m.name}</div>
+      ${m.id==='kady' ? '<div class="member-tag">YOU</div>' : ''}
+    </div>`).join('');
+}
+function addFriendDemo(){
+  const input = document.getElementById('inv-name');
+  const name = input.value.trim();
+  if(!name) return;
+  const g = currentGroup();
+  const id = 'm'+Date.now();
+  g.members.push({id, name});
+  g.doneStatus[id] = false;
+  input.value='';
+  renderInvite();
+}
+function finishInvite(){
+  goBack();
+}
+
+/* ---------------- GROUP HOME ---------------- */
+function renderGroupHome(){
+  const g = currentGroup();
+  document.getElementById('gh-title').textContent = g.name;
+  document.getElementById('gh-sub').textContent = g.start ? fmtDateRange(g) : `${g.members.length} members`;
+  updateBellBadge();
+
+  const doneIds = Object.keys(g.doneStatus).filter(id=>g.doneStatus[id]);
+  const allDone = doneIds.length === g.members.length && g.members.length>0;
+  const banner = document.getElementById('gh-banner');
+  if(allDone){
+    banner.innerHTML = `<div class="progress-banner ready"><span class="emoji">🎉</span><div class="txt">Everyone's added their expenses. Settlement is ready.</div></div>`;
+  } else {
+    banner.innerHTML = `<div class="progress-banner"><span class="emoji">⏳</span><div class="txt">${doneIds.length} of ${g.members.length} members done adding expenses.</div></div>`;
+  }
+
+  document.getElementById('gh-members').innerHTML = g.members.map((m,i)=>
+    `<div class="avatar sm" style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]}">${initials(m.name)}</div>`
+  ).join('');
+
+  const expEl = document.getElementById('gh-expenses');
+  if(g.expenses.length===0){
+    expEl.innerHTML = '<div class="empty-state">No expenses yet. Tap + to add the first one.</div>';
+  } else {
+    expEl.innerHTML = g.expenses.map(e=>{
+      const payerNames = e.payers.map(id=>memberName(id)).join(', ');
+      return `<div class="expense-row">
+        <div class="expense-icon">${EXPENSE_EMOJI[e.icon]||EXPENSE_EMOJI.default}</div>
+        <div class="expense-mid">
+          <div class="expense-desc">${e.desc}</div>
+          <div class="expense-sub">${payerNames} paid · split ${e.splitMembers.length} ways</div>
+        </div>
+        <div class="expense-amt">${fmt(e.amount)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const statusCard = document.getElementById('gh-status-card');
+  const youDone = g.doneStatus['kady'];
+  statusCard.innerHTML = `
+    <div class="group-card" style="cursor:default;">
+      <div class="group-card-top">
+        <div>
+          <div class="group-card-name" style="font-size:14px;">You: ${youDone? 'Done adding expenses ✅' : 'Still adding expenses'}</div>
+          <div class="group-card-sub">${g.members.length - doneIds.length} member(s) still in progress</div>
+        </div>
+      </div>
+      ${youDone ? '' : `<button class="btn-secondary" style="margin-top:10px;" onclick="markMyselfDone()">Mark yourself done</button>`}
+      ${!allDone ? `<button class="btn-ghost" onclick="simulateOthersDone()">Demo: mark everyone else done →</button>` : `<button class="btn-primary" style="margin-top:10px;" onclick="go('settlement')">View Settlement</button>`}
+    </div>
+  `;
+}
+function markMyselfDone(){
+  const g = currentGroup();
+  g.doneStatus['kady'] = true;
+  renderGroupHome();
+}
+function simulateOthersDone(){
+  const g = currentGroup();
+  g.members.forEach(m=>{ g.doneStatus[m.id] = true; });
+  state.notifications.unshift({
+    id:'n'+Date.now(),
+    text:`Everyone in ${g.name} is done — settlement is ready to view.`,
+    time:'just now', groupId:g.id, read:false
+  });
+  renderGroupHome();
+  updateBellBadge();
+}
+
+/* ---------------- ADD EXPENSE ---------------- */
+function startAddExpense(){
+  const g = currentGroup();
+  state.draft = {
+    desc:'', amount:0,
+    payers: g.members.length? [g.members[0].id] : [],
+    splitMembers: g.members.map(m=>m.id),
+    splitType:'equal',
+    splitValues:{},
+  };
+  go('addexpense');
+}
+function renderAddExpense(){
+  const g = currentGroup();
+  const d = state.draft;
+  document.getElementById('ae-desc').value = d.desc;
+  document.getElementById('ae-amount').value = d.amount || '';
+
+  const payersEl = document.getElementById('ae-payers');
+  payersEl.innerHTML = g.members.map((m,i)=>`
+    <div class="pick-row">
+      <div class="avatar sm" style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]}">${initials(m.name)}</div>
+      <div class="member-name" style="flex:1;">${m.name}${m.id==='kady'?' (you)':''}</div>
+      <div class="check ${d.payers.includes(m.id)?'on':''}" onclick="togglePayer('${m.id}')">✓</div>
+    </div>`).join('');
+
+  const splitEl = document.getElementById('ae-splitmembers');
+  splitEl.innerHTML = g.members.map((m,i)=>`
+    <div class="pick-row">
+      <div class="avatar sm" style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]}">${initials(m.name)}</div>
+      <div class="member-name" style="flex:1;">${m.name}${m.id==='kady'?' (you)':''}</div>
+      <div class="check ${d.splitMembers.includes(m.id)?'on':''}" onclick="toggleSplitMember('${m.id}')">✓</div>
+    </div>`).join('');
+
+  renderSplitRows();
+  validateAddExpense();
+}
+function onAmountChange(){
+  const d = state.draft;
+  d.amount = parseFloat(document.getElementById('ae-amount').value) || 0;
+  recalcEqualIfNeeded();
+  if(d.splitType==='percent' && d.percentValues) applyPercentToValues();
+  if(d.splitType==='shares' && d.shareValues) applySharesToValues();
+  renderSplitRows();
+  validateAddExpense();
+}
+function togglePayer(id){
+  const d = state.draft;
+  if(d.payers.includes(id)) d.payers = d.payers.filter(p=>p!==id);
+  else d.payers.push(id);
+  if(d.payers.length===0) d.payers=[id];
+  renderAddExpense();
+}
+function toggleSplitMember(id){
+  const d = state.draft;
+  if(d.splitMembers.includes(id)) d.splitMembers = d.splitMembers.filter(p=>p!==id);
+  else d.splitMembers.push(id);
+  if(d.splitMembers.length===0) d.splitMembers=[id];
+  recalcEqualIfNeeded();
+  if(d.splitType==='percent'){
+    if(!d.percentValues) d.percentValues={};
+    d.splitMembers.forEach(mid=>{ if(d.percentValues[mid]===undefined) d.percentValues[mid]=0; });
+    applyPercentToValues();
+  }
+  if(d.splitType==='shares'){
+    if(!d.shareValues) d.shareValues={};
+    d.splitMembers.forEach(mid=>{ if(d.shareValues[mid]===undefined) d.shareValues[mid]=1; });
+    applySharesToValues();
+  }
+  renderAddExpense();
+}
+function recalcEqualIfNeeded(){
+  const d = state.draft;
+  if(d.splitType==='equal'){
+    const share = d.splitMembers.length ? d.amount / d.splitMembers.length : 0;
+    d.splitValues = {};
+    d.splitMembers.forEach(id=> d.splitValues[id] = Math.round(share*100)/100);
+  }
+}
+function validateAddExpense(){
+  const d = state.draft;
+  document.getElementById('ae-desc').oninput = (e)=>{ d.desc = e.target.value; };
+  const valid = (document.getElementById('ae-desc').value.trim().length>0) && d.amount>0 && d.payers.length>0 && d.splitMembers.length>0;
+  document.getElementById('ae-save').disabled = !valid;
+}
+function saveExpense(){
+  const g = currentGroup();
+  const d = state.draft;
+  d.desc = document.getElementById('ae-desc').value.trim();
+  if(!d.desc || !(d.amount>0) || d.payers.length===0 || d.splitMembers.length===0) return;
+  recalcEqualIfNeeded();
+  const key = d.desc.toLowerCase();
+  let icon = 'default';
+  if(key.includes('hotel')) icon='hotel';
+  else if(key.includes('dinner')||key.includes('food')||key.includes('lunch')||key.includes('breakfast')) icon='dinner';
+  else if(key.includes('uber')||key.includes('taxi')||key.includes('lyft')||key.includes('car')) icon='uber';
+  else if(key.includes('grocer')) icon='groceries';
+  g.expenses.push({
+    id:'e'+Date.now(), desc:d.desc, icon, amount:d.amount,
+    payers:[...d.payers], splitType:d.splitType,
+    splitMembers:[...d.splitMembers], splitValues:{...d.splitValues},
+  });
+  state.draft = null;
+  go('grouphome');
+  navStack = navStack.filter(s=>s!=='addexpense');
+}
+
+/* ---------------- SPLIT METHOD (inline on Add Expense) ---------------- */
+function renderSplitRows(){
+  const g = currentGroup();
+  const d = state.draft;
+  document.querySelectorAll('#ae-split-tabs .split-tab').forEach(el=>{
+    el.classList.toggle('selected', el.dataset.type===d.splitType);
+  });
+  const descs = {
+    equal:'Split the amount equally among everyone selected.',
+    exact:'Specify exactly how much each person owes.',
+    percent:"Enter the percentage split that's fair for your situation.",
+    shares:'Great for time-based splitting (2 nights → 2 shares) and splitting across families.',
+  };
+  document.getElementById('ae-split-desc').textContent = descs[d.splitType];
+
+  const rows = document.getElementById('ae-split-rows');
+  rows.innerHTML = d.splitMembers.map(id=>{
+    const m = g.members.find(mm=>mm.id===id);
+    let value, unit, disabled='';
+    if(d.splitType==='equal'){
+      value = (d.splitValues[id]||0).toFixed(2); unit='$'; disabled='disabled';
+    } else if(d.splitType==='exact'){
+      value = d.splitValues[id]!==undefined ? d.splitValues[id] : '';
+      unit='$';
+    } else if(d.splitType==='percent'){
+      value = d.percentValues && d.percentValues[id]!==undefined ? d.percentValues[id] : '';
+      unit='%';
+    } else {
+      value = d.shareValues && d.shareValues[id]!==undefined ? d.shareValues[id] : 1;
+      unit='sh';
+    }
+    return `<div class="split-row">
+      <div class="avatar sm" style="background:${avatarColor(id)}">${initials(m.name)}</div>
+      <div class="member-name" style="flex:1;">${m.name}${id==='kady'?' (you)':''}</div>
+      <span class="unit">${unit==='$'?'$':''}</span>
+      <input type="number" ${disabled} value="${value}" oninput="onSplitInput('${id}', this.value)">
+      <span class="unit">${unit!=='$'?unit:''}</span>
+    </div>`;
+  }).join('');
+  updateSplitSummary();
+}
+function setSplitType(type){
+  const d = state.draft;
+  d.splitType = type;
+  if(type==='equal') recalcEqualIfNeeded();
+  if(type==='percent' && !d.percentValues){
+    d.percentValues = {};
+    const each = Math.round(100/d.splitMembers.length);
+    d.splitMembers.forEach(id=> d.percentValues[id]=each);
+    applyPercentToValues();
+  }
+  if(type==='shares' && !d.shareValues){
+    d.shareValues = {};
+    d.splitMembers.forEach(id=> d.shareValues[id]=1);
+    applySharesToValues();
+  }
+  renderSplitRows();
+}
+function onSplitInput(id, val){
+  const d = state.draft;
+  const num = parseFloat(val)||0;
+  if(d.splitType==='exact'){
+    d.splitValues[id] = num;
+  } else if(d.splitType==='percent'){
+    d.percentValues[id] = num;
+    applyPercentToValues();
+  } else if(d.splitType==='shares'){
+    d.shareValues[id] = num;
+    applySharesToValues();
+  }
+  updateSplitSummary();
+}
+function applyPercentToValues(){
+  const d = state.draft;
+  d.splitValues = {};
+  d.splitMembers.forEach(id=>{
+    d.splitValues[id] = Math.round((d.amount * (d.percentValues[id]||0) / 100)*100)/100;
+  });
+}
+function applySharesToValues(){
+  const d = state.draft;
+  const totalShares = d.splitMembers.reduce((s,id)=> s + (d.shareValues[id]||0), 0) || 1;
+  d.splitValues = {};
+  d.splitMembers.forEach(id=>{
+    d.splitValues[id] = Math.round((d.amount * (d.shareValues[id]||0) / totalShares)*100)/100;
+  });
+}
+function updateSplitSummary(){
+  const d = state.draft;
+  const sum = d.splitMembers.reduce((s,id)=> s + (d.splitValues[id]||0), 0);
+  const left = Math.round((d.amount - sum)*100)/100;
+  const el = document.getElementById('ae-split-summary');
+  if(d.splitType==='percent'){
+    const pctSum = d.splitMembers.reduce((s,id)=> s + (d.percentValues[id]||0), 0);
+    el.textContent = `${pctSum}% of 100% · ${100-pctSum}% left`;
+    el.className = 'split-summary' + (Math.abs(100-pctSum)>0.5 ? ' bad':'');
+  } else if(d.splitType==='shares'){
+    const totalShares = d.splitMembers.reduce((s,id)=> s + (d.shareValues[id]||0), 0);
+    el.textContent = `${totalShares} total share(s) · ${fmt(d.amount)} total`;
+    el.className = 'split-summary';
+  } else {
+    el.textContent = `${fmt(sum)} of ${fmt(d.amount)} · ${fmt(left)} left`;
+    el.className = 'split-summary' + (Math.abs(left)>0.01 ? ' bad':'');
+  }
+}
+
+/* ---------------- NOTIFICATIONS ---------------- */
+function renderNotifications(){
+  const list = document.getElementById('notif-list');
+  if(state.notifications.length===0){
+    list.innerHTML = '<div class="empty-state">No notifications yet.</div>';
+    return;
+  }
+  list.innerHTML = state.notifications.map(n=>`
+    <div class="notif-row" onclick="openNotif('${n.id}')">
+      <div class="notif-dot ${n.read?'read':''}"></div>
+      <div>
+        <div class="notif-txt">${n.text}</div>
+        <div class="notif-time">${n.time}</div>
+      </div>
+    </div>`).join('');
+}
+function openNotif(id){
+  const n = state.notifications.find(x=>x.id===id);
+  n.read = true;
+  updateBellBadge();
+  if(n.groupId){
+    state.currentGroupId = n.groupId;
+    const g = currentGroup();
+    const doneIds = Object.keys(g.doneStatus).filter(k=>g.doneStatus[k]);
+    if(doneIds.length===g.members.length){
+      go('settlement');
+    } else {
+      go('grouphome');
+    }
+  }
+}
+
+/* ---------------- SETTLEMENT ---------------- */
+function renderSettlement(){
+  const g = currentGroup();
+  document.getElementById('settle-dates').textContent = g.start ? fmtDateRange(g) : g.name;
+  document.getElementById('settle-name').textContent = `${g.name} · Settlement`;
+
+  const {balances, tx} = computeSettlement(g);
+  const txEl = document.getElementById('settle-tx');
+  if(tx.length===0){
+    txEl.innerHTML = '<div class="empty-state">Everyone is already settled up. 🎉</div>';
+  } else {
+    txEl.innerHTML = tx.map((t,i)=>`
+      <div class="tx-row">
+        <div class="tx-num">${i+1}.</div>
+        <div class="tx-flow">${memberName(t.from)} <span class="tx-arrow">→</span> ${memberName(t.to)}</div>
+        <div class="tx-amt">${fmt(t.amount)}</div>
+      </div>`).join('');
+  }
+
+  const totalsEl = document.getElementById('settle-totals');
+  totalsEl.innerHTML = g.members.map(m=>{
+    const spent = g.expenses.reduce((s,e)=> s + (e.splitMembers.includes(m.id) ? (e.splitValues[m.id]||0) : 0), 0);
+    const paid = g.expenses.reduce((s,e)=> s + (e.payers.includes(m.id) ? e.amount/e.payers.length : 0), 0);
+    return `<div class="total-row">
+      <div class="avatar sm" style="background:${avatarColor(m.id)}">${initials(m.name)}</div>
+      <div class="total-mid">
+        <div class="total-name">${m.name}${m.id==='kady'?' (you)':''}</div>
+        <div class="total-sub">paid ${fmt(paid)}</div>
+      </div>
+      <div class="total-amt">${fmt(spent)}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------------- clock ---------------- */
+function tickClock(){
+  const el = document.getElementById('clock');
+  const now = new Date();
+  let h = now.getHours()%12; if(h===0) h=12;
+  const m = now.getMinutes().toString().padStart(2,'0');
+  el.textContent = `${h}:${m}`;
+}
+tickClock();
+setInterval(tickClock, 15000);
+</script>
+</body>
+</html>
