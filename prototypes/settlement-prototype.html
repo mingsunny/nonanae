@@ -105,6 +105,11 @@
   .btn-teal{background:var(--teal); color:#fff;}
   .btn-outline{background:#fff; color:var(--ink); border:1.5px solid var(--line);}
   .btn-kakao{background:#FEE500; color:#191600;}
+
+  .loading-wrap{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;}
+  .spinner{width:34px; height:34px; border-radius:50%; border:3px solid #EDEAE1; border-top-color:var(--ink); animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-wrap .loading-text{font-size:13.5px; color:var(--ink-soft); font-weight:600;}
   .btn-text{background:none; color:var(--teal); font-weight:700; width:auto; padding:8px;}
 
   .card{
@@ -289,6 +294,14 @@
     </div>
   </div>
 
+  <!-- ================= 01a. 카카오 로그인 처리 중 ================= -->
+  <div class="screen" id="screen-kakao-loading">
+    <div class="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-text">카카오 로그인 처리 중...</div>
+    </div>
+  </div>
+
   <!-- ================= 01b. 최초 프로필(계좌) 설정 ================= -->
   <div class="screen" id="screen-onboarding">
     <div class="pad" style="padding-top:70px;">
@@ -306,18 +319,46 @@
     </div>
   </div>
 
-  <!-- ================= 02. 그룹 목록 ================= -->
+  <!-- ================= 02. 그룹 목록 (홈) / 프로필 ================= -->
   <div class="screen" id="screen-groups">
     <div class="topbar">
       <h1 id="groups-greeting">내 그룹</h1>
-      <div class="ghost-btn" onclick="alert('프로토타입에서는 준비되지 않은 기능입니다.')">설정</div>
     </div>
-    <div class="pad" id="groups-list-wrap" style="flex:1;">
-      <!-- JS renders group rows -->
+
+    <!-- ---- GNB Tab: 홈 ---- -->
+    <div id="groups-tab-home" class="pad" style="flex:1; display:block;">
+      <div id="groups-list-wrap">
+        <!-- JS renders group rows -->
+      </div>
       <div class="quick-actions">
         <button class="btn btn-teal" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
+    </div>
+
+    <!-- ---- GNB Tab: 프로필 ---- -->
+    <div id="groups-tab-profile" class="pad" style="flex:1; display:none;">
+      <div class="card" style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <div class="avatar" style="width:48px; height:48px; font-size:16px;" id="pf-avatar"></div>
+        <div>
+          <div style="font-weight:800; font-size:15px;" id="pf-name-display"></div>
+          <div style="font-size:12px; color:var(--ink-soft);">카카오 계정으로 로그인함</div>
+        </div>
+      </div>
+      <label class="field-label">이름</label>
+      <input type="text" id="pf-name" oninput="onProfileInput()"/>
+      <label class="field-label">은행</label>
+      <select class="field-select" id="pf-bank" onchange="onProfileInput()"></select>
+      <label class="field-label">계좌번호</label>
+      <input type="text" id="pf-account" oninput="onProfileInput()"/>
+      <div style="margin-top:22px;">
+        <button class="btn btn-primary" id="pf-save-btn" disabled onclick="saveProfile()">저장하기</button>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab active" data-gtab="home" onclick="setGroupsTab('home')"><div class="dot"></div><span>홈</span></div>
+      <div class="tab" data-gtab="profile" onclick="setGroupsTab('profile')"><div class="dot"></div><span>프로필</span></div>
     </div>
   </div>
 
@@ -565,6 +606,10 @@ function showToast(msg){
 /* 데모용 카카오 프로필 (실제 OAuth 없이 프로토타입에서 흉내만 냄) */
 const DEMO_KAKAO_PROFILE = {kakaoId:'kakao_demo_1', name:'카카오유저'};
 function doKakaoLogin(){
+  nav('screen-kakao-loading');
+  setTimeout(finishKakaoLogin, 700);
+}
+function finishKakaoLogin(){
   const kakaoId = DEMO_KAKAO_PROFILE.kakaoId;
   if(state.users[kakaoId]){
     state.currentUser = state.users[kakaoId];
@@ -601,7 +646,7 @@ function afterAuthed(){
     state.groups.push(g);
   }
   document.getElementById('groups-greeting').textContent = state.currentUser.name + '님의 그룹';
-  renderGroupsList();
+  setGroupsTab('home');
   nav('screen-groups');
 }
 
@@ -623,11 +668,39 @@ function renderGroupsList(){
     </div>
   `).join('');
   const empty = state.groups.length===0 ? `<div class="empty"><div class="big-icon">＋</div>아직 참여한 그룹이 없어요.<br/>새 그룹을 만들거나 초대코드로 참여해보세요.</div>` : '';
-  wrap.innerHTML = rows + empty + `
-    <div class="quick-actions">
-      <button class="btn btn-teal" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
-      <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
-    </div>`;
+  wrap.innerHTML = rows + empty;
+}
+
+/* ---- 홈 화면 GNB: 홈 / 프로필 ---- */
+function setGroupsTab(tab){
+  document.querySelectorAll('#screen-groups .tabbar .tab').forEach(t=>t.classList.toggle('active', t.dataset.gtab===tab));
+  document.getElementById('groups-tab-home').style.display = tab==='home' ? 'block':'none';
+  document.getElementById('groups-tab-profile').style.display = tab==='profile' ? 'block':'none';
+  if(tab==='home') renderGroupsList();
+  if(tab==='profile') renderProfileTab();
+}
+function renderProfileTab(){
+  const u = state.currentUser;
+  document.getElementById('pf-avatar').textContent = u.name.slice(0,1);
+  document.getElementById('pf-name-display').textContent = u.name;
+  document.getElementById('pf-name').value = u.name;
+  document.getElementById('pf-account').value = u.account;
+  document.getElementById('pf-bank').innerHTML = BANKS.map(b=>
+    `<option value="${b}" ${b===u.bank?'selected':''}>${b}</option>`
+  ).join('');
+  document.getElementById('pf-save-btn').disabled = true;
+}
+function onProfileInput(){
+  document.getElementById('pf-save-btn').disabled = false;
+}
+function saveProfile(){
+  const u = state.currentUser;
+  u.name = document.getElementById('pf-name').value.trim();
+  u.bank = document.getElementById('pf-bank').value;
+  u.account = document.getElementById('pf-account').value.trim();
+  document.getElementById('groups-greeting').textContent = u.name + '님의 그룹';
+  renderProfileTab();
+  showToast('프로필이 저장되었습니다');
 }
 
 function onNewGroupInput(){
