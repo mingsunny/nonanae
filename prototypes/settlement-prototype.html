@@ -114,7 +114,6 @@
   .btn:active{transform:scale(.98);}
   .btn-primary{background:var(--ink); color:#fff;}
   .btn-primary:disabled{opacity:.35; cursor:not-allowed;}
-  .btn-teal{background:var(--teal); color:#fff;}
   .btn-outline{background:#fff; color:var(--ink); border:1.5px solid var(--line);}
   .btn-kakao{background:#FEE500; color:#191600;}
 
@@ -155,7 +154,7 @@
     background:#fff; border:1px solid var(--line); margin-bottom:10px; cursor:pointer;
   }
   .group-thumb{
-    width:44px;height:44px;border-radius:12px; background:var(--teal); color:#fff;
+    width:44px;height:44px;border-radius:12px; background:var(--ink); color:#fff;
     display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; flex-shrink:0;
   }
   .group-row .meta{flex:1; min-width:0;}
@@ -343,7 +342,7 @@
     <!-- ---- GNB Tab: 홈 ---- -->
     <div id="groups-tab-home" class="pad" style="flex:1; display:block;">
       <div class="quick-actions" style="margin-top:0; margin-bottom:18px;">
-        <button class="btn btn-teal" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
+        <button class="btn btn-primary" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
       <div id="groups-list-wrap">
