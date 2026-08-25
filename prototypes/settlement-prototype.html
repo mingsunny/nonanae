@@ -179,7 +179,10 @@
     border:2px solid var(--ink); margin-left:-8px;
   }
   .member-chip:first-child{margin-left:0;}
-  .member-chip.member-add{background:transparent; border:2px dashed rgba(255,255,255,.5); color:#fff; cursor:pointer; font-size:14px;}
+  .invite-pill{
+    font-size:11px; font-weight:700; color:#fff; background:rgba(255,255,255,.14);
+    padding:5px 10px; border-radius:20px; cursor:pointer; flex-shrink:0; white-space:nowrap;
+  }
 
   .toggle-group{display:flex; background:#EDEAE1; border-radius:11px; padding:3px; margin:18px 0 14px;}
   .toggle-group .opt{flex:1; text-align:center; padding:8px 0; font-size:13px; font-weight:700; color:var(--ink-soft); border-radius:9px; cursor:pointer;}
@@ -416,7 +419,10 @@
         </div>
         <h1 style="color:#fff;" id="gh-name">그룹 이름</h1>
       </div>
-      <div class="gname">이 여행에서 총 사용한 금액</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+        <div class="gname" style="margin-bottom:0;">이 여행에서 총 사용한 금액</div>
+        <div class="invite-pill" onclick="nav('screen-group-invite')">+ 초대</div>
+      </div>
       <div class="gtotal" id="gh-total">₩0</div>
       <div class="members-strip" id="gh-members"></div>
     </div>
@@ -428,18 +434,6 @@
 
     <!-- ---- View: 지출 업로드/내역 (기본 화면) ---- -->
     <div id="view-expense" class="pad" style="flex:1; display:block; position:relative; padding-top:0;">
-      <div class="card" id="group-invite-banner" style="display:none; position:relative; margin-bottom:16px;">
-        <div onclick="dismissInviteBanner()" style="position:absolute; top:10px; right:12px; cursor:pointer; color:var(--ink-soft); font-size:15px; line-height:1;">✕</div>
-        <div style="font-weight:800; font-size:14px; margin-bottom:3px; padding-right:20px;">친구들을 초대해보세요</div>
-        <div style="font-size:12px; color:var(--ink-soft); margin-bottom:12px;">초대코드 <b id="banner-invite-code" style="color:var(--ink); font-variant-numeric:tabular-nums;">------</b></div>
-        <button class="btn btn-kakao" onclick="shareInviteViaKakao()">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
-          카카오톡으로 초대하기
-        </button>
-        <div style="text-align:center; margin-top:6px;">
-          <span class="btn-text" style="cursor:pointer;" onclick="copyInviteCode()">코드 복사하기</span>
-        </div>
-      </div>
       <div id="expense-list-wrap"></div>
       <div class="fab" onclick="openExpenseForm()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -731,7 +725,6 @@ function createGroup(){
     id: uid('g'), name, inviteCode: genInviteCode(),
     members: [state.currentUser], expenses: [],
   };
-  g._showInviteBanner = true;
   state.groups.unshift(g);
   state.activeGroupId = g.id;
   document.getElementById('new-group-name').value = '';
@@ -778,8 +771,7 @@ function openGroup(id){
   const g = getActiveGroup();
   document.getElementById('gh-name').textContent = g.name;
   document.getElementById('gh-total').innerHTML = won(groupTotal(g)) + ' <small>총 사용</small>';
-  document.getElementById('gh-members').innerHTML = g.members.map(m=>`<div class="member-chip" title="${m.name}">${m.name.slice(0,1)}</div>`).join('')
-    + `<div class="member-chip member-add" title="멤버 초대" onclick="nav('screen-group-invite')">+</div>`;
+  document.getElementById('gh-members').innerHTML = g.members.map(m=>`<div class="member-chip" title="${m.name}">${m.name.slice(0,1)}</div>`).join('');
   setGroupView('expense');
   nav('screen-group');
 }
@@ -825,21 +817,6 @@ function splitShares(amount, participantIds, payerId){
   let i=0;
   while(remainder>0 && order.length>0){ shares[order[i%order.length]] += 1; remainder--; i++; }
   return shares;
-}
-function renderGroupInviteBanner(){
-  const g = getActiveGroup();
-  const banner = document.getElementById('group-invite-banner');
-  if(g._showInviteBanner){
-    document.getElementById('banner-invite-code').textContent = g.inviteCode;
-    banner.style.display = 'block';
-  } else {
-    banner.style.display = 'none';
-  }
-}
-function dismissInviteBanner(){
-  const g = getActiveGroup();
-  g._showInviteBanner = false;
-  renderGroupInviteBanner();
 }
 function renderHomeTab(){
   const g = getActiveGroup();
@@ -887,7 +864,6 @@ function renderHomeTab(){
 /* ---- 지출 탭(03) ---- */
 function renderExpenseTab(){
   const g = getActiveGroup();
-  renderGroupInviteBanner();
   const wrap = document.getElementById('expense-list-wrap');
   if(g.expenses.length===0){
     wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.</div>`;
