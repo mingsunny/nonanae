@@ -321,18 +321,18 @@
 
   <!-- ================= 02. 그룹 목록 (홈) / 프로필 ================= -->
   <div class="screen" id="screen-groups">
-    <div class="topbar">
+    <div class="topbar" style="padding-top:40px;">
       <h1 id="groups-greeting">내 그룹</h1>
     </div>
 
     <!-- ---- GNB Tab: 홈 ---- -->
     <div id="groups-tab-home" class="pad" style="flex:1; display:block;">
-      <div id="groups-list-wrap">
-        <!-- JS renders group rows -->
-      </div>
-      <div class="quick-actions">
+      <div class="quick-actions" style="margin-top:0; margin-bottom:18px;">
         <button class="btn btn-teal" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
+      </div>
+      <div id="groups-list-wrap">
+        <!-- JS renders group rows -->
       </div>
     </div>
 
@@ -713,7 +713,7 @@ function createGroup(){
     id: uid('g'), name, inviteCode: genInviteCode(),
     members: [state.currentUser], expenses: [],
   };
-  state.groups.push(g);
+  state.groups.unshift(g);
   state.activeGroupId = g.id;
   document.getElementById('new-group-name').value = '';
   document.getElementById('create-group-btn').disabled = true;
