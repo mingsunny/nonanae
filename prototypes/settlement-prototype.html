@@ -137,20 +137,6 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
-  .modal-overlay{
-    position:absolute; inset:0; background:rgba(22,34,59,.5);
-    display:none; align-items:flex-end; z-index:300;
-  }
-  .modal-overlay.show{display:flex;}
-  .modal-card{
-    width:100%; background:#fff; border-radius:22px 22px 0 0; padding:26px 22px 32px;
-    animation:modalUp .22s ease-out;
-  }
-  @keyframes modalUp{ from{transform:translateY(24px); opacity:0;} to{transform:translateY(0); opacity:1;} }
-  .modal-title{font-size:18px; font-weight:800; margin-bottom:6px;}
-  .modal-sub{font-size:13px; color:var(--ink-soft); margin-bottom:20px; line-height:1.5;}
-  .modal-skip{text-align:center; font-size:12.5px; color:var(--ink-soft); font-weight:600; margin-top:16px; cursor:pointer;}
-
   /* bottom tabs */
   .tabbar{
     display:flex; border-top:1px solid var(--line); background:#fff; flex-shrink:0;
@@ -541,21 +527,6 @@
 
   <div class="toast" id="toast">복사되었습니다</div>
 
-  <!-- ================= 그룹 생성 직후 자동으로 뜨는 초대 유도 팝업 ================= -->
-  <div class="modal-overlay" id="invite-modal">
-    <div class="modal-card">
-      <div class="modal-title">그룹을 만들었어요 🎉</div>
-      <div class="modal-sub">아직 나 혼자예요. 함께 여행한 친구들을 초대해서<br/>같이 정산해보세요.</div>
-      <button class="btn btn-kakao" onclick="shareInviteViaKakao(); closeInviteModal();">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
-        카카오톡으로 초대하기
-      </button>
-      <div style="text-align:center; margin-top:10px;">
-        <span class="btn-text" style="cursor:pointer;" onclick="copyInviteCode(); closeInviteModal();">코드 복사하기</span>
-      </div>
-      <div class="modal-skip" onclick="closeInviteModal()">나중에 할게요</div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -764,13 +735,6 @@ function createGroup(){
   document.getElementById('new-group-name').value = '';
   document.getElementById('create-group-btn').disabled = true;
   openGroup(g.id);
-  showInviteModal();
-}
-function showInviteModal(){
-  document.getElementById('invite-modal').classList.add('show');
-}
-function closeInviteModal(){
-  document.getElementById('invite-modal').classList.remove('show');
 }
 function copyInviteCode(){
   const g = getActiveGroup();
@@ -879,7 +843,7 @@ function renderHomeTab(){
       </div>
     </div>`;
   }).join('');
-  document.getElementById('home-person-view').innerHTML = g.expenses.length===0 ? `<div class="empty">아직 등록된 지출이 없어요.<br/>지출 탭에서 먼저 등록해보세요.</div>` : personHtml;
+  document.getElementById('home-person-view').innerHTML = g.expenses.length===0 ? `<div class="empty">아직 등록된 지출이 없어요.</div>` : personHtml;
 
   // 카테고리별
   const byCat = {};
@@ -895,7 +859,7 @@ function renderHomeTab(){
       </div>
     </div>`;
   }).join('');
-  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.<br/>지출 탭에서 먼저 등록해보세요.</div>`;
+  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.</div>`;
 }
 
 /* ---- 지출 탭(03) ---- */
@@ -903,7 +867,14 @@ function renderExpenseTab(){
   const g = getActiveGroup();
   const wrap = document.getElementById('expense-list-wrap');
   if(g.expenses.length===0){
-    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.</div>`;
+    const inviteCta = g.members.length===1 ? `
+      <div style="margin-top:22px;">
+        <button class="btn btn-kakao" onclick="shareInviteViaKakao()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
+          카카오톡으로 친구 초대하기
+        </button>
+      </div>` : '';
+    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.${inviteCta}</div>`;
     return;
   }
   // group by dateLabel
@@ -1036,7 +1007,7 @@ function renderSettleTab(){
   const g = getActiveGroup();
   const wrap = document.getElementById('settle-list-wrap');
   if(g.expenses.length===0){
-    wrap.innerHTML = `<div class="empty">아직 등록된 지출이 없어요.<br/>지출 탭에서 지출을 등록하면 정산 결과가 여기 나타나요.</div>`;
+    wrap.innerHTML = `<div class="empty">아직 등록된 지출이 없어요.</div>`;
     return;
   }
   const tx = computeMinTransfers(g);
