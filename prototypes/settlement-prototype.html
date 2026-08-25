@@ -243,12 +243,12 @@
   }
   .checkbox.on{background:var(--teal); border-color:var(--teal);}
   .checkbox.on svg{width:11px;height:11px;}
-  .check-row .cname{font-size:13.5px; font-weight:600; flex:1;}
-  .payer-tag{font-size:10.5px; font-weight:700; color:var(--teal); background:#E3F1F0; padding:2px 7px; border-radius:6px;}
+  .check-row .cname{font-size:13.5px; font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .split-input-wrap{display:flex; align-items:center; gap:3px; flex-shrink:0;}
   .split-input{width:54px; padding:6px 6px; border:1.5px solid var(--line); border-radius:8px; font-size:13px; text-align:right; font-family:inherit; color:var(--ink);}
   .split-input:focus{border-color:var(--teal); outline:none;}
   .split-unit{font-size:12px; color:var(--ink-soft); flex-shrink:0;}
+  .split-readonly{font-size:13px; font-weight:700; color:var(--ink-soft); flex-shrink:0; font-variant-numeric:tabular-nums;}
 
   select.field-select{
     width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line);
@@ -501,7 +501,7 @@
     </div>
     <div class="pad" style="padding-bottom:100px;">
       <label class="field-label">사용 금액</label>
-      <input type="number" id="ex-amount" placeholder="0" oninput="validateExpenseForm()"/>
+      <input type="number" id="ex-amount" placeholder="0" oninput="renderParticipants(); validateExpenseForm();"/>
 
       <label class="field-label">항목명</label>
       <input type="text" id="ex-title" placeholder="예) 흑돼지 저녁식사" oninput="validateExpenseForm()"/>
@@ -1030,18 +1030,24 @@ function renderParticipants(){
   const g = getActiveGroup();
   const wrap = document.getElementById('ex-participants');
   const mode = state.expenseDraft.splitMode;
+  const amt = parseInt(document.getElementById('ex-amount').value || '0', 10);
+  const equalShares = mode==='equal' ? splitShares(amt, state.expenseDraft.participantIds, state.expenseDraft.payerId) : {};
   wrap.innerHTML = g.members.map(m=>{
     const on = state.expenseDraft.participantIds.includes(m.id);
-    const splitInput = (on && mode!=='equal') ? `
+    let shareDisplay = '';
+    if(on && mode==='equal'){
+      shareDisplay = `<div class="split-readonly">${won(equalShares[m.id]||0)}</div>`;
+    } else if(on){
+      shareDisplay = `
       <div class="split-input-wrap" onclick="event.stopPropagation()">
         <input type="number" class="split-input" value="${state.expenseDraft.customShares[m.id] ?? 0}" oninput="onShareInput('${m.id}', this.value)"/>
         <span class="split-unit">${mode==='ratio' ? '%' : '원'}</span>
-      </div>` : '';
+      </div>`;
+    }
     return `<div class="check-row" onclick="toggleParticipant('${m.id}')">
       <div class="checkbox ${on?'on':''}">${on?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M4 12l6 6L20 6"/></svg>':''}</div>
       <div class="cname">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
-      ${m.id===state.expenseDraft.payerId?'<div class="payer-tag">결제자</div>':''}
-      ${splitInput}
+      ${shareDisplay}
     </div>`;
   }).join('');
   updateSplitSummary();
