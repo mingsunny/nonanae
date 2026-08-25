@@ -104,6 +104,7 @@
   .btn-primary:disabled{opacity:.35; cursor:not-allowed;}
   .btn-teal{background:var(--teal); color:#fff;}
   .btn-outline{background:#fff; color:var(--ink); border:1.5px solid var(--line);}
+  .btn-kakao{background:#FEE500; color:#191600;}
   .btn-text{background:none; color:var(--teal); font-weight:700; width:auto; padding:8px;}
 
   .card{
@@ -278,11 +279,12 @@
   <div class="screen active" id="screen-login">
     <div class="pad" style="padding-top:90px;">
       <h2 class="big">정산일지</h2>
-      <p class="sub">여행에서 함께 쓴 돈, 이메일로 로그인하고<br/>가장 간단하게 정산해보세요.</p>
-      <label class="field-label">이메일</label>
-      <input type="email" id="login-email" placeholder="you@email.com" oninput="onLoginInput()"/>
+      <p class="sub">여행에서 함께 쓴 돈, 카카오로 로그인하고<br/>가장 간단하게 정산해보세요.</p>
       <div style="margin-top:22px;">
-        <button class="btn btn-primary" id="login-btn" disabled onclick="doLogin()">이메일로 계속하기</button>
+        <button class="btn btn-kakao" id="login-btn" onclick="doKakaoLogin()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
+          카카오로 시작하기
+        </button>
       </div>
     </div>
   </div>
@@ -290,12 +292,12 @@
   <!-- ================= 01b. 최초 프로필(계좌) 설정 ================= -->
   <div class="screen" id="screen-onboarding">
     <div class="pad" style="padding-top:70px;">
-      <h2 class="big">프로필 설정</h2>
-      <p class="sub">정산 결과를 주고받을 때 사용할 이름과<br/>계좌번호를 등록해주세요.</p>
-      <label class="field-label">이름</label>
+      <h2 class="big">계좌 등록</h2>
+      <p class="sub">카카오 프로필에서 이름을 가져왔어요.<br/>정산 결과를 주고받을 계좌번호만 등록해주세요.</p>
+      <label class="field-label">이름 <span style="font-weight:400; color:#B7B2A2;">(카카오 프로필)</span></label>
       <input type="text" id="ob-name" placeholder="예) 김민지" oninput="onObInput()"/>
       <label class="field-label">은행</label>
-      <input type="text" id="ob-bank" placeholder="예) 토스뱅크" oninput="onObInput()"/>
+      <select class="field-select" id="ob-bank" onchange="onObInput()"></select>
       <label class="field-label">계좌번호</label>
       <input type="text" id="ob-account" placeholder="예) 1000-1234-5678" oninput="onObInput()"/>
       <div style="margin-top:22px;">
@@ -482,9 +484,15 @@ const CATEGORIES = [
 ];
 function catInfo(id){ return CATEGORIES.find(c=>c.id===id) || CATEGORIES[CATEGORIES.length-1]; }
 
+const BANKS = [
+  '카카오뱅크','토스뱅크','케이뱅크','국민은행','신한은행','우리은행','하나은행',
+  '농협은행','기업은행','SC제일은행','씨티은행','우체국','새마을금고','신협',
+  '부산은행','대구은행','광주은행','경남은행',
+];
+
 let state = {
-  currentUser: null, // {id,name,bank,account,email}
-  users: {},         // email -> user
+  currentUser: null, // {id,name,bank,account,kakaoId}
+  users: {},         // kakaoId -> user
   groups: [],
   activeGroupId: null,
   activeGroupTab: 'home',
@@ -554,33 +562,35 @@ function showToast(msg){
 /* =========================================================
    01. 로그인
    ========================================================= */
-function onLoginInput(){
-  const v = document.getElementById('login-email').value.trim();
-  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  document.getElementById('login-btn').disabled = !ok;
-}
-function doLogin(){
-  const email = document.getElementById('login-email').value.trim();
-  if(state.users[email]){
-    state.currentUser = state.users[email];
+/* 데모용 카카오 프로필 (실제 OAuth 없이 프로토타입에서 흉내만 냄) */
+const DEMO_KAKAO_PROFILE = {kakaoId:'kakao_demo_1', name:'카카오유저'};
+function doKakaoLogin(){
+  const kakaoId = DEMO_KAKAO_PROFILE.kakaoId;
+  if(state.users[kakaoId]){
+    state.currentUser = state.users[kakaoId];
     afterAuthed();
   } else {
-    state._pendingEmail = email;
+    state._pendingKakaoId = kakaoId;
+    document.getElementById('ob-name').value = DEMO_KAKAO_PROFILE.name;
+    document.getElementById('ob-account').value = '';
+    document.getElementById('ob-bank').innerHTML = '<option value="">은행 선택</option>' +
+      BANKS.map(b=>`<option value="${b}">${b}</option>`).join('');
+    onObInput();
     nav('screen-onboarding');
   }
 }
 function onObInput(){
   const n = document.getElementById('ob-name').value.trim();
-  const b = document.getElementById('ob-bank').value.trim();
+  const b = document.getElementById('ob-bank').value;
   const a = document.getElementById('ob-account').value.trim();
   document.getElementById('ob-btn').disabled = !(n && b && a);
 }
 function finishOnboarding(){
   const name = document.getElementById('ob-name').value.trim();
-  const bank = document.getElementById('ob-bank').value.trim();
+  const bank = document.getElementById('ob-bank').value;
   const account = document.getElementById('ob-account').value.trim();
-  const user = {id:uid('u'), name, bank, account, email:state._pendingEmail};
-  state.users[state._pendingEmail] = user;
+  const user = {id:uid('u'), name, bank, account, kakaoId:state._pendingKakaoId};
+  state.users[state._pendingKakaoId] = user;
   state.currentUser = user;
   afterAuthed();
 }
