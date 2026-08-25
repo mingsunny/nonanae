@@ -144,9 +144,9 @@
   .tabbar .tab{
     flex:1; text-align:center; padding:11px 0 14px; cursor:pointer; color:#AFAA9B;
   }
-  .tabbar .tab .dot{width:5px;height:5px;border-radius:50%; background:transparent; margin:0 auto 5px;}
+  .tabbar .tab .tab-icon{display:block; margin:0 auto 4px;}
+  .text-link-muted{font-size:12px; color:var(--ink-soft); text-decoration:underline; cursor:pointer;}
   .tabbar .tab.active{color:var(--ink);}
-  .tabbar .tab.active .dot{background:var(--teal);}
   .tabbar .tab span{display:block; font-size:11px; font-weight:600;}
 
   /* groups list */
@@ -369,11 +369,21 @@
       <div style="margin-top:22px;">
         <button class="btn btn-primary" id="pf-save-btn" disabled onclick="saveProfile()">저장하기</button>
       </div>
+      <div style="display:flex; justify-content:center; gap:18px; margin-top:34px;">
+        <span class="text-link-muted" onclick="doLogout()">로그아웃</span>
+        <span class="text-link-muted" onclick="doWithdraw()">회원 탈퇴</span>
+      </div>
     </div>
 
     <div class="tabbar">
-      <div class="tab active" data-gtab="home" onclick="setGroupsTab('home')"><div class="dot"></div><span>홈</span></div>
-      <div class="tab" data-gtab="profile" onclick="setGroupsTab('profile')"><div class="dot"></div><span>프로필</span></div>
+      <div class="tab active" data-gtab="home" onclick="setGroupsTab('home')">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>
+        <span>홈</span>
+      </div>
+      <div class="tab" data-gtab="profile" onclick="setGroupsTab('profile')">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-6.8 7.5-6.8s7.5 2.8 7.5 6.8"/></svg>
+        <span>프로필</span>
+      </div>
     </div>
   </div>
 
@@ -461,8 +471,14 @@
     </div>
 
     <div class="tabbar">
-      <div class="tab active" data-gtab="home" onclick="goGlobalHome()"><div class="dot"></div><span>홈</span></div>
-      <div class="tab" data-gtab="profile" onclick="goGlobalProfile()"><div class="dot"></div><span>프로필</span></div>
+      <div class="tab active" data-gtab="home" onclick="goGlobalHome()">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>
+        <span>홈</span>
+      </div>
+      <div class="tab" data-gtab="profile" onclick="goGlobalProfile()">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-6.8 7.5-6.8s7.5 2.8 7.5 6.8"/></svg>
+        <span>프로필</span>
+      </div>
     </div>
   </div>
 
@@ -713,6 +729,16 @@ function saveProfile(){
   document.getElementById('groups-greeting').textContent = u.name + '님의 그룹';
   renderProfileTab();
   showToast('프로필이 저장되었습니다');
+}
+function doLogout(){
+  state.currentUser = null;
+  nav('screen-login');
+}
+function doWithdraw(){
+  if(!confirm('정말 탈퇴하시겠어요? 계정 정보가 삭제돼요.')) return;
+  delete state.users[state.currentUser.kakaoId];
+  state.currentUser = null;
+  nav('screen-login');
 }
 
 function onNewGroupInput(){
