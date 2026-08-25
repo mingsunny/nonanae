@@ -378,24 +378,6 @@
     </div>
   </div>
 
-  <!-- ================= 02b. 초대코드 발급 완료 ================= -->
-  <div class="screen" id="screen-invite-code">
-    <div class="topbar"><h1 id="invite-group-name">그룹 생성 완료</h1></div>
-    <div class="pad">
-      <p class="sub">아래 초대코드를 친구들에게 공유하면,<br/>코드를 입력해 바로 그룹에 들어올 수 있어요.</p>
-      <div class="invite-code-box">
-        <div class="lbl">초대코드</div>
-        <div class="code" id="invite-code-value">------</div>
-        <button class="btn btn-kakao" onclick="shareInviteViaKakao()">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
-          카카오톡으로 초대하기
-        </button>
-        <button class="btn btn-outline" style="background:transparent; border-color:rgba(255,255,255,.35); color:#fff; margin-top:8px;" onclick="copyInviteCode()">코드 복사하기</button>
-      </div>
-      <button class="btn btn-primary" onclick="enterGroupFromInvite()">그룹으로 이동</button>
-    </div>
-  </div>
-
   <!-- ================= 02c. 초대코드로 참여 ================= -->
   <div class="screen" id="screen-join-group">
     <div class="topbar">
@@ -430,6 +412,18 @@
 
     <!-- ---- Tab: 홈(정산내역 확인) ---- -->
     <div id="tab-home" class="pad" style="flex:1; display:block;">
+      <div class="card" id="group-invite-banner" style="display:none; position:relative; margin-bottom:16px;">
+        <div onclick="dismissInviteBanner()" style="position:absolute; top:10px; right:12px; cursor:pointer; color:var(--ink-soft); font-size:15px; line-height:1;">✕</div>
+        <div style="font-weight:800; font-size:14px; margin-bottom:3px; padding-right:20px;">친구들을 초대해보세요</div>
+        <div style="font-size:12px; color:var(--ink-soft); margin-bottom:12px;">초대코드 <b id="banner-invite-code" style="color:var(--ink); font-variant-numeric:tabular-nums;">------</b></div>
+        <button class="btn btn-kakao" onclick="shareInviteViaKakao()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
+          카카오톡으로 초대하기
+        </button>
+        <div style="text-align:center; margin-top:6px;">
+          <span class="btn-text" style="cursor:pointer;" onclick="copyInviteCode()">코드 복사하기</span>
+        </div>
+      </div>
       <div class="toggle-group">
         <div class="opt active" data-htab="person" onclick="setHomeTab('person')">인원별</div>
         <div class="opt" data-htab="category" onclick="setHomeTab('category')">카테고리별</div>
@@ -474,7 +468,9 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
           카카오톡으로 초대하기
         </button>
-        <button class="btn btn-outline" style="background:transparent; border-color:rgba(255,255,255,.35); color:#fff; margin-top:8px;" onclick="copyInviteCode()">코드 복사하기</button>
+        <div style="text-align:center; margin-top:8px;">
+          <span class="btn-text" style="cursor:pointer; color:#fff; opacity:.75;" onclick="copyInviteCode()">코드 복사하기</span>
+        </div>
       </div>
       <label class="field-label">현재 멤버</label>
       <div class="card" id="gi-member-list"></div>
@@ -721,13 +717,12 @@ function createGroup(){
     id: uid('g'), name, inviteCode: genInviteCode(),
     members: [state.currentUser], expenses: [],
   };
+  g._showInviteBanner = true;
   state.groups.unshift(g);
   state.activeGroupId = g.id;
   document.getElementById('new-group-name').value = '';
   document.getElementById('create-group-btn').disabled = true;
-  document.getElementById('invite-group-name').textContent = name + ' 생성 완료';
-  document.getElementById('invite-code-value').textContent = g.inviteCode;
-  nav('screen-invite-code');
+  openGroup(g.id);
 }
 function copyInviteCode(){
   const g = getActiveGroup();
@@ -739,10 +734,6 @@ function copyInviteCode(){
    프로토타입에서는 카카오톡 공유 시트가 열리는 것만 흉내냄. */
 function shareInviteViaKakao(){
   showToast('카카오톡 공유 시트가 열렸어요');
-}
-function enterGroupFromInvite(){
-  renderGroupsList();
-  openGroup(state.activeGroupId);
 }
 
 function onJoinCodeInput(){
@@ -819,8 +810,24 @@ function splitShares(amount, participantIds, payerId){
   while(remainder>0 && order.length>0){ shares[order[i%order.length]] += 1; remainder--; i++; }
   return shares;
 }
+function renderGroupInviteBanner(){
+  const g = getActiveGroup();
+  const banner = document.getElementById('group-invite-banner');
+  if(g._showInviteBanner){
+    document.getElementById('banner-invite-code').textContent = g.inviteCode;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+function dismissInviteBanner(){
+  const g = getActiveGroup();
+  g._showInviteBanner = false;
+  renderGroupInviteBanner();
+}
 function renderHomeTab(){
   const g = getActiveGroup();
+  renderGroupInviteBanner();
   document.getElementById('gh-total').innerHTML = won(groupTotal(g)) + ' <small>총 사용</small>';
 
   const {balances, paid} = computeBalances(g);
