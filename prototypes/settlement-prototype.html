@@ -138,7 +138,7 @@
 
   /* 첫 방문 코치마크: 나머지를 어둡게 덮고 대상 요소만 box-shadow 구멍으로 남겨 스포트라이트처럼 보이게 함 */
   .coach-catcher{position:absolute; inset:0; z-index:400; cursor:pointer;}
-  .coach-highlight{z-index:401; box-shadow:0 0 0 9999px rgba(22,34,59,.78); pointer-events:none;}
+  .coach-highlight{z-index:401 !important; box-shadow:0 0 0 9999px rgba(22,34,59,.5) !important; pointer-events:none;}
   .coach-tip{
     position:absolute; left:22px; right:22px; z-index:402;
     background:#fff; border-radius:14px; padding:14px 16px;
@@ -260,11 +260,15 @@
   .check-row .cname{font-size:13.5px; font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .split-col{flex:1; min-width:0; display:flex; justify-content:flex-end;}
   .split-input-wrap{display:flex; align-items:center; gap:3px; min-width:0; max-width:100%;}
-  .split-input{width:100%; max-width:92px; padding:6px 8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px; text-align:right; font-family:inherit; color:var(--ink);}
+  .split-input{width:100%; max-width:118px; padding:6px 8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px; text-align:right; font-family:inherit; color:var(--ink); box-sizing:border-box; -moz-appearance:textfield;}
+  .split-input::-webkit-inner-spin-button, .split-input::-webkit-outer-spin-button{-webkit-appearance:none; margin:0;}
   .split-input:focus{border-color:var(--teal); outline:none;}
   .split-input:disabled{background:#F1EFE9; color:#C7C2B3; border-color:var(--line); cursor:not-allowed;}
   .split-unit{font-size:12px; color:var(--ink-soft); flex-shrink:0;}
-  .split-readonly{font-size:13px; font-weight:700; color:var(--ink-soft); font-variant-numeric:tabular-nums;}
+  .split-readonly{
+    font-size:13px; font-weight:700; color:var(--ink-soft); font-variant-numeric:tabular-nums;
+    padding:6px 8px; border:1.5px solid transparent; box-sizing:border-box; line-height:1.35;
+  }
   .split-readonly.is-off{color:#C7C2B3; font-weight:600;}
 
   select.field-select{
