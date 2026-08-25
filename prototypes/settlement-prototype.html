@@ -285,12 +285,6 @@
   .empty{text-align:center; padding:50px 20px; color:var(--ink-soft); font-size:13px; line-height:1.6;}
   .empty .big-icon{font-size:26px; margin-bottom:10px; color:#C7C2B3;}
 
-  .invite-code-box{
-    background:var(--ink); color:#fff; border-radius:16px; padding:22px; text-align:center; margin:14px 0 20px;
-  }
-  .invite-code-box .lbl{font-size:11.5px; opacity:.65; letter-spacing:.1em; text-transform:uppercase;}
-  .invite-code-box .code{font-size:30px; font-weight:800; letter-spacing:.12em; margin:8px 0; font-variant-numeric:tabular-nums;}
-
   a.link-inline{color:var(--teal); font-weight:700; text-decoration:none;}
 </style>
 </head>
@@ -427,12 +421,13 @@
       </div>
       <div class="gname">이 여행에서 총 사용한 금액</div>
       <div class="gtotal" id="gh-total">₩0</div>
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px;">
-        <div class="members-strip" id="gh-members" style="margin-top:0;"></div>
-        <div class="invite-pill" onclick="nav('screen-group-invite')">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          친구 초대하기
+      <div class="members-strip" id="gh-members" style="cursor:pointer;" onclick="nav('screen-group-invite')"></div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <div class="invite-pill" style="background:#FEE500; color:#191600;" onclick="shareInviteViaKakao()">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
+          카카오톡 초대
         </div>
+        <div class="invite-pill" onclick="copyInviteCode()">코드 복사</div>
       </div>
     </div>
 
@@ -475,22 +470,10 @@
   <div class="screen" id="screen-group-invite">
     <div class="topbar">
       <div class="back" onclick="nav('screen-group')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
-      <h1>멤버 초대</h1>
+      <h1>멤버 목록</h1>
     </div>
     <div class="pad">
-      <p class="sub">아래 코드를 공유하면 친구가 이 그룹에<br/>바로 참여할 수 있어요.</p>
-      <div class="invite-code-box">
-        <div class="lbl">초대코드</div>
-        <div class="code" id="gi-code-value">------</div>
-        <button class="btn btn-kakao" onclick="shareInviteViaKakao()">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
-          카카오톡으로 초대하기
-        </button>
-        <div style="text-align:center; margin-top:8px;">
-          <span class="btn-text" style="cursor:pointer; color:#fff; opacity:.75;" onclick="copyInviteCode()">코드 복사하기</span>
-        </div>
-      </div>
-      <label class="field-label">현재 멤버</label>
+      <p class="sub">이 그룹에 참여 중인 멤버예요. 초대는 그룹 화면 상단의<br/>카카오톡/코드 복사 버튼으로 언제든 할 수 있어요.</p>
       <div class="card" id="gi-member-list"></div>
     </div>
   </div>
@@ -879,14 +862,7 @@ function renderExpenseTab(){
   const g = getActiveGroup();
   const wrap = document.getElementById('expense-list-wrap');
   if(g.expenses.length===0){
-    const inviteCta = g.members.length===1 ? `
-      <div style="margin-top:22px;">
-        <button class="btn btn-kakao" onclick="shareInviteViaKakao()">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
-          카카오톡으로 친구 초대하기
-        </button>
-      </div>` : '';
-    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.${inviteCta}</div>`;
+    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.</div>`;
     return;
   }
   // group by dateLabel
@@ -1122,7 +1098,10 @@ function renderSettleTab(){
   const renderRow = (t, interactive) => {
     const from = g.members.find(m=>m.id===t.from);
     const to = g.members.find(m=>m.id===t.to);
-    const account = interactive ? `
+    // 계좌 등록은 가입 시 필수라 원래 비어있을 수 없지만, 방어적으로 처리
+    let account = '';
+    if(interactive && to.account){
+      account = `
       <div class="flow-account"
            onmousedown="startLongPress('${to.account}', this)"
            onmouseup="cancelLongPress(this)" onmouseleave="cancelLongPress(this)"
@@ -1130,7 +1109,10 @@ function renderSettleTab(){
         <div class="acc-text">${to.bank} ${to.account}</div>
         <div class="copy-hint">길게 눌러 계좌번호 복사</div>
         <div class="press-bar"></div>
-      </div>` : '';
+      </div>`;
+    } else if(interactive && !to.account){
+      account = `<div class="flow-account"><div class="acc-text" style="color:var(--brick);">계좌 미등록 — ${to.name}님에게 직접 확인해주세요</div></div>`;
+    }
     return `<div class="flow-row" id="flow-${t.from}-${t.to}">
       <div class="flow-top">
         <div class="flow-name">${from.name}${from.id===state.currentUser.id?' (나)':''}</div>
@@ -1142,8 +1124,10 @@ function renderSettleTab(){
     </div>`;
   };
 
+  const mineSummary = mine.length>1 ? `<div class="date-label" style="margin-top:0;">내가 보낼 돈 · 총 ${mine.length}건 ${won(mine.reduce((s,t)=>s+t.amount,0))}</div>` : '';
+
   const ordered = [...mine.map(t=>({t, interactive:true})), ...others.map(t=>({t, interactive:false}))];
-  wrap.innerHTML = ordered.map(({t, interactive})=>renderRow(t, interactive)).join('');
+  wrap.innerHTML = mineSummary + ordered.map(({t, interactive})=>renderRow(t, interactive)).join('');
 }
 
 /* 롱프레스로 계좌번호 복사 */
@@ -1185,7 +1169,6 @@ function fallbackCopy(text){
 /* ---- 그룹 내 멤버 초대 화면 ---- */
 function renderGroupInviteScreen(){
   const g = getActiveGroup();
-  document.getElementById('gi-code-value').textContent = g.inviteCode;
   document.getElementById('gi-member-list').innerHTML = g.members.map(m=>`
     <div class="person-row">
       <div class="avatar">${m.name.slice(0,1)}</div>
