@@ -427,7 +427,7 @@
   </div>
 
   <!-- ================= 그룹 내부 (지출 / 정산) ================= -->
-  <div class="screen" id="screen-group">
+  <div class="screen" id="screen-group" style="position:relative;">
     <div class="group-header" style="padding-top:40px;">
       <div class="topbar" style="padding:0 0 14px; color:#fff;">
         <div class="back" style="background:rgba(255,255,255,.12); border-color:transparent;" onclick="nav('screen-groups')">
@@ -453,11 +453,8 @@
     </div>
 
     <!-- ---- View: 지출 업로드/내역 (기본 화면) ---- -->
-    <div id="view-expense" class="pad" style="flex:1; display:block; position:relative; padding-top:0;">
+    <div id="view-expense" class="pad" style="flex:1; display:block; padding-top:0;">
       <div id="expense-list-wrap"></div>
-      <div class="fab" onclick="openExpenseForm()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </div>
     </div>
 
     <!-- ---- View: 정산(최소송금) ---- -->
@@ -472,6 +469,10 @@
       <div class="card" id="home-person-view"></div>
       <div class="date-label">카테고리별</div>
       <div class="card" id="home-category-view"></div>
+    </div>
+
+    <div class="fab" id="expense-fab" onclick="openExpenseForm()">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     </div>
 
     <div class="tabbar">
@@ -822,6 +823,7 @@ function setGroupView(view){
   document.getElementById('view-expense').style.display = view==='expense' ? 'block':'none';
   document.getElementById('view-settle').style.display = view==='settle' ? 'block':'none';
   document.getElementById('view-stats').style.display = view==='stats' ? 'block':'none';
+  document.getElementById('expense-fab').style.display = view==='expense' ? 'flex':'none';
   if(view==='expense') renderExpenseTab();
   if(view==='settle') renderSettleTab();
   if(view==='stats') renderHomeTab();
@@ -877,7 +879,7 @@ function renderHomeTab(){
       </div>
     </div>`;
   }).join('');
-  document.getElementById('home-person-view').innerHTML = g.expenses.length===0 ? `<div class="empty">아직 등록된 지출이 없어요.<br/>지출을 추가해보세요.</div>` : personHtml;
+  document.getElementById('home-person-view').innerHTML = g.expenses.length===0 ? `<div class="empty">아직 등록된 지출이 없어요.<br/>지출 탭에서 먼저 등록해보세요.</div>` : personHtml;
 
   // 카테고리별
   const byCat = {};
@@ -893,7 +895,7 @@ function renderHomeTab(){
       </div>
     </div>`;
   }).join('');
-  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.<br/>지출을 추가해보세요.</div>`;
+  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.<br/>지출 탭에서 먼저 등록해보세요.</div>`;
 }
 
 /* ---- 지출 탭(03) ---- */
@@ -1034,7 +1036,7 @@ function renderSettleTab(){
   const g = getActiveGroup();
   const wrap = document.getElementById('settle-list-wrap');
   if(g.expenses.length===0){
-    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>지출을 추가하면 정산 결과가 여기 나타나요.</div>`;
+    wrap.innerHTML = `<div class="empty">아직 등록된 지출이 없어요.<br/>지출 탭에서 지출을 등록하면 정산 결과가 여기 나타나요.</div>`;
     return;
   }
   const tx = computeMinTransfers(g);
