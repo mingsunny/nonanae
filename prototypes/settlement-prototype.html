@@ -67,6 +67,17 @@
   .screen::-webkit-scrollbar{display:none;}
   .screen.active{display:flex;}
 
+  /* 하단 탭바(GNB)가 있는 화면은 화면 자체가 아니라 콘텐츠 영역만 스크롤되도록
+     분리 — 그래야 탭바/헤더가 스크롤에 밀려 사라지지 않고 항상 고정 노출됨 */
+  #screen-groups, #screen-group{ overflow-y:hidden; }
+  #screen-groups #groups-tab-home, #screen-groups #groups-tab-profile,
+  #screen-group #view-expense, #screen-group #view-settle{
+    overflow-y:auto; min-height:0;
+    -ms-overflow-style:none; scrollbar-width:none;
+  }
+  #screen-groups #groups-tab-home::-webkit-scrollbar, #screen-groups #groups-tab-profile::-webkit-scrollbar,
+  #screen-group #view-expense::-webkit-scrollbar, #screen-group #view-settle::-webkit-scrollbar{ display:none; }
+
   /* ---------- shared bits ---------- */
   .pad{padding:22px 22px 18px;}
   .topbar{
@@ -437,9 +448,13 @@
 
     <!-- ---- View: 정산(최소송금 + 인원별/카테고리별 요약) ---- -->
     <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:0;">
+      <div class="date-label" style="margin-top:16px;">정산 결과</div>
       <p class="sub" style="margin-bottom:14px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 계좌번호를 길게 누르면 복사돼요.</p>
       <div id="settle-list-wrap"></div>
-      <div class="toggle-group">
+
+      <div style="height:1px; background:var(--line); margin:24px 0 0;"></div>
+      <div class="date-label">인원별 · 카테고리별 요약</div>
+      <div class="toggle-group" style="margin-top:8px;">
         <div class="opt active" data-htab="person" onclick="setHomeTab('person')">인원별</div>
         <div class="opt" data-htab="category" onclick="setHomeTab('category')">카테고리별</div>
       </div>
