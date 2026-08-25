@@ -71,12 +71,13 @@
      분리 — 그래야 탭바/헤더가 스크롤에 밀려 사라지지 않고 항상 고정 노출됨 */
   #screen-groups, #screen-group{ overflow-y:hidden; }
   #screen-groups #groups-tab-home, #screen-groups #groups-tab-profile,
-  #screen-group #view-expense, #screen-group #view-settle{
+  #screen-group #view-expense, #screen-group #view-settle, #screen-group #view-stats{
     overflow-y:auto; min-height:0;
     -ms-overflow-style:none; scrollbar-width:none;
   }
   #screen-groups #groups-tab-home::-webkit-scrollbar, #screen-groups #groups-tab-profile::-webkit-scrollbar,
-  #screen-group #view-expense::-webkit-scrollbar, #screen-group #view-settle::-webkit-scrollbar{ display:none; }
+  #screen-group #view-expense::-webkit-scrollbar, #screen-group #view-settle::-webkit-scrollbar,
+  #screen-group #view-stats::-webkit-scrollbar{ display:none; }
 
   /* ---------- shared bits ---------- */
   .pad{padding:22px 22px 18px;}
@@ -180,8 +181,9 @@
   }
   .member-chip:first-child{margin-left:0;}
   .invite-pill{
-    font-size:11px; font-weight:700; color:#fff; background:rgba(255,255,255,.14);
-    padding:5px 10px; border-radius:20px; cursor:pointer; flex-shrink:0; white-space:nowrap;
+    display:flex; align-items:center; gap:5px;
+    font-size:12px; font-weight:700; color:#fff; background:rgba(255,255,255,.16);
+    padding:7px 12px; border-radius:20px; cursor:pointer; flex-shrink:0; white-space:nowrap;
   }
 
   .toggle-group{display:flex; background:#EDEAE1; border-radius:11px; padding:3px; margin:18px 0 14px;}
@@ -419,17 +421,21 @@
         </div>
         <h1 style="color:#fff;" id="gh-name">그룹 이름</h1>
       </div>
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-        <div class="gname" style="margin-bottom:0;">이 여행에서 총 사용한 금액</div>
-        <div class="invite-pill" onclick="nav('screen-group-invite')">+ 초대</div>
-      </div>
+      <div class="gname">이 여행에서 총 사용한 금액</div>
       <div class="gtotal" id="gh-total">₩0</div>
-      <div class="members-strip" id="gh-members"></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px;">
+        <div class="members-strip" id="gh-members" style="margin-top:0;"></div>
+        <div class="invite-pill" onclick="nav('screen-group-invite')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          친구 초대하기
+        </div>
+      </div>
     </div>
 
     <div class="toggle-group" style="margin:14px 22px;">
       <div class="opt active" data-gvtab="expense" onclick="setGroupView('expense')">지출</div>
       <div class="opt" data-gvtab="settle" onclick="setGroupView('settle')">정산</div>
+      <div class="opt" data-gvtab="stats" onclick="setGroupView('stats')">통계</div>
     </div>
 
     <!-- ---- View: 지출 업로드/내역 (기본 화면) ---- -->
@@ -440,15 +446,15 @@
       </div>
     </div>
 
-    <!-- ---- View: 정산(최소송금 + 인원별/카테고리별 요약) ---- -->
+    <!-- ---- View: 정산(최소송금) ---- -->
     <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:0;">
-      <div class="date-label" style="margin-top:16px;">정산 결과</div>
-      <p class="sub" style="margin-bottom:14px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 계좌번호를 길게 누르면 복사돼요.</p>
+      <p class="sub" style="margin-bottom:14px; margin-top:16px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요.</p>
       <div id="settle-list-wrap"></div>
+    </div>
 
-      <div style="height:1px; background:var(--line); margin:24px 0 0;"></div>
-      <div class="date-label">인원별 · 카테고리별 요약</div>
-      <div class="toggle-group" style="margin-top:8px;">
+    <!-- ---- View: 통계(인원별/카테고리별 요약) ---- -->
+    <div id="view-stats" class="pad" style="flex:1; display:none; padding-top:0;">
+      <div class="toggle-group" style="margin-top:16px;">
         <div class="opt active" data-htab="person" onclick="setHomeTab('person')">인원별</div>
         <div class="opt" data-htab="category" onclick="setHomeTab('category')">카테고리별</div>
       </div>
@@ -781,17 +787,19 @@ function setGroupView(view){
   document.querySelectorAll('#screen-group .toggle-group .opt[data-gvtab]').forEach(o=>o.classList.toggle('active', o.dataset.gvtab===view));
   document.getElementById('view-expense').style.display = view==='expense' ? 'block':'none';
   document.getElementById('view-settle').style.display = view==='settle' ? 'block':'none';
+  document.getElementById('view-stats').style.display = view==='stats' ? 'block':'none';
   if(view==='expense') renderExpenseTab();
-  if(view==='settle'){ renderSettleTab(); renderHomeTab(); }
+  if(view==='settle') renderSettleTab();
+  if(view==='stats') renderHomeTab();
 }
 /* 하단 전역 GNB: 그룹 화면에서도 항상 홈/프로필로 이동 */
 function goGlobalHome(){ nav('screen-groups'); setGroupsTab('home'); }
 function goGlobalProfile(){ nav('screen-groups'); setGroupsTab('profile'); }
 
-/* ---- 홈: 정산 내역(05) ---- */
+/* ---- 통계: 인원별/카테고리별 요약 ---- */
 function setHomeTab(t){
   state.activeHomeTab = t;
-  document.querySelectorAll('#view-settle .opt[data-htab]').forEach(o=>o.classList.toggle('active', o.dataset.htab===t));
+  document.querySelectorAll('#view-stats .opt[data-htab]').forEach(o=>o.classList.toggle('active', o.dataset.htab===t));
   document.getElementById('home-person-view').style.display = t==='person' ? 'block':'none';
   document.getElementById('home-category-view').style.display = t==='category' ? 'block':'none';
 }
@@ -842,7 +850,7 @@ function renderHomeTab(){
       </div>
     </div>`;
   }).join('');
-  document.getElementById('home-person-view').innerHTML = personHtml || `<div class="empty">아직 등록된 지출이 없어요.</div>`;
+  document.getElementById('home-person-view').innerHTML = g.expenses.length===0 ? `<div class="empty">아직 등록된 지출이 없어요.<br/>지출을 추가해보세요.</div>` : personHtml;
 
   // 카테고리별
   const byCat = {};
@@ -858,7 +866,7 @@ function renderHomeTab(){
       </div>
     </div>`;
   }).join('');
-  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.</div>`;
+  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.<br/>지출을 추가해보세요.</div>`;
 }
 
 /* ---- 지출 탭(03) ---- */
@@ -997,16 +1005,33 @@ function computeMinTransfers(g){
 }
 function renderSettleTab(){
   const g = getActiveGroup();
-  const tx = computeMinTransfers(g);
   const wrap = document.getElementById('settle-list-wrap');
+  if(g.expenses.length===0){
+    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>지출을 추가하면 정산 결과가 여기 나타나요.</div>`;
+    return;
+  }
+  const tx = computeMinTransfers(g);
   if(tx.length===0){
     wrap.innerHTML = `<div class="empty"><div class="big-icon">✓</div>정산할 금액이 없어요.<br/>모두 정확히 나눠 냈어요.</div>`;
     return;
   }
-  wrap.innerHTML = tx.map(t=>{
+  const nameOf = id => (g.members.find(m=>m.id===id)||{}).name || '';
+  const mine = tx.filter(t=>t.from===state.currentUser.id).sort((a,b)=>b.amount-a.amount);
+  const others = tx.filter(t=>t.from!==state.currentUser.id)
+    .sort((a,b)=> nameOf(a.from).localeCompare(nameOf(b.from),'ko') || nameOf(a.to).localeCompare(nameOf(b.to),'ko'));
+
+  const renderRow = (t, interactive) => {
     const from = g.members.find(m=>m.id===t.from);
     const to = g.members.find(m=>m.id===t.to);
-    const isMe = t.from === state.currentUser.id;
+    const account = interactive ? `
+      <div class="flow-account"
+           onmousedown="startLongPress('${to.account}', this)"
+           onmouseup="cancelLongPress(this)" onmouseleave="cancelLongPress(this)"
+           ontouchstart="startLongPress('${to.account}', this)" ontouchend="cancelLongPress(this)">
+        <div class="acc-text">${to.bank} ${to.account}</div>
+        <div class="copy-hint">길게 눌러 계좌번호 복사</div>
+        <div class="press-bar"></div>
+      </div>` : '';
     return `<div class="flow-row" id="flow-${t.from}-${t.to}">
       <div class="flow-top">
         <div class="flow-name">${from.name}${from.id===state.currentUser.id?' (나)':''}</div>
@@ -1014,16 +1039,20 @@ function renderSettleTab(){
         <div class="flow-name">${to.name}${to.id===state.currentUser.id?' (나)':''}</div>
         <div class="flow-amt">${won(t.amount)}</div>
       </div>
-      <div class="flow-account"
-           onmousedown="startLongPress('${to.account}', this)"
-           onmouseup="cancelLongPress(this)" onmouseleave="cancelLongPress(this)"
-           ontouchstart="startLongPress('${to.account}', this)" ontouchend="cancelLongPress(this)">
-        <div class="acc-text">${to.bank} ${to.account}</div>
-        <div class="copy-hint">${isMe ? '길게 눌러 계좌번호 복사' : '받는 사람 계좌'}</div>
-        <div class="press-bar"></div>
-      </div>
+      ${account}
     </div>`;
-  }).join('');
+  };
+
+  let html = '';
+  if(mine.length>0){
+    html += `<div class="date-label" style="margin-top:0;">내가 보낼 돈</div>`;
+    html += mine.map(t=>renderRow(t, true)).join('');
+  }
+  if(others.length>0){
+    html += `<div class="date-label" style="${mine.length>0?'':'margin-top:0;'}">${mine.length>0 ? '다른 인원 정산 현황' : '정산 현황'}</div>`;
+    html += others.map(t=>renderRow(t, false)).join('');
+  }
+  wrap.innerHTML = html;
 }
 
 /* 롱프레스로 계좌번호 복사 */
