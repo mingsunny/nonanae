@@ -261,7 +261,8 @@
   .split-col{flex:1; min-width:0; display:flex; justify-content:flex-end;}
   .split-input-wrap{display:flex; align-items:center; gap:3px; min-width:0; max-width:100%;}
   .split-input{width:100%; max-width:118px; padding:6px 8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px; text-align:right; font-family:inherit; color:var(--ink); box-sizing:border-box; -moz-appearance:textfield;}
-  .split-input::-webkit-inner-spin-button, .split-input::-webkit-outer-spin-button{-webkit-appearance:none; margin:0;}
+  input[type=number]{-moz-appearance:textfield;}
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none; margin:0;}
   .split-input:focus{border-color:var(--teal); outline:none;}
   .split-input:disabled{background:#F1EFE9; color:#C7C2B3; border-color:var(--line); cursor:not-allowed;}
   .split-unit{font-size:12px; color:var(--ink-soft); flex-shrink:0;}
@@ -474,7 +475,7 @@
 
     <!-- ---- View: 정산(최소송금) ---- -->
     <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:0;">
-      <p class="sub" style="margin-bottom:14px; margin-top:16px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요.</p>
+      <p class="sub" style="margin-bottom:14px; margin-top:16px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요.<br/>지출을 등록하면 정산 결과도 실시간으로 바로 반영돼요.</p>
       <div id="settle-list-wrap"></div>
     </div>
 
