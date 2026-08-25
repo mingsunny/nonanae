@@ -11,7 +11,7 @@
 
 1. **로그인 및 계좌정보 등록** — 카카오 로그인(v1), 가입 과정에서 계좌번호·은행명 필수 입력
 2. **그룹(여행) 생성 및 초대** — 대표자가 그룹 생성 → 카카오톡 공유하기(자동 입장 링크) 또는 초대코드 직접 전달, 두 방식 모두 지원
-3. **지출 항목 업로드** — 금액, 카테고리, 영수증 사진, 결제자, 참여자(서브셋 지정 가능) 기록
+3. **지출 항목 업로드** — 금액, 카테고리, 영수증 사진, 결제자, 참여자(서브셋 지정 가능), 나누기 방식(균등/비율/금액) 기록
 4. **최소 송금 정산 계산** — 그룹 내 지출을 바탕으로 "누가 누구에게 얼마" 송금하면 되는지 최소 건수로 제시
 5. **정산 내역 확인** — 인당 결제금액/사용금액 탭 분리 확인, 카테고리별·전체 경비 요약
 6. **빠른 송금** — 정산 결과에서 상대방 계좌번호를 롱프레스로 복사해 바로 붙여넣기
@@ -54,11 +54,14 @@ GroupMember
 
 Expense (지출 항목)
  ├─ id, group_id, paid_by (user_id), amount, category, memo, receipt_image_url (nullable), spent_at
+ ├─ split_type: equal | ratio | amount (나누기 방식, 지출별로 선택)
  └─ participants: ExpenseParticipant[]  ← 일부 인원만 지정 가능
 
 ExpenseParticipant
  ├─ expense_id, user_id
- └─ (v1: 균등 분할만 지원. share_amount는 항상 amount / participants.length)
+ └─ share_amount — split_type에 따라 계산 방식이 다름:
+      · equal: 저장 안 해도 됨(항상 amount / participants.length, 나머지 배분 규칙은 아래 알고리즘 섹션 참고), 계산 시점에 매번 도출
+      · ratio · amount: 지출 등록 시점에 사용자가 입력한 값을 원 단위로 확정해서 저장(비율은 % → 원 환산 후 반올림 오차를 나머지 분배로 정확히 맞춤). 이후 재계산 없이 그대로 사용
 
 Category (enum, v1 고정값)
  └─ 식비 | 숙박 | 교통 | 쇼핑 | 액티비티 | 기타
@@ -79,9 +82,9 @@ Category (enum, v1 고정값)
    - 부담해야 할 금액 합 = 그 사람이 참여자로 지정된 모든 지출에서 각자의 `share`(아래 나머지 배분 규칙 참고)의 합 (= "각자 여행에서 전체 사용한 금액")
    - 이 두 값의 차이가 곧 `balance`이며, 05번 스펙의 "탭으로 분리해서 보여주는" 두 숫자가 바로 이 두 합계다.
 
-**나머지(잔돈) 배분 규칙 — 결제자가 손해 보지 않는 구조 (확정)**
+**나머지(잔돈) 배분 규칙 — 결제자가 손해 보지 않는 구조 (확정, `split_type: equal`에만 적용)**
 
-지출 금액이 참여자 수로 나누어떨어지지 않을 때, 결제자(돈을 받아야 하는 사람)가 반올림 때문에 덜 받는 일이 없도록 잔돈은 항상 결제자가 아닌 다른 참여자들이 나눠서 더 부담한다.
+지출 금액이 참여자 수로 나누어떨어지지 않을 때, 결제자(돈을 받아야 하는 사람)가 반올림 때문에 덜 받는 일이 없도록 잔돈은 항상 결제자가 아닌 다른 참여자들이 나눠서 더 부담한다. (`ratio`/`amount`는 사용자가 직접 입력한 값이 곧 최종 분담액이라 이 규칙이 적용되지 않음 — 대신 비율의 % → 원 환산 과정에서 생기는 반올림 오차만 참여자 `user_id` 오름차순으로 1원씩 분배해 합계를 맞춘다.)
 
 ```
 base = floor(amount / N)              // N = 참여자 수
@@ -113,10 +116,11 @@ users (id, email UNIQUE NULLABLE, kakao_id UNIQUE, auth_provider, password_hash 
 bank_accounts (id, user_id FK, bank_name, account_number, account_holder, is_primary, created_at)
 groups (id, name, invite_code UNIQUE, created_by FK, created_at)
 group_members (group_id FK, user_id FK, role, joined_at, PRIMARY KEY(group_id, user_id))
-expenses (id, group_id FK, paid_by FK, amount, category, memo, receipt_image_url NULLABLE, spent_at, created_at)
-expense_participants (expense_id FK, user_id FK, PRIMARY KEY(expense_id, user_id))
+expenses (id, group_id FK, paid_by FK, amount, category, memo, receipt_image_url NULLABLE, split_type, spent_at, created_at)
+expense_participants (expense_id FK, user_id FK, share_amount NULLABLE, PRIMARY KEY(expense_id, user_id))
 ```
 
+- `expense_participants.share_amount`는 `split_type='equal'`이면 NULL(매번 계산), `ratio`/`amount`면 등록 시점에 확정된 원 단위 금액을 저장
 - 계좌번호는 민감 정보 — 같은 그룹 멤버에게만 노출, 그룹 멤버가 아닌 사용자의 API 접근은 반드시 차단 (v1에서는 컬럼 암호화까지는 과할 수 있으나 접근 제어는 필수)
 - `email`, `password_hash`는 v1에서는 항상 NULL (카카오만 지원) — Phase 2에서 이메일 로그인을 추가할 때 이 컬럼들을 그대로 사용하도록 미리 만들어 둠
 - `invite_code`는 추측 어렵게 충분히 긴 랜덤 문자열로 생성 (예: 8자리 영숫자) — 무차별 대입으로 다른 그룹에 침입 못 하도록
@@ -133,7 +137,7 @@ expense_participants (expense_id FK, user_id FK, PRIMARY KEY(expense_id, user_id
           → 그룹 상세 (상단 토글로 세 뷰 전환, 기본값은 지출)
               ├─ 지출 뷰 (기본 화면 — 그룹 내에서 가장 자주 하는 행동이라 우선 배치)
               │     ├─ 지출이 없으면 "아직 등록된 지출이 없어요" (멤버가 나 혼자뿐이면 카카오 초대 버튼도 같이 노출)
-              │     └─ 지출 목록 + [지출 추가](FAB, 화면 고정) — 금액, 카테고리, 영수증 사진(선택), 결제자, 참여자 체크박스
+              │     └─ 지출 목록 + [지출 추가](FAB, 화면 고정) — 금액, 카테고리, 영수증 사진(선택), 결제자, 나누기 방식(균등/비율/금액 토글), 참여자 체크박스(+ 비율·금액 모드면 인원별 인라인 입력)
               ├─ 정산 뷰 (최소송금 리스트만 — 확정/알림 없이 항상 실시간 재계산)
               │     ├─ 지출이 없으면 "아직 등록된 지출이 없어요" / 있지만 잔액이 0이면 "정산할 금액이 없어요"로 구분해 안내(둘 다 한 줄 문구)
               │     └─ 단일 리스트, 섹션 구분 없이 내가 보낼 송금이 금액 내림차순으로 맨 위, 나머지는 이름순. 계좌 롱프레스 복사는 내가 보낼 항목에만 적용(다른 사람 것은 복사할 필요 없으므로)
@@ -199,7 +203,7 @@ expense_participants (expense_id FK, user_id FK, PRIMARY KEY(expense_id, user_id
 - 카카오 로그인 (v1)
 - 가입 시 계좌번호/은행명 필수 입력
 - 그룹 생성 + 카카오톡 공유하기 / 초대코드 직접 입력, 두 방식 병행 참가
-- 지출 등록 (카테고리 6개 확정, 영수증 사진(선택), 참여자 서브셋 지정 포함)
+- 지출 등록 (카테고리 6개 확정, 영수증 사진(선택), 참여자 서브셋 지정, 나누기 방식 균등/비율/금액 선택 포함)
 - 정산 계산 및 표시 (결제자가 반올림 손해를 보지 않는 나머지 배분 규칙 적용)
 - 정산 내역 탭 (결제금액/사용금액 분리, 카테고리별 요약, 총액)
 - 계좌번호 롱프레스 복사 (기본 계좌 1개만 노출)
@@ -210,7 +214,6 @@ expense_participants (expense_id FK, user_id FK, PRIMARY KEY(expense_id, user_id
 
 **제외 (Phase 2 이후로 미룸)**
 - 이메일 로그인 (비밀번호 재설정, 이메일 인증 발송 포함)
-- 커스텀 비율 분할 (현재는 균등 분할만)
 - 다중 통화
 - 앱 내 실제 계좌 이체 (PG/오픈뱅킹 연동)
 - 뱅킹앱 딥링크 (v1은 복사까지만)
@@ -227,6 +230,7 @@ expense_participants (expense_id FK, user_id FK, PRIMARY KEY(expense_id, user_id
 5. ~~이메일 로그인 보안 요구 수준~~ → **확정**: v1은 카카오 로그인만 지원. 이메일 로그인(비밀번호 재설정, 인증 메일 발송 포함)은 Phase 2로 미룸
 6. ~~계좌 여러 개 등록 시 UX~~ → **확정**: 정산/송금 화면엔 기본 계좌(`is_primary`) 1개만 노출. 계좌 전환은 "내 정보" 화면에서만 (토스·카카오페이 등 유사 서비스의 통상적인 패턴)
 7. ~~카카오 로그인 시 실명(이름) 수집 여부~~ → **확정**: v1은 닉네임만 요청, 실명은 수집하지 않음. `name` 동의항목은 카카오싱크 전용이라 사업자등록이 필요해 지금은 신청 불가 — 온보딩에서 닉네임을 사용자가 직접 실명으로 고쳐 쓸 수 있게 하는 것으로 대체. 사업자등록증을 낸 뒤 카카오싱크로 전환하면 재검토
+8. ~~커스텀 비율 분할 필요 여부~~ → **확정**: Phase 2 제외 목록에서 v1으로 앞당김. 지출 등록 폼에 균등/비율/금액 3방식 토글을 인라인으로 추가(별도 화면 없음). 균등은 기존 나머지 배분 규칙 그대로, 비율/금액은 사용자가 입력한 값을 등록 시점에 원 단위로 확정해 저장
 
 ## 열린 질문
 
