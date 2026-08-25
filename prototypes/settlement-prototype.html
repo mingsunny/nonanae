@@ -394,11 +394,11 @@
       <h1>새 그룹 만들기</h1>
     </div>
     <div class="pad">
-      <p class="sub">여행 이름으로 그룹을 만들면, 초대코드로<br/>함께 간 친구들을 초대할 수 있어요.</p>
+      <p class="sub">여행 이름으로 그룹을 만들면, 카카오톡으로<br/>함께 간 친구들을 바로 초대할 수 있어요.</p>
       <label class="field-label">그룹(여행) 이름</label>
       <input type="text" id="new-group-name" placeholder="예) 제주도 우정여행" oninput="onNewGroupInput()"/>
       <div style="margin-top:22px;">
-        <button class="btn btn-primary" id="create-group-btn" disabled onclick="createGroup()">그룹 만들고 초대코드 받기</button>
+        <button class="btn btn-primary" id="create-group-btn" disabled onclick="createGroup()">그룹 만들기</button>
       </div>
     </div>
   </div>
@@ -424,7 +424,7 @@
   <div class="screen" id="screen-group" style="position:relative;">
     <div class="group-header" style="padding-top:40px;">
       <div class="topbar" style="padding:0 0 14px; color:#fff;">
-        <div class="back" style="background:rgba(255,255,255,.12); border-color:transparent;" onclick="nav('screen-groups')">
+        <div class="back" style="background:rgba(255,255,255,.12); border-color:transparent;" onclick="goGlobalHome()">
           <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg>
         </div>
         <h1 style="color:#fff;" id="gh-name">그룹 이름</h1>
@@ -433,11 +433,11 @@
       <div class="gtotal" id="gh-total">₩0</div>
       <div class="members-strip" id="gh-members" style="cursor:pointer;" onclick="nav('screen-group-invite')"></div>
       <div style="display:flex; gap:8px; margin-top:12px;">
-        <div class="invite-pill" style="background:#FEE500; color:#191600;" onclick="shareInviteViaKakao()">
+        <div class="invite-pill" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="shareInviteViaKakao()">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
           카카오톡 초대
         </div>
-        <div class="invite-pill" onclick="copyInviteCode()">코드 복사</div>
+        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="copyInviteCode()">코드 복사</div>
       </div>
     </div>
 
@@ -498,7 +498,7 @@
   <div class="screen" id="screen-expense-form">
     <div class="topbar">
       <div class="back" onclick="nav('screen-group'); setGroupView('expense')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
-      <h1>지출 추가</h1>
+      <h1 id="ex-form-title">지출 추가</h1>
     </div>
     <div class="pad" style="padding-bottom:100px;">
       <label class="field-label">사용 금액</label>
@@ -532,6 +532,9 @@
 
       <div style="margin-top:22px;">
         <button class="btn btn-primary" id="ex-submit-btn" disabled onclick="submitExpense()">지출 등록하기</button>
+      </div>
+      <div id="ex-delete-btn" style="display:none; text-align:center; margin-top:18px;">
+        <span class="text-link-muted" style="color:var(--brick);" onclick="deleteExpense()">이 지출 삭제하기</span>
       </div>
     </div>
   </div>
@@ -901,7 +904,7 @@ function renderExpenseTab(){
       const c = catInfo(e.category);
       const payer = g.members.find(m=>m.id===e.payerId);
       const partial = e.participantIds.length < g.members.length;
-      html += `<div class="receipt">
+      html += `<div class="receipt" style="cursor:pointer;" onclick="openExpenseForm('${e.id}')">
         <div class="cat-badge" style="background:${c.color};">${c.label.slice(0,1)}</div>
         <div class="rinfo">
           <div class="rtitle">${e.title}</div>
@@ -914,26 +917,52 @@ function renderExpenseTab(){
   wrap.innerHTML = html;
 }
 
-function openExpenseForm(){
+function openExpenseForm(expenseId){
   const g = getActiveGroup();
-  document.getElementById('ex-amount').value = '';
-  document.getElementById('ex-title').value = '';
-  document.getElementById('ex-upload-label').textContent = '눌러서 사진 첨부하기';
+  const editing = expenseId ? g.expenses.find(e=>e.id===expenseId) : null;
+
+  document.getElementById('ex-amount').value = editing ? editing.amount : '';
+  document.getElementById('ex-title').value = editing ? editing.title : '';
+  document.getElementById('ex-upload-label').textContent = (editing && editing.photoUrl) ? '사진이 첨부되었어요 · 다시 선택하려면 누르세요' : '눌러서 사진 첨부하기';
   document.getElementById('ex-upload-box').querySelector('img')?.remove();
+  if(editing && editing.photoUrl){
+    const img = document.createElement('img');
+    img.src = editing.photoUrl;
+    document.getElementById('ex-upload-box').insertBefore(img, document.getElementById('ex-upload-box').firstChild);
+  }
+
+  let splitMode = 'equal', customShares = {};
+  if(editing && editing.customShares){
+    splitMode = editing.splitMode || 'amount';
+    if(splitMode==='ratio'){
+      editing.participantIds.forEach(id=>{ customShares[id] = Math.round((editing.customShares[id]||0) / editing.amount * 100); });
+    } else {
+      customShares = {...editing.customShares};
+    }
+  }
+
   state.expenseDraft = {
-    category:'food', photoUrl:null, payerId: state.currentUser.id, participantIds: g.members.map(m=>m.id),
-    splitMode:'equal', customShares:{},
+    editingId: editing ? editing.id : null,
+    category: editing ? editing.category : 'food',
+    photoUrl: editing ? editing.photoUrl : null,
+    payerId: editing ? editing.payerId : state.currentUser.id,
+    participantIds: editing ? editing.participantIds.slice() : g.members.map(m=>m.id),
+    splitMode, customShares,
   };
 
   document.getElementById('ex-category-chips').innerHTML = CATEGORIES.map(c=>
-    `<div class="chip ${c.id==='food'?'selected':''}" data-cat="${c.id}" onclick="pickCategory('${c.id}')">${c.label}</div>`
+    `<div class="chip ${c.id===state.expenseDraft.category?'selected':''}" data-cat="${c.id}" onclick="pickCategory('${c.id}')">${c.label}</div>`
   ).join('');
 
   const payerSel = document.getElementById('ex-payer');
-  payerSel.innerHTML = g.members.map(m=>`<option value="${m.id}" ${m.id===state.currentUser.id?'selected':''}>${m.name}${m.id===state.currentUser.id?' (나)':''}</option>`).join('');
+  payerSel.innerHTML = g.members.map(m=>`<option value="${m.id}" ${m.id===state.expenseDraft.payerId?'selected':''}>${m.name}${m.id===state.currentUser.id?' (나)':''}</option>`).join('');
 
-  document.querySelectorAll('#ex-split-toggle .opt').forEach(o=>o.classList.toggle('active', o.dataset.split==='equal'));
+  document.querySelectorAll('#ex-split-toggle .opt').forEach(o=>o.classList.toggle('active', o.dataset.split===splitMode));
   document.getElementById('ex-split-summary').style.display = 'none';
+
+  document.getElementById('ex-form-title').textContent = editing ? '지출 수정' : '지출 추가';
+  document.getElementById('ex-submit-btn').textContent = editing ? '저장하기' : '지출 등록하기';
+  document.getElementById('ex-delete-btn').style.display = editing ? 'block' : 'none';
 
   renderParticipants();
   validateExpenseForm();
@@ -1071,17 +1100,42 @@ function submitExpense(){
   const g = getActiveGroup();
   const amount = parseInt(document.getElementById('ex-amount').value,10);
   const title = document.getElementById('ex-title').value.trim();
-  const today = new Date();
-  const dateLabel = (today.getMonth()+1)+'월 '+today.getDate()+'일';
-  g.expenses.unshift({
-    id: uid('e'), title, amount,
-    category: state.expenseDraft.category,
-    payerId: state.expenseDraft.payerId,
-    participantIds: state.expenseDraft.participantIds.slice(),
-    customShares: finalizeCustomShares(amount),
-    dateLabel, photoUrl: state.expenseDraft.photoUrl,
-  });
-  showToast('지출이 등록되었습니다');
+  const editingId = state.expenseDraft.editingId;
+
+  if(editingId){
+    const e = g.expenses.find(x=>x.id===editingId);
+    e.title = title; e.amount = amount;
+    e.category = state.expenseDraft.category;
+    e.payerId = state.expenseDraft.payerId;
+    e.participantIds = state.expenseDraft.participantIds.slice();
+    e.splitMode = state.expenseDraft.splitMode;
+    e.customShares = finalizeCustomShares(amount);
+    e.photoUrl = state.expenseDraft.photoUrl;
+    showToast('지출이 수정되었습니다');
+  } else {
+    const today = new Date();
+    const dateLabel = (today.getMonth()+1)+'월 '+today.getDate()+'일';
+    g.expenses.unshift({
+      id: uid('e'), title, amount,
+      category: state.expenseDraft.category,
+      payerId: state.expenseDraft.payerId,
+      participantIds: state.expenseDraft.participantIds.slice(),
+      splitMode: state.expenseDraft.splitMode,
+      customShares: finalizeCustomShares(amount),
+      dateLabel, photoUrl: state.expenseDraft.photoUrl,
+    });
+    showToast('지출이 등록되었습니다');
+  }
+  nav('screen-group');
+  setGroupView('expense');
+}
+function deleteExpense(){
+  const g = getActiveGroup();
+  const id = state.expenseDraft.editingId;
+  if(!id) return;
+  if(!confirm('이 지출을 삭제할까요?')) return;
+  g.expenses = g.expenses.filter(e=>e.id!==id);
+  showToast('지출이 삭제되었습니다');
   nav('screen-group');
   setGroupView('expense');
 }
