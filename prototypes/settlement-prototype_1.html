@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>정산일지 프로토타입</title>
+<style>
+  :root{
+    --paper:#F5F3EE;
+    --ink:#16223B;
+    --ink-soft:#5B637A;
+    --teal:#0E7C7B;
+    --teal-deep:#0A5F5E;
+    --amber:#E3A23C;
+    --brick:#C1443C;
+    --line:#E1DDD2;
+    --card:#FFFFFF;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:#EBE7DC;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:36px 16px 60px;
+  }
+  .stage-label{
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:#8A8370;
+    margin-bottom:14px;
+    text-align:center;
+  }
+  .stage-label b{color:var(--ink); letter-spacing:0;text-transform:none; font-size:15px; display:block; margin-top:2px;}
+
+  /* ---------- phone frame ---------- */
+  .phone{
+    width:390px;
+    max-width:100%;
+    height:790px;
+    background:var(--paper);
+    border-radius:44px;
+    border:10px solid #1B1B1B;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.05);
+    overflow:hidden;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+  }
+  .notch{
+    position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:130px; height:26px; background:#1B1B1B; border-radius:0 0 16px 16px; z-index:50;
+  }
+  .screen{
+    display:none;
+    flex-direction:column;
+    height:100%;
+    overflow-y:auto;
+    -ms-overflow-style:none; scrollbar-width:none;
+  }
+  .screen::-webkit-scrollbar{display:none;}
+  .screen.active{display:flex;}
+
+  /* ---------- shared bits ---------- */
+  .pad{padding:22px 22px 18px;}
+  .topbar{
+    display:flex; align-items:center; gap:10px;
+    padding:18px 20px 8px; flex-shrink:0;
+  }
+  .topbar .back{
+    width:30px;height:30px;border-radius:50%;background:var(--card);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    border:1px solid var(--line); flex-shrink:0;
+  }
+  .topbar .back svg{width:14px;height:14px;}
+  .topbar h1{font-size:16px; font-weight:700; margin:0; flex:1;}
+  .topbar .ghost-btn{font-size:12.5px; color:var(--ink-soft); cursor:pointer; padding:6px 10px;}
+
+  h2.big{font-size:24px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em;}
+  p.sub{font-size:13.5px; color:var(--ink-soft); margin:0 0 24px; line-height:1.5;}
+
+  label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); display:block; margin:16px 0 7px;}
+  input[type=text], input[type=email], input[type=number]{
+    width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line);
+    background:#fff; font-size:15px; color:var(--ink); font-family:inherit;
+    outline:none; transition:border-color .15s;
+  }
+  input:focus{border-color:var(--teal);}
+  input::placeholder{color:#B7B2A2;}
+
+  .btn{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    width:100%; padding:14px; border-radius:12px; border:none; cursor:pointer;
+    font-size:15px; font-weight:700; font-family:inherit; transition:opacity .15s, transform .1s;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--ink); color:#fff;}
+  .btn-primary:disabled{opacity:.35; cursor:not-allowed;}
+  .btn-teal{background:var(--teal); color:#fff;}
+  .btn-outline{background:#fff; color:var(--ink); border:1.5px solid var(--line);}
+  .btn-text{background:none; color:var(--teal); font-weight:700; width:auto; padding:8px;}
+
+  .card{
+    background:var(--card); border-radius:var(--radius); border:1px solid var(--line);
+    padding:16px;
+  }
+
+  .toast{
+    position:absolute; bottom:100px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:#fff; font-size:13px; font-weight:600;
+    padding:11px 18px; border-radius:30px; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; z-index:200; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* bottom tabs */
+  .tabbar{
+    display:flex; border-top:1px solid var(--line); background:#fff; flex-shrink:0;
+  }
+  .tabbar .tab{
+    flex:1; text-align:center; padding:11px 0 14px; cursor:pointer; color:#AFAA9B;
+  }
+  .tabbar .tab .dot{width:5px;height:5px;border-radius:50%; background:transparent; margin:0 auto 5px;}
+  .tabbar .tab.active{color:var(--ink);}
+  .tabbar .tab.active .dot{background:var(--teal);}
+  .tabbar .tab span{display:block; font-size:11px; font-weight:600;}
+
+  /* groups list */
+  .group-row{
+    display:flex; align-items:center; gap:12px; padding:14px; border-radius:14px;
+    background:#fff; border:1px solid var(--line); margin-bottom:10px; cursor:pointer;
+  }
+  .group-thumb{
+    width:44px;height:44px;border-radius:12px; background:var(--teal); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; flex-shrink:0;
+  }
+  .group-row .meta{flex:1; min-width:0;}
+  .group-row .meta .name{font-size:14.5px; font-weight:700;}
+  .group-row .meta .sum{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .group-row .arrow{color:#C7C2B3;}
+
+  .quick-actions{display:flex; gap:10px; margin-top:18px;}
+  .quick-actions .btn{padding:12px;}
+
+  /* group home summary */
+  .group-header{
+    padding:20px 20px 16px; background:var(--ink); color:#fff; flex-shrink:0; position:relative;
+  }
+  .group-header .gname{font-size:13px; opacity:.7; margin-bottom:4px;}
+  .group-header .gtotal{font-size:30px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums;}
+  .group-header .gtotal small{font-size:14px; font-weight:600; opacity:.75; margin-left:4px;}
+  .group-header .members-strip{display:flex; margin-top:14px; gap:-6px;}
+  .member-chip{
+    width:26px;height:26px; border-radius:50%; background:var(--amber); color:var(--ink);
+    font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center;
+    border:2px solid var(--ink); margin-left:-8px;
+  }
+  .member-chip:first-child{margin-left:0;}
+
+  .settle-status-row{display:flex; align-items:flex-start; margin-top:14px; gap:8px; flex-wrap:wrap;}
+  .settle-group{display:flex; gap:6px; flex-wrap:wrap;}
+  .settle-group.right{margin-left:auto; justify-content:flex-end;}
+  .settle-chip{
+    display:flex; align-items:center; gap:6px; padding:6px 11px 6px 6px; border-radius:20px;
+    cursor:pointer; transition:.15s; border:1.4px solid rgba(255,255,255,.2); background:rgba(255,255,255,.06);
+  }
+  .settle-chip:active{transform:scale(.97);}
+  .settle-chip .s-avatar{
+    width:22px;height:22px;border-radius:50%; background:var(--amber); color:var(--ink);
+    font-size:10.5px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .settle-chip .s-label{font-size:11px; font-weight:700; color:rgba(255,255,255,.85); white-space:nowrap;}
+  .settle-chip.done{background:var(--teal); border-color:var(--teal);}
+  .settle-chip.done .s-avatar{background:#fff; color:var(--teal-deep);}
+  .settle-chip.done .s-label{color:#fff;}
+  .settle-chip.readonly{cursor:default;}
+  .settle-chip.readonly:active{transform:none;}
+  .settle-chip.readonly:not(.done){opacity:.55;}
+
+  /* ---- 알림 ---- */
+  .icon-btn{
+    width:34px;height:34px;border-radius:50%; background:var(--card); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; flex-shrink:0;
+  }
+  .notif-dot{
+    position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%;
+    background:var(--brick); border:1.5px solid #fff; display:none;
+  }
+  .notif-panel{
+    position:absolute; top:64px; right:20px; width:258px; max-height:320px; overflow-y:auto;
+    background:#fff; border-radius:16px; border:1px solid var(--line); box-shadow:0 14px 30px rgba(0,0,0,.18);
+    opacity:0; pointer-events:none; transform:translateY(-6px); transition:.15s ease; z-index:120; padding:4px 0;
+  }
+  .notif-panel.show{opacity:1; pointer-events:auto; transform:translateY(0);}
+  .notif-title{font-size:11.5px; font-weight:800; color:var(--ink-soft); letter-spacing:.04em; padding:10px 14px 6px; text-transform:uppercase;}
+  .notif-item{display:flex; gap:9px; padding:10px 14px; border-top:1px solid var(--line);}
+  .notif-item:first-of-type{border-top:none;}
+  .notif-dotmark{width:7px;height:7px;border-radius:50%; background:transparent; margin-top:5px; flex-shrink:0;}
+  .notif-item.unread .notif-dotmark{background:var(--teal);}
+  .notif-body{min-width:0;}
+  .notif-text{font-size:12.5px; font-weight:600; line-height:1.4;}
+  .notif-time{font-size:10.5px; color:#B7B2A2; margin-top:3px;}
+  .notif-empty{padding:30px 14px; text-align:center; font-size:12.5px; color:var(--ink-soft);}
+
+  .toggle-group{display:flex; background:#EDEAE1; border-radius:11px; padding:3px; margin:18px 0 14px;}
+  .toggle-group .opt{flex:1; text-align:center; padding:8px 0; font-size:13px; font-weight:700; color:var(--ink-soft); border-radius:9px; cursor:pointer;}
+  .toggle-group .opt.active{background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.08);}
+
+  .person-row{display:flex; align-items:center; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line);}
+  .person-row:last-child{border-bottom:none;}
+  .avatar{
+    width:34px;height:34px;border-radius:50%; background:#EDEAE1; color:var(--ink);
+    display:flex;align-items:center;justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0;
+  }
+  .person-row .pname{font-size:13.5px; font-weight:700; flex:1;}
+  .person-row .psub{font-size:11.5px; color:var(--ink-soft); margin-top:1px;}
+  .person-row .pamt{font-size:14px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .pamt.pos{color:var(--teal-deep);}
+  .pamt.neg{color:var(--brick);}
+
+  .cat-row{display:flex; align-items:center; gap:10px; padding:10px 4px;}
+  .cat-badge{width:30px;height:30px;border-radius:9px; display:flex;align-items:center;justify-content:center; color:#fff; font-size:12px; font-weight:800; flex-shrink:0;}
+  .cat-bar-wrap{flex:1;}
+  .cat-bar-track{height:6px; border-radius:4px; background:#EDEAE1; overflow:hidden; margin-top:5px;}
+  .cat-bar-fill{height:100%; border-radius:4px;}
+  .cat-top{display:flex; justify-content:space-between; font-size:12.5px; font-weight:700;}
+  .cat-top .amt{font-variant-numeric:tabular-nums; color:var(--ink-soft); font-weight:600;}
+
+  /* expense list - receipt style */
+  .receipt{
+    position:relative; background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:13px 14px; margin-bottom:10px; display:flex; align-items:center; gap:11px;
+    background-image:radial-gradient(circle at 0 50%, #EBE7DC 5px, transparent 5.5px), radial-gradient(circle at 100% 50%, #EBE7DC 5px, transparent 5.5px);
+  }
+  .receipt .cat-badge{width:36px;height:36px; border-radius:10px;}
+  .receipt .rinfo{flex:1; min-width:0;}
+  .receipt .rtitle{font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .receipt .rsub{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .receipt .ramt{font-size:14.5px; font-weight:800; font-variant-numeric:tabular-nums; flex-shrink:0;}
+  .date-label{font-size:11.5px; font-weight:700; color:#9C9686; margin:14px 0 8px; text-transform:uppercase; letter-spacing:.06em;}
+
+  .fab{
+    position:absolute; right:18px; bottom:84px; width:50px; height:50px; border-radius:50%;
+    background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 18px rgba(0,0,0,.25); cursor:pointer; z-index:40;
+  }
+
+  /* chips (category select, participants) */
+  .chip-row{display:flex; flex-wrap:wrap; gap:8px; margin-top:2px;}
+  .chip{
+    padding:9px 14px; border-radius:20px; border:1.5px solid var(--line); font-size:13px; font-weight:600;
+    color:var(--ink-soft); cursor:pointer; background:#fff;
+  }
+  .chip.selected{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .check-row{display:flex; align-items:center; gap:10px; padding:11px 2px; border-bottom:1px solid var(--line); cursor:pointer;}
+  .check-row:last-child{border-bottom:none;}
+  .checkbox{
+    width:19px;height:19px; border-radius:6px; border:1.6px solid #C7C2B3; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; transition:.12s;
+  }
+  .checkbox.on{background:var(--teal); border-color:var(--teal);}
+  .checkbox.on svg{width:11px;height:11px;}
+  .check-row .cname{font-size:13.5px; font-weight:600; flex:1;}
+  .payer-tag{font-size:10.5px; font-weight:700; color:var(--teal); background:#E3F1F0; padding:2px 7px; border-radius:6px;}
+
+  select.field-select{
+    width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line);
+    background:#fff; font-size:15px; color:var(--ink); font-family:inherit; appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B637A' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center;
+  }
+  .upload-box{
+    margin-top:8px; border:1.5px dashed var(--line); border-radius:12px; padding:18px; text-align:center;
+    color:var(--ink-soft); font-size:12.5px; cursor:pointer; position:relative; overflow:hidden;
+  }
+  .upload-box img{width:100%; max-height:120px; object-fit:cover; border-radius:8px;}
+  .upload-box input{position:absolute; inset:0; opacity:0; cursor:pointer;}
+
+  /* settlement flow rows */
+  .flow-row{
+    background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px;
+    position:relative; overflow:hidden; user-select:none; -webkit-user-select:none;
+  }
+  .flow-row.press{background:#EFF7F6;}
+  .flow-top{display:flex; align-items:center; gap:8px;}
+  .flow-name{font-size:13.5px; font-weight:800;}
+  .flow-arrow{color:#B7B2A2; font-size:12px;}
+  .flow-amt{margin-left:auto; font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--brick);}
+  .flow-account{
+    margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .flow-account .acc-text{font-size:12.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums;}
+  .flow-account .copy-hint{font-size:10.5px; color:var(--teal); font-weight:700;}
+  .press-bar{position:absolute; left:0; bottom:0; height:3px; background:var(--teal); width:0%;}
+
+  .empty{text-align:center; padding:50px 20px; color:var(--ink-soft); font-size:13px; line-height:1.6;}
+  .empty .big-icon{font-size:26px; margin-bottom:10px; color:#C7C2B3;}
+
+  .invite-code-box{
+    background:var(--ink); color:#fff; border-radius:16px; padding:22px; text-align:center; margin:14px 0 20px;
+  }
+  .invite-code-box .lbl{font-size:11.5px; opacity:.65; letter-spacing:.1em; text-transform:uppercase;}
+  .invite-code-box .code{font-size:30px; font-weight:800; letter-spacing:.12em; margin:8px 0; font-variant-numeric:tabular-nums;}
+
+  a.link-inline{color:var(--teal); font-weight:700; text-decoration:none;}
+
+  .split-summary{margin-top:10px; font-size:12.5px; font-weight:700; text-align:right; min-height:16px;}
+  .split-summary.ok{color:var(--teal-deep);}
+  .split-summary.bad{color:var(--brick);}
+  .share-input-wrap{display:flex; align-items:center; gap:4px; flex-shrink:0;}
+  .share-input{
+    width:70px; padding:6px 8px; border-radius:8px; border:1.4px solid var(--line);
+    font-size:12.5px; text-align:right; font-variant-numeric:tabular-nums; font-family:inherit;
+  }
+  .share-input:focus{border-color:var(--teal); outline:none;}
+  .share-unit{font-size:11.5px; color:var(--ink-soft);}
+  .share-readonly{font-size:12.5px; font-weight:700; color:var(--ink-soft); font-variant-numeric:tabular-nums; flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<div class="stage-label">Prototype &middot; 화면을 직접 눌러보며 흐름을 확인하세요<b>정산일지 &mdash; 여행 정산 서비스</b></div>
+
+<div class="phone">
+  <div class="notch"></div>
+
+  <!-- ================= 01. 로그인 ================= -->
+  <div class="screen active" id="screen-login">
+    <div class="pad" style="padding-top:90px;">
+      <h2 class="big">정산일지</h2>
+      <p class="sub">여행에서 함께 쓴 돈, 이메일로 로그인하고<br/>가장 간단하게 정산해보세요.</p>
+      <label class="field-label">이메일</label>
+      <input type="email" id="login-email" placeholder="you@email.com" oninput="onLoginInput()"/>
+      <div style="margin-top:22px;">
+        <button class="btn btn-primary" id="login-btn" disabled onclick="doLogin()">이메일로 계속하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 01b. 최초 프로필(계좌) 설정 ================= -->
+  <div class="screen" id="screen-onboarding">
+    <div class="pad" style="padding-top:70px;">
+      <h2 class="big">프로필 설정</h2>
+      <p class="sub">정산 결과를 주고받을 때 사용할 이름과<br/>계좌번호를 등록해주세요.</p>
+      <label class="field-label">이름</label>
+      <input type="text" id="ob-name" placeholder="예) 김민지" oninput="onObInput()"/>
+      <label class="field-label">은행</label>
+      <input type="text" id="ob-bank" placeholder="예) 토스뱅크" oninput="onObInput()"/>
+      <label class="field-label">계좌번호</label>
+      <input type="text" id="ob-account" placeholder="예) 1000-1234-5678" oninput="onObInput()"/>
+      <div style="margin-top:22px;">
+        <button class="btn btn-primary" id="ob-btn" disabled onclick="finishOnboarding()">시작하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 02. 그룹 목록 ================= -->
+  <div class="screen" id="screen-groups">
+    <div class="topbar">
+      <h1 id="groups-greeting">내 그룹</h1>
+      <div class="icon-btn" onclick="toggleNotifications()">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#16223B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="notif-dot" id="notif-dot"></span>
+      </div>
+    </div>
+    <div class="notif-panel" id="notif-panel"></div>
+
+    <!-- ---- 여행 탭 ---- -->
+    <div id="groups-tab-trip" class="pad" style="flex:1; display:block;">
+      <div id="groups-list-wrap"></div>
+    </div>
+
+    <!-- ---- 마이 탭 ---- -->
+    <div id="groups-tab-my" class="pad" style="flex:1; display:none;">
+      <div class="card" style="margin-bottom:20px; display:flex; align-items:center; gap:12px;">
+        <div class="avatar" style="width:46px;height:46px;font-size:16px; flex-shrink:0;" id="my-avatar-initial"></div>
+        <div style="min-width:0;">
+          <div style="font-weight:800; font-size:15px;" id="my-name-display"></div>
+          <div style="font-size:12px; color:var(--ink-soft);" id="my-email-display"></div>
+        </div>
+      </div>
+
+      <label class="field-label">이름</label>
+      <input type="text" id="my-name" oninput="validateMyProfileForm()"/>
+
+      <label class="field-label">은행</label>
+      <input type="text" id="my-bank" oninput="validateMyProfileForm()"/>
+
+      <label class="field-label">계좌번호</label>
+      <input type="text" id="my-account" oninput="validateMyProfileForm()"/>
+
+      <div style="margin-top:22px;">
+        <button class="btn btn-primary" id="my-save-btn" onclick="saveMyProfile()">저장하기</button>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab active" data-gtab="trip" onclick="setGroupsPageTab('trip')"><div class="dot"></div><span>여행</span></div>
+      <div class="tab" data-gtab="my" onclick="setGroupsPageTab('my')"><div class="dot"></div><span>마이</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 02a. 그룹 생성 ================= -->
+  <div class="screen" id="screen-create-group">
+    <div class="topbar">
+      <div class="back" onclick="nav('screen-groups')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <h1>새 그룹 만들기</h1>
+    </div>
+    <div class="pad">
+      <p class="sub">여행 이름으로 그룹을 만들면, 초대코드로<br/>함께 간 친구들을 초대할 수 있어요.</p>
+      <label class="field-label">그룹(여행) 이름</label>
+      <input type="text" id="new-group-name" placeholder="예) 제주도 우정여행" oninput="onNewGroupInput()"/>
+      <div style="margin-top:22px;">
+        <button class="btn btn-primary" id="create-group-btn" disabled onclick="createGroup()">그룹 만들고 초대코드 받기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 02b. 초대코드 발급 완료 ================= -->
+  <div class="screen" id="screen-invite-code">
+    <div class="topbar"><h1 id="invite-group-name">그룹 생성 완료</h1></div>
+    <div class="pad">
+      <p class="sub">아래 초대코드를 친구들에게 공유하면,<br/>코드를 입력해 바로 그룹에 들어올 수 있어요.</p>
+      <div class="invite-code-box">
+        <div class="lbl">초대코드</div>
+        <div class="code" id="invite-code-value">------</div>
+        <button class="btn btn-outline" style="background:transparent; border-color:rgba(255,255,255,.35); color:#fff;" onclick="copyInviteCode()">코드 복사하기</button>
+      </div>
+      <button class="btn btn-primary" onclick="enterGroupFromInvite()">그룹으로 이동</button>
+    </div>
+  </div>
+
+  <!-- ================= 02c. 초대코드로 참여 ================= -->
+  <div class="screen" id="screen-join-group">
+    <div class="topbar">
+      <div class="back" onclick="nav('screen-groups')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <h1>초대코드로 참여</h1>
+    </div>
+    <div class="pad">
+      <p class="sub">친구에게 받은 초대코드 6자리를<br/>입력해주세요.</p>
+      <label class="field-label">초대코드</label>
+      <input type="text" id="join-code-input" placeholder="예) 4B7K2P" style="letter-spacing:.12em; font-weight:700;" oninput="onJoinCodeInput()"/>
+      <div id="join-error" style="color:var(--brick); font-size:12.5px; margin-top:8px; display:none;">일치하는 그룹을 찾을 수 없어요. 코드를 다시 확인해주세요.</div>
+      <div style="margin-top:22px;">
+        <button class="btn btn-primary" id="join-group-btn" disabled onclick="joinGroupByCode()">그룹 참여하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 그룹 내부 (홈 / 지출 / 정산) ================= -->
+  <div class="screen" id="screen-group">
+    <div class="group-header">
+      <div class="topbar" style="padding:0 0 14px; color:#fff;">
+        <div class="back" style="background:rgba(255,255,255,.12); border-color:transparent;" onclick="nav('screen-groups')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg>
+        </div>
+        <h1 style="color:#fff;" id="gh-name">그룹 이름</h1>
+        <div class="ghost-btn" style="color:rgba(255,255,255,.75);" onclick="nav('screen-group-invite')">멤버 초대</div>
+      </div>
+      <div class="gname">이 여행에서 총 사용한 금액</div>
+      <div class="gtotal" id="gh-total">₩0</div>
+      <div class="settle-status-row" id="gh-settle-row"></div>
+    </div>
+
+    <!-- ---- Tab: 요약(정산내역 확인) ---- -->
+    <div id="tab-home" class="pad" style="flex:1; display:none;">
+      <div class="toggle-group">
+        <div class="opt active" data-htab="person" onclick="setHomeTab('person')">인원별</div>
+        <div class="opt" data-htab="category" onclick="setHomeTab('category')">카테고리별</div>
+      </div>
+      <div class="card" id="home-person-view"></div>
+      <div class="card" id="home-category-view" style="display:none;"></div>
+    </div>
+
+    <!-- ---- Tab: 지출 업로드/내역 ---- -->
+    <div id="tab-expense" class="pad" style="flex:1; display:block; position:relative;">
+      <div id="expense-list-wrap"></div>
+      <div class="fab" onclick="openExpenseForm()">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
+    </div>
+
+    <!-- ---- Tab: 정산(최소송금+송금하기) ---- -->
+    <div id="tab-settle" class="pad" style="flex:1; display:none;">
+      <p class="sub" style="margin-bottom:14px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 계좌번호를 길게 누르면 복사돼요.</p>
+      <div id="settle-list-wrap"></div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab active" data-tab="expense" onclick="setGroupTab('expense')"><div class="dot"></div><span>지출</span></div>
+      <div class="tab" data-tab="home" onclick="setGroupTab('home')"><div class="dot"></div><span>요약</span></div>
+      <div class="tab" data-tab="settle" onclick="setGroupTab('settle')"><div class="dot"></div><span>정산</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 그룹 멤버 초대(그룹 내부에서) ================= -->
+  <div class="screen" id="screen-group-invite">
+    <div class="topbar">
+      <div class="back" onclick="nav('screen-group')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <h1>멤버 초대</h1>
+    </div>
+    <div class="pad">
+      <p class="sub">아래 코드를 공유하면 친구가 이 그룹에<br/>바로 참여할 수 있어요.</p>
+      <div class="invite-code-box">
+        <div class="lbl">초대코드</div>
+        <div class="code" id="gi-code-value">------</div>
+        <button class="btn btn-outline" style="background:transparent; border-color:rgba(255,255,255,.35); color:#fff;" onclick="copyInviteCode()">코드 복사하기</button>
+      </div>
+      <label class="field-label">현재 멤버</label>
+      <div class="card" id="gi-member-list"></div>
+    </div>
+  </div>
+
+  <!-- ================= 지출 등록 폼 ================= -->
+  <div class="screen" id="screen-expense-form">
+    <div class="topbar">
+      <div class="back" onclick="nav('screen-group'); setGroupTab('expense')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <h1>지출 추가</h1>
+    </div>
+    <div class="pad" style="padding-bottom:100px;">
+      <label class="field-label">사용 금액</label>
+      <input type="number" id="ex-amount" placeholder="0" oninput="onAmountInput()"/>
+
+      <label class="field-label">항목명</label>
+      <input type="text" id="ex-title" placeholder="예) 흑돼지 저녁식사" oninput="validateExpenseForm()"/>
+
+      <label class="field-label">카테고리</label>
+      <div class="chip-row" id="ex-category-chips"></div>
+
+      <label class="field-label">영수증 사진 (선택)</label>
+      <div class="upload-box" id="ex-upload-box">
+        <span id="ex-upload-label">눌러서 사진 첨부하기</span>
+        <input type="file" accept="image/*" onchange="onReceiptUpload(event)"/>
+      </div>
+
+      <label class="field-label">결제자</label>
+      <select class="field-select" id="ex-payer" onchange="onPayerChange()"></select>
+
+      <label class="field-label">함께 사용한 인원 <span style="font-weight:400; color:#B7B2A2;">(일부만 선택 가능)</span></label>
+      <div class="chip-row" id="ex-split-mode-chips" style="margin-bottom:12px;"></div>
+      <div class="card" id="ex-participants" style="padding:6px 12px;"></div>
+      <div id="ex-split-summary" class="split-summary"></div>
+
+      <div style="margin-top:22px;">
+        <button class="btn btn-primary" id="ex-submit-btn" disabled onclick="submitExpense()">지출 등록하기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">복사되었습니다</div>
+</div>
+
+<script>
+/* =========================================================
+   상태(State) - 실제 서비스에서는 서버/DB에 저장되지만
+   이 프로토타입은 메모리(변수)에만 저장합니다.
+   ========================================================= */
+const CATEGORIES = [
+  {id:'lodging', label:'숙소', color:'#0E7C7B'},
+  {id:'food', label:'식비', color:'#E3A23C'},
+  {id:'transport', label:'교통', color:'#5B637A'},
+  {id:'activity', label:'액티비티', color:'#C1443C'},
+  {id:'shopping', label:'쇼핑', color:'#8A6FBF'},
+  {id:'etc', label:'기타', color:'#9C9686'},
+];
+function catInfo(id){ return CATEGORIES.find(c=>c.id===id) || CATEGORIES[CATEGORIES.length-1]; }
+
+const SPLIT_MODES = [
+  {id:'equal', label:'N분의 1'},
+  {id:'percent', label:'비율로 나누기'},
+  {id:'custom', label:'직접 입력'},
+];
+
+let state = {
+  currentUser: null, // {id,name,bank,account,email}
+  users: {},         // email -> user
+  groups: [],
+  activeGroupId: null,
+  activeGroupTab: 'expense',
+  activeHomeTab: 'person',
+  expenseDraft: null,
+  notifications: [], // {id,text,time,unread}
+};
+
+function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,8); }
+function won(n){ return '₩' + Math.round(n).toLocaleString('ko-KR'); }
+function genInviteCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s=''; for(let i=0;i<6;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+/* 데모용 시드 멤버 (사용자가 로그인하면 이 그룹에 함께 참여) */
+function seedDemoGroup(currentUser){
+  const m1 = {id:uid('m'), name:'박서연', bank:'카카오뱅크', account:'3333-01-1234567'};
+  const m2 = {id:uid('m'), name:'김도윤', bank:'국민은행', account:'123456-04-123456'};
+  const m3 = {id:uid('m'), name:'이하준', bank:'신한은행', account:'110-123-456789'};
+  const me = currentUser;
+  const members = [me, m1, m2, m3];
+
+  const group = {
+    id: uid('g'),
+    name: '제주도 우정여행',
+    inviteCode: genInviteCode(),
+    members: members,
+    expenses: [],
+    settledIds: [m2.id], // 데모: 김도윤은 이미 정산 완료 상태로 시작
+  };
+
+  const mk = (title, amount, catId, payer, participantIds, dateLabel) => ({
+    id: uid('e'), title, amount, category:catId, payerId:payer.id,
+    participantIds, dateLabel, photoUrl:null,
+  });
+  const all = members.map(m=>m.id);
+
+  group.expenses.push(mk('애월 게스트하우스 2박', 360000, 'lodging', m1, all, '10월 12일'));
+  group.expenses.push(mk('공항 렌터카 3일', 210000, 'transport', m2, all, '10월 12일'));
+  group.expenses.push(mk('흑돼지 저녁식사', 128000, 'food', me, all, '10월 12일'));
+  group.expenses.push(mk('스노클링 체험', 180000, 'activity', m1, [me.id, m1.id, m2.id], '10월 13일'));
+  group.expenses.push(mk('오후 카페', 24000, 'food', m3, [m1.id, m3.id], '10월 13일'));
+  group.expenses.push(mk('기념품 쇼핑', 56000, 'shopping', me, all, '10월 14일'));
+
+  return group;
+}
+
+/* =========================================================
+   화면 전환
+   ========================================================= */
+function nav(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelector('.phone').scrollTop = 0;
+  const scr = document.getElementById(id);
+  if(scr) scr.scrollTop = 0;
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+}
+
+/* =========================================================
+   01. 로그인
+   ========================================================= */
+function onLoginInput(){
+  const v = document.getElementById('login-email').value.trim();
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  document.getElementById('login-btn').disabled = !ok;
+}
+function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  if(state.users[email]){
+    state.currentUser = state.users[email];
+    afterAuthed();
+  } else {
+    state._pendingEmail = email;
+    nav('screen-onboarding');
+  }
+}
+function onObInput(){
+  const n = document.getElementById('ob-name').value.trim();
+  const b = document.getElementById('ob-bank').value.trim();
+  const a = document.getElementById('ob-account').value.trim();
+  document.getElementById('ob-btn').disabled = !(n && b && a);
+}
+function finishOnboarding(){
+  const name = document.getElementById('ob-name').value.trim();
+  const bank = document.getElementById('ob-bank').value.trim();
+  const account = document.getElementById('ob-account').value.trim();
+  const user = {id:uid('u'), name, bank, account, email:state._pendingEmail};
+  state.users[state._pendingEmail] = user;
+  state.currentUser = user;
+  afterAuthed();
+}
+function afterAuthed(){
+  if(state.groups.length === 0){
+    // 데모 그룹을 현재 로그인한 사용자로 시드
+    const g = seedDemoGroup(state.currentUser);
+    state.groups.push(g);
+    state.notifications = [
+      {id:uid('n'), text:'정산일지에 오신 것을 환영해요', time:'09:02', unread:true},
+      {id:uid('n'), text:"박서연님이 '스노클링 체험' 지출을 등록했어요", time:'09:14', unread:true},
+      {id:uid('n'), text:'김도윤님이 정산을 완료했어요', time:'09:20', unread:true},
+    ];
+  }
+  document.getElementById('groups-greeting').textContent = state.currentUser.name + '님의 그룹';
+  updateNotifDot();
+  renderGroupsList();
+  nav('screen-groups');
+}
+
+/* ---- 알림 ---- */
+function toggleNotifications(){
+  const panel = document.getElementById('notif-panel');
+  const opening = !panel.classList.contains('show');
+  panel.classList.toggle('show');
+  if(opening){
+    renderNotifPanel();
+    state.notifications.forEach(n=> n.unread = false);
+    updateNotifDot();
+  }
+}
+function renderNotifPanel(){
+  const panel = document.getElementById('notif-panel');
+  if(state.notifications.length===0){
+    panel.innerHTML = `<div class="notif-empty">아직 알림이 없어요</div>`;
+    return;
+  }
+  panel.innerHTML = `<div class="notif-title">알림</div>` + state.notifications.map(n=>`
+    <div class="notif-item ${n.unread?'unread':''}">
+      <div class="notif-dotmark"></div>
+      <div class="notif-body">
+        <div class="notif-text">${n.text}</div>
+        <div class="notif-time">${n.time}</div>
+      </div>
+    </div>`).join('');
+}
+function addNotification(text){
+  const now = new Date();
+  const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  state.notifications.unshift({id:uid('n'), text, time, unread:true});
+  updateNotifDot();
+  if(document.getElementById('notif-panel').classList.contains('show')) renderNotifPanel();
+}
+function updateNotifDot(){
+  const has = state.notifications.some(n=>n.unread);
+  document.getElementById('notif-dot').style.display = has ? 'block' : 'none';
+}
+
+/* ---- 그룹목록 화면의 여행/마이 탭 ---- */
+function setGroupsPageTab(tab){
+  document.querySelectorAll('#screen-groups .tabbar .tab').forEach(t=>t.classList.toggle('active', t.dataset.gtab===tab));
+  document.getElementById('groups-tab-trip').style.display = tab==='trip' ? 'block' : 'none';
+  document.getElementById('groups-tab-my').style.display = tab==='my' ? 'block' : 'none';
+  if(tab==='my') renderMyProfileForm();
+}
+function renderMyProfileForm(){
+  const u = state.currentUser;
+  document.getElementById('my-name').value = u.name;
+  document.getElementById('my-bank').value = u.bank;
+  document.getElementById('my-account').value = u.account;
+  document.getElementById('my-name-display').textContent = u.name;
+  document.getElementById('my-email-display').textContent = u.email;
+  document.getElementById('my-avatar-initial').textContent = u.name.slice(0,1);
+  validateMyProfileForm();
+}
+function validateMyProfileForm(){
+  const name = document.getElementById('my-name').value.trim();
+  const bank = document.getElementById('my-bank').value.trim();
+  const account = document.getElementById('my-account').value.trim();
+  document.getElementById('my-save-btn').disabled = !(name && bank && account);
+}
+function saveMyProfile(){
+  const name = document.getElementById('my-name').value.trim();
+  const bank = document.getElementById('my-bank').value.trim();
+  const account = document.getElementById('my-account').value.trim();
+  if(!name || !bank || !account) return;
+  const u = state.currentUser; // 그룹 멤버 목록 등에서 같은 객체를 참조하므로, 값만 바꾸면 전체에 반영됨
+  u.name = name; u.bank = bank; u.account = account;
+  document.getElementById('groups-greeting').textContent = name + '님의 그룹';
+  document.getElementById('my-name-display').textContent = name;
+  document.getElementById('my-avatar-initial').textContent = name.slice(0,1);
+  showToast('프로필이 저장되었습니다');
+}
+
+/* =========================================================
+   02. 그룹 목록 / 생성 / 초대
+   ========================================================= */
+function groupTotal(g){ return g.expenses.reduce((s,e)=>s+e.amount,0); }
+
+function renderGroupsList(){
+  const wrap = document.getElementById('groups-list-wrap');
+  const rows = state.groups.map(g=>`
+    <div class="group-row" onclick="openGroup('${g.id}')">
+      <div class="group-thumb">${g.name.slice(0,1)}</div>
+      <div class="meta">
+        <div class="name">${g.name}</div>
+        <div class="sum">멤버 ${g.members.length}명 · 총 ${won(groupTotal(g))}</div>
+      </div>
+      <div class="arrow">›</div>
+    </div>
+  `).join('');
+  const empty = state.groups.length===0 ? `<div class="empty"><div class="big-icon">＋</div>아직 참여한 그룹이 없어요.<br/>새 그룹을 만들거나 초대코드로 참여해보세요.</div>` : '';
+  wrap.innerHTML = rows + empty + `
+    <div class="quick-actions">
+      <button class="btn btn-teal" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
+      <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
+    </div>`;
+}
+
+function onNewGroupInput(){
+  const v = document.getElementById('new-group-name').value.trim();
+  document.getElementById('create-group-btn').disabled = !v;
+}
+function createGroup(){
+  const name = document.getElementById('new-group-name').value.trim();
+  const g = {
+    id: uid('g'), name, inviteCode: genInviteCode(),
+    members: [state.currentUser], expenses: [], settledIds: [],
+  };
+  state.groups.push(g);
+  state.activeGroupId = g.id;
+  document.getElementById('new-group-name').value = '';
+  document.getElementById('create-group-btn').disabled = true;
+  document.getElementById('invite-group-name').textContent = name + ' 생성 완료';
+  document.getElementById('invite-code-value').textContent = g.inviteCode;
+  nav('screen-invite-code');
+}
+function copyInviteCode(){
+  const g = getActiveGroup();
+  if(!g) return;
+  copyToClipboard(g.inviteCode);
+  showToast('초대코드가 복사되었습니다');
+}
+function enterGroupFromInvite(){
+  renderGroupsList();
+  openGroup(state.activeGroupId);
+}
+
+function onJoinCodeInput(){
+  const v = document.getElementById('join-code-input').value.trim();
+  document.getElementById('join-group-btn').disabled = v.length < 4;
+  document.getElementById('join-error').style.display = 'none';
+}
+function joinGroupByCode(){
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  const g = state.groups.find(gr => gr.inviteCode === code);
+  if(!g){
+    document.getElementById('join-error').style.display = 'block';
+    return;
+  }
+  if(!g.members.find(m=>m.id===state.currentUser.id)) g.members.push(state.currentUser);
+  document.getElementById('join-code-input').value='';
+  renderGroupsList();
+  openGroup(g.id);
+}
+
+/* =========================================================
+   그룹 내부
+   ========================================================= */
+function getActiveGroup(){ return state.groups.find(g=>g.id===state.activeGroupId); }
+
+function openGroup(id){
+  state.activeGroupId = id;
+  const g = getActiveGroup();
+  document.getElementById('gh-name').textContent = g.name;
+  document.getElementById('gh-total').innerHTML = won(groupTotal(g)) + ' <small>총 사용</small>';
+  renderSettleStatusRow();
+  setGroupTab('expense');
+  nav('screen-group');
+}
+
+/* ---- 정산 완료 현황(총 사용금액 하단) ---- */
+function renderSettleStatusRow(){
+  const g = getActiveGroup();
+  if(!g) return;
+  if(!g.settledIds) g.settledIds = [];
+  const unsettled = g.members.filter(m=> !g.settledIds.includes(m.id));
+  const settled = g.members.filter(m=> g.settledIds.includes(m.id));
+  const chip = (m, done) => {
+    const isMe = m.id === state.currentUser.id;
+    const clickAttr = isMe ? ` onclick="toggleSettleStatus('${m.id}')"` : '';
+    const label = isMe ? (done ? '정산 취소' : '정산 완료') : (done ? '정산 완료' : '대기중');
+    return `<div class="settle-chip ${done?'done':''} ${isMe?'':'readonly'}"${clickAttr}>
+      <div class="s-avatar">${m.name.slice(0,1)}</div>
+      <div class="s-label">${label}</div>
+    </div>`;
+  };
+  document.getElementById('gh-settle-row').innerHTML =
+    `<div class="settle-group">${unsettled.map(m=>chip(m,false)).join('')}</div>` +
+    `<div class="settle-group right">${settled.map(m=>chip(m,true)).join('')}</div>`;
+}
+function toggleSettleStatus(memberId){
+  if(memberId !== state.currentUser.id){ return; } // 본인 상태만 변경 가능
+  const g = getActiveGroup();
+  if(!g.settledIds) g.settledIds = [];
+  const idx = g.settledIds.indexOf(memberId);
+  if(idx>-1) g.settledIds.splice(idx,1);
+  else{
+    g.settledIds.push(memberId);
+    addNotification(`'${g.name}'에서 정산 완료로 표시했어요`);
+  }
+  renderSettleStatusRow();
+  if(g.settledIds.length === g.members.length){
+    showToast('모든 인원이 정산을 완료했어요 · 송금 알림을 보냈어요');
+    addNotification(`'${g.name}' 모든 인원이 정산을 완료했어요 · 송금을 진행해주세요`);
+  }
+}
+
+function setGroupTab(tab){
+  state.activeGroupTab = tab;
+  document.querySelectorAll('#screen-group .tabbar .tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.getElementById('tab-home').style.display = tab==='home' ? 'block':'none';
+  document.getElementById('tab-expense').style.display = tab==='expense' ? 'block':'none';
+  document.getElementById('tab-settle').style.display = tab==='settle' ? 'block':'none';
+  if(tab==='home') renderHomeTab();
+  if(tab==='expense') renderExpenseTab();
+  if(tab==='settle') renderSettleTab();
+}
+
+/* ---- 홈: 정산 내역(05) ---- */
+function setHomeTab(t){
+  state.activeHomeTab = t;
+  document.querySelectorAll('#tab-home .opt').forEach(o=>o.classList.toggle('active', o.dataset.htab===t));
+  document.getElementById('home-person-view').style.display = t==='person' ? 'block':'none';
+  document.getElementById('home-category-view').style.display = t==='category' ? 'block':'none';
+}
+function computeBalances(g){
+  const balances = {};
+  g.members.forEach(m=> balances[m.id] = 0);
+  const paid = {}; g.members.forEach(m=> paid[m.id]=0);
+  g.expenses.forEach(e=>{
+    paid[e.payerId] = (paid[e.payerId]||0) + e.amount;
+    balances[e.payerId] += e.amount;
+    // 지출에 저장된 분담 방식별 최종 금액(shares)이 있으면 그대로 사용, 없으면(레거시 데이터) N분의 1로 계산
+    const shares = e.shares || splitShares(e.amount, e.participantIds, e.payerId);
+    Object.entries(shares).forEach(([pid, amt])=>{ balances[pid] -= amt; });
+  });
+  return {balances, paid};
+}
+function splitShares(amount, participantIds, payerId){
+  const n = participantIds.length || 1;
+  const base = Math.floor(amount / n);
+  let remainder = amount - base*n;
+  const shares = {}; participantIds.forEach(id=> shares[id]=base);
+  let order = participantIds.slice();
+  if(order.includes(payerId)) order = [payerId, ...order.filter(id=>id!==payerId)];
+  let i=0;
+  while(remainder>0 && order.length>0){ shares[order[i%order.length]] += 1; remainder--; i++; }
+  return shares;
+}
+/* 비율(%) 또는 직접입력 금액을 최종 '원' 단위 분담액으로 변환 (반올림 오차는 결제자부터 보정) */
+function resolveShares(amount, splitMode, participantIds, payerId, customShares){
+  if(splitMode==='percent'){
+    const raw = {}; let sum = 0;
+    participantIds.forEach(id=>{
+      const amt = Math.round(amount * (customShares[id]||0) / 100);
+      raw[id] = amt; sum += amt;
+    });
+    let diff = amount - sum;
+    let order = participantIds.slice();
+    if(order.includes(payerId)) order = [payerId, ...order.filter(id=>id!==payerId)];
+    let i=0;
+    while(diff!==0 && order.length>0){
+      const id = order[i%order.length];
+      raw[id] += diff>0 ? 1 : -1;
+      diff += diff>0 ? -1 : 1;
+      i++;
+    }
+    return raw;
+  }
+  if(splitMode==='custom'){
+    const raw = {};
+    participantIds.forEach(id=> raw[id] = Math.round(customShares[id]||0));
+    return raw;
+  }
+  return splitShares(amount, participantIds, payerId); // equal
+}
+/* 분담 입력값(비율/직접입력)이 유효한지 확인 */
+function computeSplitValidity(){
+  const d = state.expenseDraft;
+  const amount = parseInt(document.getElementById('ex-amount').value||'0',10);
+  if(!d || d.splitMode==='equal') return {valid:true, text:''};
+  if(d.splitMode==='percent'){
+    const sum = d.participantIds.reduce((s,id)=> s + (d.customShares[id]||0), 0);
+    const rounded = Math.round(sum*100)/100;
+    return {valid: Math.abs(sum-100) < 0.05, text: `합계 ${rounded}% / 100%`};
+  }
+  if(d.splitMode==='custom'){
+    const sum = d.participantIds.reduce((s,id)=> s + Math.round(d.customShares[id]||0), 0);
+    return {valid: sum===amount && amount>0, text: `합계 ${won(sum)} / 총 ${won(amount)}`};
+  }
+  return {valid:true, text:''};
+}
+function updateSplitSummary(){
+  const el = document.getElementById('ex-split-summary');
+  if(!el) return;
+  const d = state.expenseDraft;
+  if(!d || d.splitMode==='equal'){ el.textContent=''; el.className='split-summary'; return; }
+  const r = computeSplitValidity();
+  el.textContent = r.text;
+  el.className = 'split-summary ' + (r.valid ? 'ok' : 'bad');
+}
+/* 분담 방식을 바꾸거나 참여 인원이 바뀔 때, 현재 인원 기준으로 보기 좋은 기본값을 다시 채워줌 */
+function initDefaultShares(){
+  const d = state.expenseDraft;
+  const amount = parseInt(document.getElementById('ex-amount').value||'0',10);
+  d.customShares = {};
+  if(d.splitMode==='percent'){
+    const n = d.participantIds.length || 1;
+    const base = Math.floor(100/n);
+    let remainder = 100 - base*n;
+    let order = d.participantIds.slice();
+    if(order.includes(d.payerId)) order = [d.payerId, ...order.filter(id=>id!==d.payerId)];
+    d.participantIds.forEach(id=> d.customShares[id]=base);
+    let i=0;
+    while(remainder>0 && order.length>0){ d.customShares[order[i%order.length]] += 1; remainder--; i++; }
+  } else if(d.splitMode==='custom'){
+    const shares = splitShares(amount, d.participantIds, d.payerId);
+    d.participantIds.forEach(id=> d.customShares[id] = shares[id]||0);
+  }
+}
+function renderHomeTab(){
+  const g = getActiveGroup();
+  document.getElementById('gh-total').innerHTML = won(groupTotal(g)) + ' <small>총 사용</small>';
+
+  const {balances, paid} = computeBalances(g);
+  const total = groupTotal(g) || 1;
+
+  // 인원별
+  const personHtml = g.members.map(m=>{
+    const net = balances[m.id];
+    const cls = net>=0 ? 'pos' : 'neg';
+    const sign = net>0 ? '받을 돈' : (net<0 ? '보낼 돈' : '정산 완료');
+    return `<div class="person-row">
+      <div class="avatar">${m.name.slice(0,1)}</div>
+      <div style="flex:1;">
+        <div class="pname">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
+        <div class="psub">결제 ${won(paid[m.id]||0)}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="pamt ${cls}">${net===0?'—':won(Math.abs(net))}</div>
+        <div class="psub">${sign}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('home-person-view').innerHTML = personHtml || `<div class="empty">아직 등록된 지출이 없어요.</div>`;
+
+  // 카테고리별
+  const byCat = {};
+  g.expenses.forEach(e=>{ byCat[e.category] = (byCat[e.category]||0) + e.amount; });
+  const catHtml = CATEGORIES.filter(c=>byCat[c.id]).sort((a,b)=>byCat[b.id]-byCat[a.id]).map(c=>{
+    const amt = byCat[c.id];
+    const pct = Math.round((amt/total)*100);
+    return `<div class="cat-row">
+      <div class="cat-badge" style="background:${c.color};">${c.label.slice(0,1)}</div>
+      <div class="cat-bar-wrap">
+        <div class="cat-top"><span>${c.label}</span><span class="amt">${won(amt)} · ${pct}%</span></div>
+        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%; background:${c.color};"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.</div>`;
+}
+
+/* ---- 지출 탭(03) ---- */
+function renderExpenseTab(){
+  const g = getActiveGroup();
+  const wrap = document.getElementById('expense-list-wrap');
+  if(g.expenses.length===0){
+    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.</div>`;
+    return;
+  }
+  // group by dateLabel
+  const groups = {};
+  g.expenses.forEach(e=>{ (groups[e.dateLabel] = groups[e.dateLabel]||[]).push(e); });
+  let html = '';
+  Object.keys(groups).forEach(date=>{
+    html += `<div class="date-label">${date}</div>`;
+    groups[date].forEach(e=>{
+      const c = catInfo(e.category);
+      const payer = g.members.find(m=>m.id===e.payerId);
+      const partial = e.participantIds.length < g.members.length;
+      const modeTag = e.splitMode==='percent' ? ' · 비율 정산' : (e.splitMode==='custom' ? ' · 직접 입력' : '');
+      html += `<div class="receipt">
+        <div class="cat-badge" style="background:${c.color};">${c.label.slice(0,1)}</div>
+        <div class="rinfo">
+          <div class="rtitle">${e.title}</div>
+          <div class="rsub">${payer ? payer.name : '알 수 없음'} 결제 · ${e.participantIds.length}명 나눔${partial?' (일부)':''}${modeTag}</div>
+        </div>
+        <div class="ramt">${won(e.amount)}</div>
+      </div>`;
+    });
+  });
+  wrap.innerHTML = html;
+}
+
+function openExpenseForm(){
+  const g = getActiveGroup();
+  document.getElementById('ex-amount').value = '';
+  document.getElementById('ex-title').value = '';
+  document.getElementById('ex-upload-label').textContent = '눌러서 사진 첨부하기';
+  document.getElementById('ex-upload-box').querySelector('img')?.remove();
+  state.expenseDraft = { category:'food', photoUrl:null, payerId: state.currentUser.id, participantIds: g.members.map(m=>m.id), splitMode:'equal', customShares:{} };
+
+  document.getElementById('ex-category-chips').innerHTML = CATEGORIES.map(c=>
+    `<div class="chip ${c.id==='food'?'selected':''}" data-cat="${c.id}" onclick="pickCategory('${c.id}')">${c.label}</div>`
+  ).join('');
+  document.getElementById('ex-split-mode-chips').innerHTML = SPLIT_MODES.map(s=>
+    `<div class="chip ${s.id==='equal'?'selected':''}" data-split="${s.id}" onclick="pickSplitMode('${s.id}')">${s.label}</div>`
+  ).join('');
+
+  const payerSel = document.getElementById('ex-payer');
+  payerSel.innerHTML = g.members.map(m=>`<option value="${m.id}" ${m.id===state.currentUser.id?'selected':''}>${m.name}${m.id===state.currentUser.id?' (나)':''}</option>`).join('');
+
+  renderParticipants();
+  updateSplitSummary();
+  validateExpenseForm();
+  nav('screen-expense-form');
+}
+function pickCategory(id){
+  state.expenseDraft.category = id;
+  document.querySelectorAll('#ex-category-chips .chip').forEach(c=>c.classList.toggle('selected', c.dataset.cat===id));
+}
+function pickSplitMode(id){
+  state.expenseDraft.splitMode = id;
+  document.querySelectorAll('#ex-split-mode-chips .chip').forEach(c=>c.classList.toggle('selected', c.dataset.split===id));
+  initDefaultShares();
+  renderParticipants();
+  updateSplitSummary();
+  validateExpenseForm();
+}
+function onReceiptUpload(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  state.expenseDraft.photoUrl = url;
+  const box = document.getElementById('ex-upload-box');
+  box.querySelector('img')?.remove();
+  const img = document.createElement('img');
+  img.src = url;
+  box.insertBefore(img, box.firstChild);
+  document.getElementById('ex-upload-label').textContent = '사진이 첨부되었어요 · 다시 선택하려면 누르세요';
+}
+function onPayerChange(){
+  state.expenseDraft.payerId = document.getElementById('ex-payer').value;
+  renderParticipants();
+  validateExpenseForm();
+}
+function onAmountInput(){
+  const d = state.expenseDraft;
+  const amount = parseInt(document.getElementById('ex-amount').value||'0',10);
+  if(d){
+    if(d.splitMode==='equal'){
+      renderParticipants(); // N분의 1 결과(원)가 총액에 따라 바뀌므로 다시 그림
+    } else if(d.splitMode==='percent'){
+      // 입력 중인 비율(%) 값은 그대로 두고, 옆에 보이는 원화 환산 금액만 갱신
+      d.participantIds.forEach(id=>{
+        const lbl = document.getElementById('share-wonlabel-'+id);
+        if(lbl) lbl.textContent = won(Math.round(amount*(d.customShares[id]||0)/100));
+      });
+    }
+  }
+  validateExpenseForm();
+}
+function renderParticipants(){
+  const g = getActiveGroup();
+  const wrap = document.getElementById('ex-participants');
+  const d = state.expenseDraft;
+  const amount = parseInt(document.getElementById('ex-amount').value||'0',10);
+  let equalShares = {};
+  if(d.splitMode==='equal') equalShares = splitShares(amount, d.participantIds, d.payerId);
+
+  wrap.innerHTML = g.members.map(m=>{
+    const on = d.participantIds.includes(m.id);
+    let rightHtml = '';
+    if(on){
+      if(d.splitMode==='equal'){
+        rightHtml = `<div class="share-readonly">${won(equalShares[m.id]||0)}</div>`;
+      } else if(d.splitMode==='percent'){
+        const v = d.customShares[m.id] ?? 0;
+        rightHtml = `<div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+          <div class="share-input-wrap">
+            <input type="number" class="share-input" value="${v}" oninput="onShareInput('${m.id}', this.value)"/>
+            <span class="share-unit">%</span>
+          </div>
+          <div class="share-readonly" id="share-wonlabel-${m.id}" style="font-size:11px; color:#9C9686;">${won(Math.round(amount*v/100))}</div>
+        </div>`;
+      } else if(d.splitMode==='custom'){
+        const v = d.customShares[m.id] ?? 0;
+        rightHtml = `<div class="share-input-wrap">
+          <input type="number" class="share-input" value="${v}" oninput="onShareInput('${m.id}', this.value)"/>
+          <span class="share-unit">원</span>
+        </div>`;
+      }
+    }
+    return `<div class="check-row">
+      <div class="checkbox ${on?'on':''}" onclick="toggleParticipant('${m.id}')" style="cursor:pointer;">${on?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M4 12l6 6L20 6"/></svg>':''}</div>
+      <div class="cname" onclick="toggleParticipant('${m.id}')" style="cursor:pointer;">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
+      ${m.id===d.payerId?'<div class="payer-tag">결제자</div>':''}
+      ${rightHtml}
+    </div>`;
+  }).join('');
+}
+function toggleParticipant(id){
+  const list = state.expenseDraft.participantIds;
+  const idx = list.indexOf(id);
+  if(idx>-1){
+    if(list.length===1){ showToast('최소 1명은 선택되어야 해요'); return; }
+    list.splice(idx,1);
+  } else list.push(id);
+  if(state.expenseDraft.splitMode!=='equal') initDefaultShares();
+  renderParticipants();
+  updateSplitSummary();
+  validateExpenseForm();
+}
+function onShareInput(id, value){
+  const v = parseFloat(value);
+  state.expenseDraft.customShares[id] = isNaN(v) ? 0 : v;
+  if(state.expenseDraft.splitMode==='percent'){
+    const amount = parseInt(document.getElementById('ex-amount').value||'0',10);
+    const lbl = document.getElementById('share-wonlabel-'+id);
+    if(lbl) lbl.textContent = won(Math.round(amount*(state.expenseDraft.customShares[id]||0)/100));
+  }
+  updateSplitSummary();
+  validateExpenseForm();
+}
+function validateExpenseForm(){
+  const amt = parseInt(document.getElementById('ex-amount').value || '0', 10);
+  const title = document.getElementById('ex-title').value.trim();
+  const d = state.expenseDraft;
+  updateSplitSummary();
+  const r = d ? computeSplitValidity() : {valid:true};
+  const ok = amt > 0 && title.length>0 && d && d.participantIds.length>0 && r.valid;
+  document.getElementById('ex-submit-btn').disabled = !ok;
+}
+function submitExpense(){
+  const g = getActiveGroup();
+  const amount = parseInt(document.getElementById('ex-amount').value,10);
+  const title = document.getElementById('ex-title').value.trim();
+  const d = state.expenseDraft;
+  const today = new Date();
+  const dateLabel = (today.getMonth()+1)+'월 '+today.getDate()+'일';
+  const shares = resolveShares(amount, d.splitMode, d.participantIds, d.payerId, d.customShares);
+  g.expenses.unshift({
+    id: uid('e'), title, amount,
+    category: d.category,
+    payerId: d.payerId,
+    participantIds: d.participantIds.slice(),
+    splitMode: d.splitMode,
+    shares,
+    dateLabel, photoUrl: d.photoUrl,
+  });
+  showToast('지출이 등록되었습니다');
+  const payer = g.members.find(m=>m.id===d.payerId);
+  addNotification(`${payer?payer.name:''}님이 '${title}' 지출을 등록했어요`);
+  nav('screen-group');
+  setGroupTab('expense');
+}
+
+/* ---- 정산 탭(04+06): 최소 송금 계산 + 송금하기 ---- */
+function computeMinTransfers(g){
+  const {balances} = computeBalances(g);
+  let creditors = Object.entries(balances).filter(([,v])=>v>0.5).map(([id,v])=>({id, amt:v}));
+  let debtors = Object.entries(balances).filter(([,v])=>v<-0.5).map(([id,v])=>({id, amt:-v}));
+  creditors.sort((a,b)=>b.amt-a.amt);
+  debtors.sort((a,b)=>b.amt-a.amt);
+  const tx = [];
+  let i=0, j=0;
+  while(i<debtors.length && j<creditors.length){
+    const pay = Math.min(debtors[i].amt, creditors[j].amt);
+    if(pay>0.5) tx.push({from:debtors[i].id, to:creditors[j].id, amount:Math.round(pay)});
+    debtors[i].amt -= pay; creditors[j].amt -= pay;
+    if(debtors[i].amt<1) i++;
+    if(creditors[j].amt<1) j++;
+  }
+  return tx;
+}
+function renderSettleTab(){
+  const g = getActiveGroup();
+  const tx = computeMinTransfers(g);
+  const wrap = document.getElementById('settle-list-wrap');
+  if(tx.length===0){
+    wrap.innerHTML = `<div class="empty"><div class="big-icon">✓</div>정산할 금액이 없어요.<br/>모두 정확히 나눠 냈어요.</div>`;
+    return;
+  }
+  wrap.innerHTML = tx.map(t=>{
+    const from = g.members.find(m=>m.id===t.from);
+    const to = g.members.find(m=>m.id===t.to);
+    const isMe = t.from === state.currentUser.id;
+    return `<div class="flow-row" id="flow-${t.from}-${t.to}">
+      <div class="flow-top">
+        <div class="flow-name">${from.name}${from.id===state.currentUser.id?' (나)':''}</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-name">${to.name}${to.id===state.currentUser.id?' (나)':''}</div>
+        <div class="flow-amt">${won(t.amount)}</div>
+      </div>
+      <div class="flow-account"
+           onmousedown="startLongPress('${to.account}', this)"
+           onmouseup="cancelLongPress(this)" onmouseleave="cancelLongPress(this)"
+           ontouchstart="startLongPress('${to.account}', this)" ontouchend="cancelLongPress(this)">
+        <div class="acc-text">${to.bank} ${to.account}</div>
+        <div class="copy-hint">${isMe ? '길게 눌러 계좌번호 복사' : '받는 사람 계좌'}</div>
+        <div class="press-bar"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* 롱프레스로 계좌번호 복사 */
+let __pressTimer=null, __pressStart=0;
+function startLongPress(account, el){
+  __pressStart = Date.now();
+  const bar = el.querySelector('.press-bar');
+  bar.style.transition = 'width .55s linear';
+  requestAnimationFrame(()=> bar.style.width='100%');
+  __pressTimer = setTimeout(()=>{
+    copyToClipboard(account);
+    showToast('계좌번호가 복사되었습니다');
+    el.closest('.flow-row').classList.add('press');
+    setTimeout(()=> el.closest('.flow-row').classList.remove('press'), 350);
+    resetPressBar(el);
+  }, 550);
+}
+function cancelLongPress(el){
+  clearTimeout(__pressTimer);
+  resetPressBar(el);
+}
+function resetPressBar(el){
+  const bar = el.querySelector('.press-bar');
+  bar.style.transition = 'none';
+  bar.style.width = '0%';
+}
+function copyToClipboard(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));
+  } else fallbackCopy(text);
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+/* ---- 그룹 내 멤버 초대 화면 ---- */
+function renderGroupInviteScreen(){
+  const g = getActiveGroup();
+  document.getElementById('gi-code-value').textContent = g.inviteCode;
+  document.getElementById('gi-member-list').innerHTML = g.members.map(m=>`
+    <div class="person-row">
+      <div class="avatar">${m.name.slice(0,1)}</div>
+      <div class="pname" style="flex:1;">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
+    </div>`).join('');
+}
+document.getElementById('screen-group-invite').addEventListener('transitionstart', ()=>{});
+const _origNav = nav;
+nav = function(id){
+  _origNav(id);
+  document.getElementById('notif-panel')?.classList.remove('show');
+  if(id==='screen-group-invite') renderGroupInviteScreen();
+};
+</script>
+</body>
+</html>
