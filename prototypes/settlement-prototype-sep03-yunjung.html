@@ -513,7 +513,7 @@
           <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
           멤버 초대
         </div>
-        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="dismissInviteCoach(); openCopyCodeFlow()">코드 복사</div>
+        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="dismissInviteCoach(); copyInviteCode()">코드 복사</div>
       </div>
     </div>
 
@@ -579,21 +579,6 @@
     </div>
   </div>
 
-  <!-- ================= 코드 복사 (예상 인원수 지정) ================= -->
-  <div class="screen" id="screen-copy-code">
-    <div class="topbar">
-      <div class="back" onclick="nav('screen-group')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
-      <h1>초대코드 복사</h1>
-    </div>
-    <div class="pad">
-      <p class="sub">총 몇 명이서 함께하나요? (나 포함)<br/>아직 안 들어온 인원 자리도 미리 만들어서 정산 계산에 넣어둘게요.</p>
-      <label class="field-label">예상 인원수</label>
-      <input type="number" id="copy-code-count" placeholder="예) 5" oninput="onCopyCodeCountInput()"/>
-      <div style="margin-top:22px;">
-        <button class="btn btn-primary" id="copy-code-btn" disabled onclick="confirmCopyCodeWithCount()">인원수 확정하고 코드 복사</button>
-      </div>
-    </div>
-  </div>
 
   <!-- ================= 지출 등록 폼 ================= -->
   <div class="screen" id="screen-expense-form">
@@ -964,29 +949,6 @@ function copyInviteCode(){
   if(!g) return;
   copyToClipboard(g.inviteCode);
   showToast('초대코드가 복사되었습니다');
-}
-
-/* ---- 코드 복사: 예상 인원수만큼 이름 없는 대기 자리를 미리 만들어둠 ---- */
-function openCopyCodeFlow(){
-  const g = getActiveGroup();
-  if(!g) return;
-  document.getElementById('copy-code-count').value = g.members.length;
-  onCopyCodeCountInput();
-  nav('screen-copy-code');
-}
-function onCopyCodeCountInput(){
-  const v = parseInt(document.getElementById('copy-code-count').value, 10);
-  document.getElementById('copy-code-btn').disabled = !(v > 0);
-}
-function confirmCopyCodeWithCount(){
-  const g = getActiveGroup();
-  const total = parseInt(document.getElementById('copy-code-count').value, 10);
-  const toAdd = total - g.members.length;
-  for(let i=0; i<toAdd; i++){
-    g.members.push({id: uid('m'), name: `멤버 ${g.members.length+1}`, pending: true});
-  }
-  copyInviteCode();
-  openGroup(g.id);
 }
 /* 실제 구현에서는 Kakao.Share.sendDefault()로 참여 링크(초대코드 파라미터 포함)를 전송.
    프로토타입에서는 카카오톡 공유 시트가 열리는 것만 흉내냄. */
