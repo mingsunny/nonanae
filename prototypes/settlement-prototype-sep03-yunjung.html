@@ -100,6 +100,14 @@
   h2.big{font-size:24px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em;}
   p.sub{font-size:13.5px; color:var(--ink-soft); margin:0 0 24px; line-height:1.5;}
 
+  /* 로그인 화면 가이드 캐러셀: 한 줄 문구가 순환하며 페이드 전환 */
+  .login-guide{margin:-8px 0 20px;}
+  .login-guide-text{font-size:12.5px; font-weight:700; color:var(--teal-deep); min-height:16px; opacity:1; transition:opacity .3s;}
+  .login-guide-text.fade{opacity:0;}
+  .login-guide-dots{display:flex; gap:5px; margin-top:8px;}
+  .login-guide-dots .dot{width:5px; height:5px; border-radius:50%; background:var(--line); transition:background .3s;}
+  .login-guide-dots .dot.active{background:var(--teal-deep);}
+
   label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); display:block; margin:16px 0 7px;}
   input[type=text], input[type=email], input[type=number]{
     width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line);
@@ -341,6 +349,12 @@
     <div class="pad" style="padding-top:90px;">
       <h2 class="big">정산일지</h2>
       <p class="sub">여행에서 함께 쓴 돈, 카카오로 로그인하고<br/>가장 간단하게 정산해보세요.</p>
+      <div class="login-guide">
+        <div class="login-guide-text" id="login-guide-text">카카오 로그인, 계좌만 등록하면 끝</div>
+        <div class="login-guide-dots" id="login-guide-dots">
+          <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+      </div>
       <div style="margin-top:22px;">
         <button class="btn btn-kakao" id="login-btn" onclick="doKakaoLogin()">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
@@ -711,6 +725,24 @@ function showToast(msg){
 /* =========================================================
    01. 로그인
    ========================================================= */
+/* 로그인 화면 가이드 캐러셀: 3개 문구를 순서대로 페이드 전환 */
+const LOGIN_GUIDE_MESSAGES = ['카카오 로그인, 계좌만 등록하면 끝', '지출 등록하면 정산 금액 자동 계산', '카카오톡으로 친구 초대'];
+let loginGuideIndex = 0;
+function startLoginGuideCarousel(){
+  const textEl = document.getElementById('login-guide-text');
+  const dots = document.querySelectorAll('#login-guide-dots .dot');
+  setInterval(()=>{
+    textEl.classList.add('fade');
+    setTimeout(()=>{
+      loginGuideIndex = (loginGuideIndex+1) % LOGIN_GUIDE_MESSAGES.length;
+      textEl.textContent = LOGIN_GUIDE_MESSAGES[loginGuideIndex];
+      dots.forEach((d,i)=>d.classList.toggle('active', i===loginGuideIndex));
+      textEl.classList.remove('fade');
+    }, 300);
+  }, 2600);
+}
+startLoginGuideCarousel();
+
 /* 데모용 카카오 프로필 (실제 OAuth 없이 프로토타입에서 흉내만 냄) */
 const DEMO_KAKAO_PROFILE = {kakaoId:'kakao_demo_1', name:'카카오유저'};
 function doKakaoLogin(){
