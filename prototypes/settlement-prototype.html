@@ -1021,15 +1021,19 @@ function mergePendingMember(g, placeholderId){
 }
 function confirmJoinMatch(placeholderId){
   const g = state.groups.find(gr=>gr.id===state.pendingJoinGroupId);
-  state.pendingJoinGroupId = null;
   if(!g) return;
   if(placeholderId){
+    // 같은 초대 링크가 여러 명에게 한 번에 가다 보니, 목록에서 엉뚱한 이름을 잘못 누르는 걸
+    // 막기 위해 한 번 더 확인 — 실수로 다른 사람 지출 내역이 나한테 연결되는 걸 방지
+    const m = g.members.find(mm=>mm.id===placeholderId);
+    if(!confirm(`${m.name}님 본인이 맞나요?\n확인하면 이 이름으로 등록된 지출이 전부 내 걸로 연결돼요.`)) return;
     mergePendingMember(g, placeholderId);
     showToast('기존에 등록된 멤버와 연결됐어요');
   } else {
     g.members.push(state.currentUser);
     addNotification('member_joined', {groupId:g.id, memberId:state.currentUser.id});
   }
+  state.pendingJoinGroupId = null;
   renderGroupsList();
   openGroup(g.id);
 }
@@ -1143,7 +1147,10 @@ function renderExpenseTab(){
   const g = getActiveGroup();
   const wrap = document.getElementById('expense-list-wrap');
   if(g.expenses.length===0){
-    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.</div>`;
+    wrap.innerHTML = `<div class="empty">
+      <div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.
+      <button class="btn btn-outline" style="width:auto; padding:10px 18px; font-size:13px; margin:16px auto 0;" onclick="nav('screen-group-invite')">멤버 초대하기</button>
+    </div>`;
     return;
   }
   // group by dateLabel
@@ -1172,6 +1179,7 @@ function renderExpenseTab(){
 function openExpenseForm(expenseId){
   const g = getActiveGroup();
   const editing = expenseId ? g.expenses.find(e=>e.id===expenseId) : null;
+  if(!editing) showToast(`현재 ${g.members.length}명으로 정산돼요`);
 
   document.getElementById('ex-amount').value = editing ? editing.amount : '';
   document.getElementById('ex-title').value = editing ? editing.title : '';
