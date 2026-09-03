@@ -93,6 +93,9 @@
   .topbar .back svg{width:14px;height:14px;}
   .topbar h1{font-size:16px; font-weight:700; margin:0; flex:1;}
   .topbar .ghost-btn{font-size:12.5px; color:var(--ink-soft); cursor:pointer; padding:6px 10px;}
+  .topbar .bell-btn{position:relative; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:var(--ink);}
+  .topbar .bell-btn svg{width:22px; height:22px;}
+  .bell-dot{position:absolute; top:5px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--brick); border:2px solid var(--paper);}
 
   h2.big{font-size:24px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em;}
   p.sub{font-size:13.5px; color:var(--ink-soft); margin:0 0 24px; line-height:1.5;}
@@ -345,6 +348,10 @@
   <div class="screen" id="screen-groups">
     <div class="topbar">
       <h1 id="groups-greeting">내 그룹</h1>
+      <div class="bell-btn" onclick="renderNotifications(); nav('screen-notifications')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5z"/><path d="M9.5 17a2.5 2.5 0 0 0 5 0"/></svg>
+        <div class="bell-dot" id="noti-dot" style="display:none;"></div>
+      </div>
     </div>
 
     <!-- ---- GNB Tab: 홈 ---- -->
@@ -391,6 +398,17 @@
         <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-6.8 7.5-6.8s7.5 2.8 7.5 6.8"/></svg>
         <span>프로필</span>
       </div>
+    </div>
+  </div>
+
+  <!-- ================= 02b. 알림 내역 ================= -->
+  <div class="screen" id="screen-notifications">
+    <div class="topbar">
+      <div class="back" onclick="nav('screen-groups')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <h1>알림</h1>
+    </div>
+    <div class="pad" style="padding-top:8px;">
+      <div id="noti-list-wrap"></div>
     </div>
   </div>
 
@@ -448,26 +466,20 @@
       </div>
     </div>
 
-    <div class="toggle-group" style="margin:14px 22px;">
-      <div class="opt active" data-gvtab="expense" onclick="setGroupView('expense')">지출</div>
-      <div class="opt" data-gvtab="settle" onclick="setGroupView('settle')">정산</div>
-      <div class="opt" data-gvtab="stats" onclick="setGroupView('stats')">통계</div>
-    </div>
-
     <!-- ---- View: 지출 업로드/내역 (기본 화면) ---- -->
-    <div id="view-expense" class="pad" style="flex:1; display:block; padding-top:0;">
+    <div id="view-expense" class="pad" style="flex:1; display:block; padding-top:18px;">
       <div id="expense-list-wrap"></div>
     </div>
 
     <!-- ---- View: 정산(최소송금) ---- -->
-    <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:0;">
-      <p class="sub" style="margin-bottom:14px; margin-top:16px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요. 지출을 등록하면 정산 결과도 실시간으로 바로 반영돼요.</p>
+    <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:18px;">
+      <p class="sub" style="margin-bottom:14px; margin-top:0;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요. 지출을 등록하면 정산 결과도 실시간으로 바로 반영돼요.</p>
       <div id="settle-list-wrap"></div>
     </div>
 
     <!-- ---- View: 통계(인원별/카테고리별 요약) ---- -->
-    <div id="view-stats" class="pad" style="flex:1; display:none; padding-top:0;">
-      <div class="date-label" style="margin-top:16px;">인원별</div>
+    <div id="view-stats" class="pad" style="flex:1; display:none; padding-top:18px;">
+      <div class="date-label" style="margin-top:0;">인원별</div>
       <div class="card" id="home-person-view"></div>
       <div class="date-label">카테고리별</div>
       <div class="card" id="home-category-view"></div>
@@ -478,13 +490,17 @@
     </div>
 
     <div class="tabbar">
-      <div class="tab active" data-gtab="home" onclick="goGlobalHome()">
-        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>
-        <span>홈</span>
+      <div class="tab active" data-gvtab="expense" onclick="setGroupView('expense')">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v16l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3V3z"/><path d="M9 7.5h6M9 11h6"/></svg>
+        <span>지출</span>
       </div>
-      <div class="tab" data-gtab="profile" onclick="goGlobalProfile()">
-        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-6.8 7.5-6.8s7.5 2.8 7.5 6.8"/></svg>
-        <span>프로필</span>
+      <div class="tab" data-gvtab="settle" onclick="setGroupView('settle')">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h10m0 0-3-3m3 3-3 3M17 16H7m0 0 3-3m-3 3 3 3"/></svg>
+        <span>정산</span>
+      </div>
+      <div class="tab" data-gvtab="stats" onclick="setGroupView('stats')">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20V14M12 20V9M18 20V5"/></svg>
+        <span>통계</span>
       </div>
     </div>
   </div>
@@ -576,6 +592,7 @@ let state = {
   groups: [],
   activeGroupId: null,
   expenseDraft: null,
+  notifications: [], // 전역 알림 내역 (최신순)
 };
 
 function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,8); }
@@ -616,6 +633,28 @@ function seedDemoGroup(currentUser){
   group.expenses.push(mk('기념품 쇼핑', 56000, 'shopping', me, all, '10월 14일'));
 
   return group;
+}
+
+/* 데모용 알림 시드: 지출 등록 1건 + 멤버 참여 1건 예시를 미리 채워둠 */
+function seedDemoNotifications(g){
+  const joined = g.members.find(m=>m.name==='이하준');
+  if(joined){
+    state.notifications.push({
+      id: uid('n'), type:'member_joined', groupId:g.id, memberId:joined.id,
+      title:`${joined.name}님이 초대 링크로 참여했어요`, sub:g.name,
+      timeLabel:'10월 11일', read:true,
+    });
+  }
+  const lastExpense = g.expenses[g.expenses.length-1];
+  if(lastExpense){
+    const payer = g.members.find(m=>m.id===lastExpense.payerId);
+    state.notifications.unshift({
+      id: uid('n'), type:'expense', groupId:g.id, expenseId:lastExpense.id,
+      title:`${payer?payer.name:'누군가'}님이 '${lastExpense.title}'을 등록했어요`,
+      sub:`${g.name} · ${won(lastExpense.amount)}`,
+      timeLabel:lastExpense.dateLabel, read:false,
+    });
+  }
 }
 
 /* =========================================================
@@ -681,9 +720,11 @@ function afterAuthed(){
     // 데모 그룹을 현재 로그인한 사용자로 시드
     const g = seedDemoGroup(state.currentUser);
     state.groups.push(g);
+    seedDemoNotifications(g);
   }
   document.getElementById('groups-greeting').textContent = state.currentUser.name + '님의 그룹';
   setGroupsTab('home');
+  renderNotiDot();
   nav('screen-groups');
 }
 
@@ -790,7 +831,10 @@ function joinGroupByCode(){
     document.getElementById('join-error').style.display = 'block';
     return;
   }
-  if(!g.members.find(m=>m.id===state.currentUser.id)) g.members.push(state.currentUser);
+  if(!g.members.find(m=>m.id===state.currentUser.id)){
+    g.members.push(state.currentUser);
+    addNotification('member_joined', {groupId:g.id, memberId:state.currentUser.id});
+  }
   document.getElementById('join-code-input').value='';
   renderGroupsList();
   openGroup(g.id);
@@ -813,7 +857,7 @@ function openGroup(id){
 
 /* 그룹 내부 뷰: 지출(기본) / 정산(최소송금 + 인원별·카테고리별 요약) */
 function setGroupView(view){
-  document.querySelectorAll('#screen-group .toggle-group .opt[data-gvtab]').forEach(o=>o.classList.toggle('active', o.dataset.gvtab===view));
+  document.querySelectorAll('#screen-group .tabbar .tab[data-gvtab]').forEach(o=>o.classList.toggle('active', o.dataset.gvtab===view));
   document.getElementById('view-expense').style.display = view==='expense' ? 'block':'none';
   document.getElementById('view-settle').style.display = view==='settle' ? 'block':'none';
   document.getElementById('view-stats').style.display = view==='stats' ? 'block':'none';
@@ -822,9 +866,8 @@ function setGroupView(view){
   if(view==='settle') renderSettleTab();
   if(view==='stats') renderHomeTab();
 }
-/* 하단 전역 GNB: 그룹 화면에서도 항상 홈/프로필로 이동 */
+/* 그룹 화면 상단 back 버튼: 전역 홈으로 이동 */
 function goGlobalHome(){ nav('screen-groups'); setGroupsTab('home'); }
-function goGlobalProfile(){ nav('screen-groups'); setGroupsTab('profile'); }
 
 function computeBalances(g){
   const balances = {};
@@ -1128,7 +1171,7 @@ function submitExpense(){
   } else {
     const today = new Date();
     const dateLabel = (today.getMonth()+1)+'월 '+today.getDate()+'일';
-    g.expenses.unshift({
+    const newExpense = {
       id: uid('e'), title, amount,
       category: state.expenseDraft.category,
       payerId: state.expenseDraft.payerId,
@@ -1136,12 +1179,70 @@ function submitExpense(){
       splitMode: state.expenseDraft.splitMode,
       customShares: finalizeCustomShares(amount),
       dateLabel, photoUrl: state.expenseDraft.photoUrl,
-    });
+    };
+    g.expenses.unshift(newExpense);
+    addNotification('expense', {groupId:g.id, expenseId:newExpense.id});
     showToast('지출이 등록되었습니다');
   }
   nav('screen-group');
   setGroupView('expense');
 }
+/* ---- 알림 내역 ---- */
+function addNotification(type, payload){
+  const g = state.groups.find(gr=>gr.id===payload.groupId);
+  if(!g) return;
+  let title, sub;
+  if(type==='expense'){
+    const e = g.expenses.find(x=>x.id===payload.expenseId);
+    if(!e) return;
+    const payer = g.members.find(m=>m.id===e.payerId);
+    title = `${payer?payer.name:'누군가'}님이 '${e.title}'을 등록했어요`;
+    sub = `${g.name} · ${won(e.amount)}`;
+  } else if(type==='member_joined'){
+    const m = g.members.find(mm=>mm.id===payload.memberId);
+    if(!m) return;
+    title = `${m.name}님이 초대 링크로 참여했어요`;
+    sub = g.name;
+  }
+  state.notifications.unshift({
+    id: uid('n'), type, groupId: g.id,
+    expenseId: payload.expenseId || null,
+    title, sub, timeLabel:'방금', read:false,
+  });
+  renderNotiDot();
+}
+function renderNotiDot(){
+  document.getElementById('noti-dot').style.display = state.notifications.some(n=>!n.read) ? 'block' : 'none';
+}
+function renderNotifications(){
+  const wrap = document.getElementById('noti-list-wrap');
+  if(state.notifications.length===0){
+    wrap.innerHTML = `<div class="empty"><div class="big-icon">🔔</div>아직 도착한 알림이 없어요.</div>`;
+    return;
+  }
+  wrap.innerHTML = state.notifications.map(n=>`
+    <div class="receipt" style="cursor:pointer;" onclick="openNotification('${n.id}')">
+      <div class="cat-badge" style="background:${n.type==='expense'?'var(--teal)':'var(--amber)'};">${n.type==='expense'?'₩':'참'}</div>
+      <div class="rinfo">
+        <div class="rtitle">${n.read?'':'<span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--brick); margin-right:6px;"></span>'}${n.title}</div>
+        <div class="rsub">${n.sub}</div>
+      </div>
+      <div class="ramt" style="font-size:11px; font-weight:600; color:var(--ink-soft);">${n.timeLabel}</div>
+    </div>`).join('');
+}
+function openNotification(id){
+  const n = state.notifications.find(x=>x.id===id);
+  if(!n) return;
+  n.read = true;
+  renderNotiDot();
+  openGroup(n.groupId);
+  if(n.type==='expense'){
+    openExpenseForm(n.expenseId);
+  } else if(n.type==='member_joined'){
+    nav('screen-group-invite');
+  }
+}
+
 function deleteExpense(){
   const g = getActiveGroup();
   const id = state.expenseDraft.editingId;
