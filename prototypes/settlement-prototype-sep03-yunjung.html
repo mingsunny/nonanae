@@ -674,7 +674,7 @@ function seedDemoNotifications(g){
   if(joined){
     state.notifications.push({
       id: uid('n'), type:'member_joined', groupId:g.id, memberId:joined.id,
-      title:`${joined.name}님이 초대 링크로 참여했어요`,
+      title:`${joined.name}님이 [${g.name}] 그룹에 참여했어요`,
       timeLabel:'10월 11일', read:true,
     });
   }
@@ -683,7 +683,7 @@ function seedDemoNotifications(g){
     const payer = g.members.find(m=>m.id===lastExpense.payerId);
     state.notifications.unshift({
       id: uid('n'), type:'expense', groupId:g.id, expenseId:lastExpense.id,
-      title:`${payer?payer.name:'누군가'}님이 '${lastExpense.title}'을 등록했어요`,
+      title:`${payer?payer.name:'누군가'}님이 [${g.name}]에 내역을 추가했어요`,
       timeLabel:lastExpense.dateLabel, read:false,
     });
   }
@@ -1237,11 +1237,11 @@ function addNotification(type, payload){
     const e = g.expenses.find(x=>x.id===payload.expenseId);
     if(!e) return;
     const payer = g.members.find(m=>m.id===e.payerId);
-    title = `${payer?payer.name:'누군가'}님이 '${e.title}'을 등록했어요`;
+    title = `${payer?payer.name:'누군가'}님이 [${g.name}]에 내역을 추가했어요`;
   } else if(type==='member_joined'){
     const m = g.members.find(mm=>mm.id===payload.memberId);
     if(!m) return;
-    title = `${m.name}님이 초대 링크로 참여했어요`;
+    title = `${m.name}님이 [${g.name}] 그룹에 참여했어요`;
   }
   state.notifications.unshift({
     id: uid('n'), type, groupId: g.id,
