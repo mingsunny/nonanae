@@ -100,11 +100,14 @@
   h2.big{font-size:24px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em;}
   p.sub{font-size:13.5px; color:var(--ink-soft); margin:0 0 24px; line-height:1.5;}
 
-  /* 왜 이 행동이 필요한지 강조하는 가이드 박스 (로그인/계좌등록 화면) */
+  /* 왜/어떻게 이 행동이 필요한지 강조하는 가이드 박스. 어떤 버튼을 눌러야 하는지
+     가리킬 때는 .guide-callout-arrow 아이콘을 같이 넣어서 방향을 알려줌 */
   .guide-callout{
+    display:flex; align-items:center; gap:8px;
     background:#EAF4F3; border-radius:12px; padding:12px 14px; margin:0 0 22px;
     font-size:13px; font-weight:700; color:var(--teal-deep); line-height:1.5;
   }
+  .guide-callout-arrow{flex-shrink:0;}
 
   label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); display:block; margin:16px 0 7px;}
   input[type=text], input[type=email], input[type=number]{
@@ -400,7 +403,10 @@
         <button class="btn btn-primary" id="create-group-entry-btn" onclick="dismissGroupCreateCoach(); nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
-      <div class="guide-callout" id="group-create-hint" style="display:none;">그룹을 만들고 정산을 시작해요</div>
+      <div class="guide-callout" id="group-create-hint" style="display:none;">
+        <svg class="guide-callout-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12V2M7 2 3 6M7 2l4 4"/></svg>
+        <span>그룹을 만들고 정산을 시작해요</span>
+      </div>
       <div id="groups-list-wrap">
         <!-- JS renders group rows -->
       </div>
@@ -578,7 +584,6 @@
       <h1 id="ex-form-title">지출 추가</h1>
     </div>
     <div class="pad" style="padding-bottom:100px;">
-      <div id="ex-headcount-banner" class="guide-callout" style="display:none;"></div>
       <label class="field-label">사용 금액</label>
       <input type="number" id="ex-amount" placeholder="0" oninput="renderParticipants(); validateExpenseForm();"/>
 
@@ -882,7 +887,7 @@ function dismissGroupCreateCoach(){
 }
 function updateGroupCreateHint(){
   const show = !!state.currentUser && !state.currentUser.seenGroupCreateCoach && state.groups.length===0;
-  document.getElementById('group-create-hint').style.display = show ? 'block' : 'none';
+  document.getElementById('group-create-hint').style.display = show ? 'flex' : 'none';
 }
 
 function copyInviteCode(){
@@ -1091,7 +1096,10 @@ function renderExpenseTab(){
     // 아직 아무도 초대 안 했으면(=나 혼자) "멤버부터 초대하라"는 안내만, 이미 멤버가
     // 있으면 "지출을 추가하라"는 안내만 — 두 메시지를 동시에 보여주지 않고 상태에 따라 하나만
     if(g.members.length===1){
-      wrap.innerHTML = `<div class="guide-callout">위에서 친구를 초대해보세요</div>`;
+      wrap.innerHTML = `<div class="guide-callout">
+        <svg class="guide-callout-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12V2M7 2 3 6M7 2l4 4"/></svg>
+        <span>정산할 친구를 초대해주세요</span>
+      </div>`;
     } else {
       wrap.innerHTML = `<div class="empty">
         <div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.
@@ -1125,15 +1133,6 @@ function renderExpenseTab(){
 function openExpenseForm(expenseId){
   const g = getActiveGroup();
   const editing = expenseId ? g.expenses.find(e=>e.id===expenseId) : null;
-  // 멤버가 이미 여러 명이면 아래 "함께 사용한 인원" 목록만 봐도 알 수 있어서 굳이 또 알려줄 필요
-  // 없음 — 나 혼자일 때(=까먹고 혼자 등록할 위험이 있을 때)만 새로 등록하는 경우에 띄움
-  const banner = document.getElementById('ex-headcount-banner');
-  if(!editing && g.members.length===1){
-    banner.textContent = '현재 나 혼자라 나 혼자 낸 걸로 기록돼요';
-    banner.style.display = 'block';
-  } else {
-    banner.style.display = 'none';
-  }
 
   document.getElementById('ex-amount').value = editing ? editing.amount : '';
   document.getElementById('ex-title').value = editing ? editing.title : '';
