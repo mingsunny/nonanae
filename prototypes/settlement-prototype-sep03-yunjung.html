@@ -152,9 +152,7 @@
   .group-create-hint-text{font-size:13px; font-weight:700; margin-top:2px;}
 
   /* 지출 empty state: 헤더의 "멤버 초대" 버튼을 가리키는 안내 (버튼 중복 없이 위쪽을 가리킴) */
-  .list-invite-hint{text-align:center; margin-bottom:16px; color:var(--teal-deep);}
-  .list-invite-hint svg{display:block; margin:0 auto;}
-  .list-invite-hint-text{font-size:13px; font-weight:700; margin-top:2px;}
+  .list-invite-hint-text{font-size:13px; font-weight:700; color:var(--teal-deep); margin-top:6px;}
 
   /* 알림 레이어: 화면 전환 없이 현재 화면 위에 드롭다운으로 뜸 */
   .noti-overlay{
@@ -1100,17 +1098,18 @@ function renderExpenseTab(){
   const g = getActiveGroup();
   const wrap = document.getElementById('expense-list-wrap');
   if(g.expenses.length===0){
-    // 아직 아무도 초대 안 했으면(=나 혼자) 헤더의 "멤버 초대" 버튼을 가리키는 화살표만 노출 —
-    // 버튼을 여기 또 만들면 헤더 버튼이랑 중복이라, 위쪽을 가리키는 안내로 대신함
-    const inviteHint = g.members.length===1 ? `
-      <div class="list-invite-hint">
-        <svg width="18" height="24" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 22V4M9 4l-6 6M9 4l6 6"/></svg>
+    // 아직 아무도 초대 안 했으면(=나 혼자) "멤버부터 초대하라"는 안내만, 이미 멤버가
+    // 있으면 "지출을 추가하라"는 안내만 — 두 메시지를 동시에 보여주지 않고 상태에 따라 하나만
+    if(g.members.length===1){
+      wrap.innerHTML = `<div class="empty">
+        <svg width="18" height="24" viewBox="0 0 18 24" fill="none" stroke="var(--teal-deep)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 22V4M9 4l-6 6M9 4l6 6"/></svg>
         <div class="list-invite-hint-text">위에서 친구를 초대해보세요</div>
-      </div>` : '';
-    wrap.innerHTML = `<div class="empty">
-      ${inviteHint}
-      <div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.
-    </div>`;
+      </div>`;
+    } else {
+      wrap.innerHTML = `<div class="empty">
+        <div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.
+      </div>`;
+    }
     return;
   }
   // group by dateLabel
