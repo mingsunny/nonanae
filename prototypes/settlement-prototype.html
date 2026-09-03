@@ -145,16 +145,11 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
-  /* 첫 방문 코치마크: catcher가 .phone 전체를 균일하게 딤 처리하고(헤더·GNB 포함),
-     타겟 위치만 clip-path로 구멍을 뚫어 원래 요소가 그대로 밝게 보이도록 함.
-     (이전엔 타겟 자신의 box-shadow로 딤을 흉내냈는데, 스크롤 컨테이너의
-     overflow에 가려 헤더/GNB처럼 그 바깥 영역은 딤이 안 되는 문제가 있었음) */
-  .coach-catcher{position:absolute; inset:0; z-index:400; cursor:pointer; background:rgba(22,34,59,.6); transition:clip-path .2s ease;}
-  .coach-tip-text{
-    display:none; position:absolute; left:22px; right:22px; z-index:402;
-    color:#fff; font-size:13.5px; font-weight:700; line-height:1.5; text-align:center;
-    text-shadow:0 1px 6px rgba(0,0,0,.35); pointer-events:none;
-  }
+  /* 첫 그룹 만들기 안내: 딤 없이 화살표+텍스트만 (빈 홈 화면엔 어차피 다른 콘텐츠가 없어서
+     딤으로 시선을 뺏을 필요가 없음) */
+  .group-create-hint{display:none; text-align:center; margin-bottom:12px; color:var(--teal-deep);}
+  .group-create-hint svg{display:block; margin:0 auto;}
+  .group-create-hint-text{font-size:13px; font-weight:700; margin-top:2px;}
 
   /* 알림 레이어: 화면 전환 없이 현재 화면 위에 드롭다운으로 뜸 */
   .noti-overlay{
@@ -406,6 +401,10 @@
 
     <!-- ---- GNB Tab: 홈 ---- -->
     <div id="groups-tab-home" class="pad" style="flex:1; display:block;">
+      <div class="group-create-hint" id="group-create-hint">
+        <svg width="18" height="24" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v18M9 20l-6-6M9 20l6-6"/></svg>
+        <div class="group-create-hint-text">그룹을 만들고 정산을 시작해요</div>
+      </div>
       <div class="quick-actions" style="margin-top:0; margin-bottom:18px;">
         <button class="btn btn-primary" id="create-group-entry-btn" onclick="dismissGroupCreateCoach(); nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
@@ -508,12 +507,12 @@
       <div class="gname">이 여행에서 총 사용한 금액</div>
       <div class="gtotal" id="gh-total">₩0</div>
       <div class="members-strip" id="gh-members" style="cursor:pointer;" onclick="nav('screen-group-invite')"></div>
-      <div id="gh-invite-row" style="display:flex; gap:8px; margin-top:12px;">
-        <div class="invite-pill" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="dismissInviteCoach(); nav('screen-group-invite')">
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <div class="invite-pill" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="nav('screen-group-invite')">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
           멤버 초대
         </div>
-        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="dismissInviteCoach(); copyInviteCode()">코드 복사</div>
+        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="copyInviteCode()">코드 복사</div>
       </div>
     </div>
 
@@ -627,10 +626,6 @@
 
   <div class="toast" id="toast">복사되었습니다</div>
 
-  <!-- ================= 첫 방문 코치마크 (유저당 1회) ================= -->
-  <div class="coach-catcher" id="coach-catcher" style="display:none;" onclick="dismissCurrentCoach()"></div>
-  <div class="coach-tip-text" id="coach-tip-text"></div>
-
   <!-- ================= 알림 레이어 (오버레이) ================= -->
   <div class="noti-overlay" id="noti-overlay" onclick="if(event.target===this) closeNotifications()">
     <div class="noti-panel">
@@ -733,7 +728,6 @@ function seedDemoNotifications(g){
    화면 전환
    ========================================================= */
 function nav(id){
-  hideCoach(); // 화면을 벗어나면 떠 있던 코치마크는 항상 정리
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelector('.phone').scrollTop = 0;
@@ -789,13 +783,12 @@ function finishOnboarding(){
   afterAuthed();
 }
 function afterAuthed(){
-  // 첫 로그인 직후엔 그룹이 실제로 하나도 없어야 "+ 새 그룹 만들기" 코치마크가 자연스러움 —
+  // 첫 로그인 직후엔 그룹이 실제로 하나도 없어야 "＋ 새 그룹 만들기" 안내가 자연스러움 —
   // 데모 데이터는 그 첫 그룹을 실제로 만들 때 채워 넣음 (createGroup 참고)
   document.getElementById('groups-greeting').textContent = state.currentUser.name + '님의 그룹';
   setGroupsTab('home');
   renderNotiDot();
   nav('screen-groups');
-  maybeShowGroupCreateCoach();
 }
 
 /* =========================================================
@@ -817,6 +810,7 @@ function renderGroupsList(){
   `).join('');
   const empty = state.groups.length===0 ? `<div class="empty"><div class="big-icon">＋</div>아직 참여한 그룹이 없어요.<br/>새 그룹을 만들거나 초대코드로 참여해보세요.</div>` : '';
   wrap.innerHTML = rows + empty;
+  updateGroupCreateHint();
 }
 
 /* ---- 홈 화면 GNB: 홈 / 프로필 ---- */
@@ -882,66 +876,18 @@ function createGroup(){
   document.getElementById('new-group-name').value = '';
   document.getElementById('create-group-btn').disabled = true;
   openGroup(g.id);
-  if(isFirstGroup) maybeShowInviteCoach();
 }
 
-/* ---- 첫 방문 코치마크 (유저당 1회): 그룹 생성 -> 친구 초대 ---- */
-let activeCoachKey = null;
-function showCoach(key, targetId, text, placement){
-  const target = document.getElementById(targetId);
-  if(!target) return;
-  activeCoachKey = key;
-  const tip = document.getElementById('coach-tip-text');
-  tip.textContent = text;
-  tip.style.display = 'block';
-  const catcher = document.getElementById('coach-catcher');
-  catcher.style.display = 'block';
-  // catcher 자신의 rect를 기준으로 좌표를 잡아야 함 — .phone은 10px border가 있어서
-  // .phone의 getBoundingClientRect()(테두리 바깥 기준)를 쓰면 catcher(테두리 안쪽이 기준인
-  // 포지셔닝 컨텍스트)와 10px씩 어긋나 구멍 위치가 빗나감
-  const catcherRect = catcher.getBoundingClientRect();
-  const r = target.getBoundingClientRect();
-  const pad = 6;
-  const w = catcherRect.width, h = catcherRect.height;
-  const x1 = Math.max(0, r.left - catcherRect.left - pad), y1 = Math.max(0, r.top - catcherRect.top - pad);
-  const x2 = Math.min(w, r.right - catcherRect.left + pad), y2 = Math.min(h, r.bottom - catcherRect.top + pad);
-  catcher.style.clipPath = `path(evenodd, "M0,0 H${w} V${h} H0 Z M${x1},${y1} H${x2} V${y2} H${x1} Z")`;
-  if(placement==='below'){
-    tip.style.top = (r.bottom - catcherRect.top + 14) + 'px';
-    tip.style.bottom = 'auto';
-  } else {
-    tip.style.bottom = (catcherRect.bottom - r.top + 14) + 'px';
-    tip.style.top = 'auto';
-  }
-}
-function hideCoach(){
-  const catcher = document.getElementById('coach-catcher');
-  catcher.style.display = 'none';
-  catcher.style.clipPath = '';
-  document.getElementById('coach-tip-text').style.display = 'none';
-  activeCoachKey = null;
-}
+/* ---- 첫 그룹 만들기 안내 (유저당 1회): 빈 홈 화면엔 다른 콘텐츠가 없어서
+   딤 처리 없이 버튼 위 화살표+텍스트로만 안내. 초대 쪽은 별도 코치마크 없이
+   지출 empty state의 "멤버 초대하기" 버튼이 그 역할을 대신함. ---- */
 function dismissGroupCreateCoach(){
   if(state.currentUser) state.currentUser.seenGroupCreateCoach = true;
-  hideCoach();
+  updateGroupCreateHint();
 }
-function dismissInviteCoach(){
-  if(state.currentUser) state.currentUser.seenInviteCoach = true;
-  hideCoach();
-}
-function dismissCurrentCoach(){
-  if(activeCoachKey==='groupCreate') dismissGroupCreateCoach();
-  else if(activeCoachKey==='invite') dismissInviteCoach();
-}
-function maybeShowGroupCreateCoach(){
-  if(!state.currentUser || state.currentUser.seenGroupCreateCoach) return;
-  if(state.groups.length > 0) return;
-  setTimeout(()=>showCoach('groupCreate', 'create-group-entry-btn', '그룹을 만들고 정산을 시작해요', 'below'), 250);
-}
-function maybeShowInviteCoach(){
-  if(!state.currentUser || state.currentUser.seenInviteCoach) return;
-  // 두 버튼 다 다른 화면으로 이동해서, 순서대로 스포트라이트하지 않고 묶어서 한 번에 안내
-  setTimeout(()=>showCoach('invite', 'gh-invite-row', '멤버를 초대해요 — 이름으로 추가하거나 코드를 공유해요', 'below'), 250);
+function updateGroupCreateHint(){
+  const show = !!state.currentUser && !state.currentUser.seenGroupCreateCoach && state.groups.length===0;
+  document.getElementById('group-create-hint').style.display = show ? 'block' : 'none';
 }
 
 function copyInviteCode(){
