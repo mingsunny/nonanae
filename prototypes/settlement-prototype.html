@@ -100,13 +100,11 @@
   h2.big{font-size:24px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em;}
   p.sub{font-size:13.5px; color:var(--ink-soft); margin:0 0 24px; line-height:1.5;}
 
-  /* 로그인 화면 가이드 캐러셀: 한 줄 문구가 순환하며 페이드 전환 */
-  .login-guide{margin:-8px 0 20px;}
-  .login-guide-text{font-size:12.5px; font-weight:700; color:var(--teal-deep); min-height:16px; opacity:1; transition:opacity .3s;}
-  .login-guide-text.fade{opacity:0;}
-  .login-guide-dots{display:flex; gap:5px; margin-top:8px;}
-  .login-guide-dots .dot{width:5px; height:5px; border-radius:50%; background:var(--line); transition:background .3s;}
-  .login-guide-dots .dot.active{background:var(--teal-deep);}
+  /* 왜 이 행동이 필요한지 강조하는 가이드 박스 (로그인/계좌등록 화면) */
+  .guide-callout{
+    background:#EAF4F3; border-radius:12px; padding:12px 14px; margin:0 0 22px;
+    font-size:13px; font-weight:700; color:var(--teal-deep); line-height:1.5;
+  }
 
   label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); display:block; margin:16px 0 7px;}
   input[type=text], input[type=email], input[type=number]{
@@ -146,6 +144,15 @@
     transition:opacity .2s, transform .2s; z-index:200; white-space:nowrap;
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* 첫 방문 코치마크: 화면 전체를 덮는 catcher 위, 타겟 요소만 거대한 box-shadow 구멍으로 밝게 남겨 스포트라이트처럼 보이게 함 */
+  .coach-catcher{position:absolute; inset:0; z-index:400; cursor:pointer;}
+  .coach-highlight{position:relative; z-index:401 !important; box-shadow:0 0 0 9999px rgba(22,34,59,.55) !important; pointer-events:auto;}
+  .coach-tip-text{
+    display:none; position:absolute; left:22px; right:22px; z-index:402;
+    color:#fff; font-size:13.5px; font-weight:700; line-height:1.5; text-align:center;
+    text-shadow:0 1px 6px rgba(0,0,0,.35); pointer-events:none;
+  }
 
   /* 알림 레이어: 화면 전환 없이 현재 화면 위에 드롭다운으로 뜸 */
   .noti-overlay{
@@ -348,13 +355,7 @@
   <div class="screen active" id="screen-login">
     <div class="pad" style="padding-top:90px;">
       <h2 class="big">정산일지</h2>
-      <p class="sub">여행에서 함께 쓴 돈, 카카오로 로그인하고<br/>가장 간단하게 정산해보세요.</p>
-      <div class="login-guide">
-        <div class="login-guide-text" id="login-guide-text">카카오 로그인, 계좌만 등록하면 끝</div>
-        <div class="login-guide-dots" id="login-guide-dots">
-          <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
-        </div>
-      </div>
+      <div class="guide-callout">여행에서 함께 쓴 돈, 카카오로 로그인하고<br/>가장 간단하게 정산해보세요.</div>
       <div style="margin-top:22px;">
         <button class="btn btn-kakao" id="login-btn" onclick="doKakaoLogin()">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
@@ -376,7 +377,7 @@
   <div class="screen" id="screen-onboarding">
     <div class="pad" style="padding-top:70px;">
       <h2 class="big">계좌 등록</h2>
-      <p class="sub">카카오 프로필에서 이름을 가져왔어요.<br/>정산 결과를 주고받을 계좌번호만 등록해주세요.</p>
+      <div class="guide-callout">카카오 프로필에서 이름을 가져왔어요.<br/>정산 결과를 주고받을 계좌번호만 등록해주세요.</div>
       <label class="field-label">이름 <span style="font-weight:400; color:#B7B2A2;">(카카오 프로필)</span></label>
       <input type="text" id="ob-name" placeholder="예) 김민지" oninput="onObInput()"/>
       <label class="field-label">은행</label>
@@ -402,7 +403,7 @@
     <!-- ---- GNB Tab: 홈 ---- -->
     <div id="groups-tab-home" class="pad" style="flex:1; display:block;">
       <div class="quick-actions" style="margin-top:0; margin-bottom:18px;">
-        <button class="btn btn-primary" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
+        <button class="btn btn-primary" id="create-group-entry-btn" onclick="dismissGroupCreateCoach(); nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
       <div id="groups-list-wrap">
@@ -491,12 +492,12 @@
       <div class="gname">이 여행에서 총 사용한 금액</div>
       <div class="gtotal" id="gh-total">₩0</div>
       <div class="members-strip" id="gh-members" style="cursor:pointer;" onclick="nav('screen-group-invite')"></div>
-      <div style="display:flex; gap:8px; margin-top:12px;">
-        <div class="invite-pill" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="shareInviteViaKakao()">
+      <div id="gh-invite-row" style="display:flex; gap:8px; margin-top:12px; border-radius:16px;">
+        <div class="invite-pill" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="dismissInviteCoach(); shareInviteViaKakao()">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
           카카오톡 초대
         </div>
-        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="copyInviteCode()">코드 복사</div>
+        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="dismissInviteCoach(); copyInviteCode()">코드 복사</div>
       </div>
     </div>
 
@@ -598,6 +599,10 @@
 
   <div class="toast" id="toast">복사되었습니다</div>
 
+  <!-- ================= 첫 방문 코치마크 (유저당 1회) ================= -->
+  <div class="coach-catcher" id="coach-catcher" style="display:none;" onclick="dismissCurrentCoach()"></div>
+  <div class="coach-tip-text" id="coach-tip-text"></div>
+
   <!-- ================= 알림 레이어 (오버레이) ================= -->
   <div class="noti-overlay" id="noti-overlay" onclick="if(event.target===this) closeNotifications()">
     <div class="noti-panel">
@@ -650,36 +655,28 @@ function genInviteCode(){
   return s;
 }
 
-/* 데모용 시드 멤버 (사용자가 로그인하면 이 그룹에 함께 참여) */
-function seedDemoGroup(currentUser){
+/* 데모용 시드 멤버/지출을 이미 만들어진 그룹(g)에 채워 넣음.
+   첫 그룹은 코치마크로 안내하며 직접 만들게 해야 해서, 로그인 시점이 아니라
+   그 첫 그룹이 실제로 생성된 순간에 호출됨 (createGroup 참고). */
+function fillDemoContent(g, currentUser){
   const m1 = {id:uid('m'), name:'박서연', bank:'카카오뱅크', account:'3333-01-1234567'};
   const m2 = {id:uid('m'), name:'김도윤', bank:'국민은행', account:'123456-04-123456'};
   const m3 = {id:uid('m'), name:'이하준', bank:'신한은행', account:'110-123-456789'};
   const me = currentUser;
-  const members = [me, m1, m2, m3];
-
-  const group = {
-    id: uid('g'),
-    name: '제주도 우정여행',
-    inviteCode: genInviteCode(),
-    members: members,
-    expenses: [],
-  };
+  g.members.push(m1, m2, m3);
 
   const mk = (title, amount, catId, payer, participantIds, dateLabel) => ({
     id: uid('e'), title, amount, category:catId, payerId:payer.id,
     participantIds, dateLabel, photoUrl:null,
   });
-  const all = members.map(m=>m.id);
+  const all = g.members.map(m=>m.id);
 
-  group.expenses.push(mk('애월 게스트하우스 2박', 360000, 'lodging', m1, all, '10월 12일'));
-  group.expenses.push(mk('공항 렌터카 3일', 210000, 'transport', m2, all, '10월 12일'));
-  group.expenses.push(mk('흑돼지 저녁식사', 128000, 'food', me, all, '10월 12일'));
-  group.expenses.push(mk('스노클링 체험', 180000, 'activity', m1, [me.id, m1.id, m2.id], '10월 13일'));
-  group.expenses.push(mk('오후 카페', 24000, 'food', m3, [m1.id, m3.id], '10월 13일'));
-  group.expenses.push(mk('기념품 쇼핑', 56000, 'shopping', me, all, '10월 14일'));
-
-  return group;
+  g.expenses.push(mk('애월 게스트하우스 2박', 360000, 'lodging', m1, all, '10월 12일'));
+  g.expenses.push(mk('공항 렌터카 3일', 210000, 'transport', m2, all, '10월 12일'));
+  g.expenses.push(mk('흑돼지 저녁식사', 128000, 'food', me, all, '10월 12일'));
+  g.expenses.push(mk('스노클링 체험', 180000, 'activity', m1, [me.id, m1.id, m2.id], '10월 13일'));
+  g.expenses.push(mk('오후 카페', 24000, 'food', m3, [m1.id, m3.id], '10월 13일'));
+  g.expenses.push(mk('기념품 쇼핑', 56000, 'shopping', me, all, '10월 14일'));
 }
 
 /* 데모용 알림 시드: 지출 등록 1건 + 멤버 참여 1건 예시를 미리 채워둠 */
@@ -707,6 +704,7 @@ function seedDemoNotifications(g){
    화면 전환
    ========================================================= */
 function nav(id){
+  hideCoach(); // 화면을 벗어나면 떠 있던 코치마크는 항상 정리
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelector('.phone').scrollTop = 0;
@@ -725,24 +723,6 @@ function showToast(msg){
 /* =========================================================
    01. 로그인
    ========================================================= */
-/* 로그인 화면 가이드 캐러셀: 3개 문구를 순서대로 페이드 전환 */
-const LOGIN_GUIDE_MESSAGES = ['카카오 로그인, 계좌만 등록하면 끝', '지출 등록하면 정산 금액 자동 계산', '카카오톡으로 친구 초대'];
-let loginGuideIndex = 0;
-function startLoginGuideCarousel(){
-  const textEl = document.getElementById('login-guide-text');
-  const dots = document.querySelectorAll('#login-guide-dots .dot');
-  setInterval(()=>{
-    textEl.classList.add('fade');
-    setTimeout(()=>{
-      loginGuideIndex = (loginGuideIndex+1) % LOGIN_GUIDE_MESSAGES.length;
-      textEl.textContent = LOGIN_GUIDE_MESSAGES[loginGuideIndex];
-      dots.forEach((d,i)=>d.classList.toggle('active', i===loginGuideIndex));
-      textEl.classList.remove('fade');
-    }, 300);
-  }, 2600);
-}
-startLoginGuideCarousel();
-
 /* 데모용 카카오 프로필 (실제 OAuth 없이 프로토타입에서 흉내만 냄) */
 const DEMO_KAKAO_PROFILE = {kakaoId:'kakao_demo_1', name:'카카오유저'};
 function doKakaoLogin(){
@@ -780,16 +760,13 @@ function finishOnboarding(){
   afterAuthed();
 }
 function afterAuthed(){
-  if(state.groups.length === 0){
-    // 데모 그룹을 현재 로그인한 사용자로 시드
-    const g = seedDemoGroup(state.currentUser);
-    state.groups.push(g);
-    seedDemoNotifications(g);
-  }
+  // 첫 로그인 직후엔 그룹이 실제로 하나도 없어야 "+ 새 그룹 만들기" 코치마크가 자연스러움 —
+  // 데모 데이터는 그 첫 그룹을 실제로 만들 때 채워 넣음 (createGroup 참고)
   document.getElementById('groups-greeting').textContent = state.currentUser.name + '님의 그룹';
   setGroupsTab('home');
   renderNotiDot();
   nav('screen-groups');
+  maybeShowGroupCreateCoach();
 }
 
 /* =========================================================
@@ -861,16 +838,73 @@ function onNewGroupInput(){
 }
 function createGroup(){
   const name = document.getElementById('new-group-name').value.trim();
+  const isFirstGroup = state.groups.length === 0;
   const g = {
     id: uid('g'), name, inviteCode: genInviteCode(),
     members: [state.currentUser], expenses: [],
   };
+  if(isFirstGroup){
+    // 첫 그룹은 방금 코치마크로 만들게 안내한 그룹 — 곧바로 둘러볼 수 있게 데모 멤버/지출/알림을 채워 넣음
+    fillDemoContent(g, state.currentUser);
+    seedDemoNotifications(g);
+  }
   state.groups.unshift(g);
   state.activeGroupId = g.id;
   document.getElementById('new-group-name').value = '';
   document.getElementById('create-group-btn').disabled = true;
   openGroup(g.id);
+  if(isFirstGroup) maybeShowInviteCoach();
 }
+
+/* ---- 첫 방문 코치마크 (유저당 1회): 그룹 생성 -> 친구 초대 ---- */
+let activeCoachKey = null;
+function showCoach(key, targetId, text, placement){
+  const target = document.getElementById(targetId);
+  if(!target) return;
+  activeCoachKey = key;
+  target.classList.add('coach-highlight');
+  const tip = document.getElementById('coach-tip-text');
+  tip.textContent = text;
+  tip.style.display = 'block';
+  document.getElementById('coach-catcher').style.display = 'block';
+  const phoneRect = document.querySelector('.phone').getBoundingClientRect();
+  const r = target.getBoundingClientRect();
+  if(placement==='below'){
+    tip.style.top = (r.bottom - phoneRect.top + 14) + 'px';
+    tip.style.bottom = 'auto';
+  } else {
+    tip.style.bottom = (phoneRect.bottom - r.top + 14) + 'px';
+    tip.style.top = 'auto';
+  }
+}
+function hideCoach(){
+  document.querySelectorAll('.coach-highlight').forEach(el=>el.classList.remove('coach-highlight'));
+  document.getElementById('coach-catcher').style.display = 'none';
+  document.getElementById('coach-tip-text').style.display = 'none';
+  activeCoachKey = null;
+}
+function dismissGroupCreateCoach(){
+  if(state.currentUser) state.currentUser.seenGroupCreateCoach = true;
+  hideCoach();
+}
+function dismissInviteCoach(){
+  if(state.currentUser) state.currentUser.seenInviteCoach = true;
+  hideCoach();
+}
+function dismissCurrentCoach(){
+  if(activeCoachKey==='groupCreate') dismissGroupCreateCoach();
+  else if(activeCoachKey==='invite') dismissInviteCoach();
+}
+function maybeShowGroupCreateCoach(){
+  if(!state.currentUser || state.currentUser.seenGroupCreateCoach) return;
+  if(state.groups.length > 0) return;
+  setTimeout(()=>showCoach('groupCreate', 'create-group-entry-btn', '여기를 눌러 첫 그룹을 만들어보세요', 'below'), 250);
+}
+function maybeShowInviteCoach(){
+  if(!state.currentUser || state.currentUser.seenInviteCoach) return;
+  setTimeout(()=>showCoach('invite', 'gh-invite-row', '함께 여행한 친구를 초대해보세요', 'below'), 250);
+}
+
 function copyInviteCode(){
   const g = getActiveGroup();
   if(!g) return;
