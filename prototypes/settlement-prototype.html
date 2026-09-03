@@ -93,33 +93,9 @@
   .topbar .back svg{width:14px;height:14px;}
   .topbar h1{font-size:16px; font-weight:700; margin:0; flex:1;}
   .topbar .ghost-btn{font-size:12.5px; color:var(--ink-soft); cursor:pointer; padding:6px 10px;}
-  .topbar .bell-btn{position:relative; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; color:var(--ink);}
-  .topbar .bell-btn svg{width:22px; height:22px;}
-  .bell-dot{position:absolute; top:5px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--brick); border:2px solid var(--paper);}
 
   h2.big{font-size:24px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em;}
   p.sub{font-size:13.5px; color:var(--ink-soft); margin:0 0 24px; line-height:1.5;}
-
-  /* 왜 이 행동이 필요한지 강조하는 가이드 박스 (로그인/계좌등록 화면) */
-  .guide-callout{
-    background:#EAF4F3; border-radius:12px; padding:12px 14px; margin:0 0 22px;
-    font-size:13px; font-weight:700; color:var(--teal-deep); line-height:1.5;
-  }
-
-  /* 어떤 버튼을 눌러야 하는지는 문구가 아니라 버튼 자체를 강조해서 알려줌 —
-     테두리만으론 눈에 안 띄어서 은은하게 커졌다 작아지는 글로우로.
-     밝은 배경(홈)에선 teal 글로우, 어두운 그룹 헤더 위에선 teal이 네이비와
-     묻혀서 잘 안 보이길래 흰색 글로우로 — 같은 "강조" 역할을 표면에 맞게 */
-  .guide-target{animation:guide-target-pulse 1.6s ease-in-out infinite;}
-  @keyframes guide-target-pulse{
-    0%,100%{ box-shadow:0 0 0 3px var(--teal-deep), 0 0 10px 2px rgba(14,124,123,.35); }
-    50%{ box-shadow:0 0 0 3px var(--teal-deep), 0 0 22px 7px rgba(14,124,123,.65); }
-  }
-  .guide-target.on-dark{animation-name:guide-target-pulse-light;}
-  @keyframes guide-target-pulse-light{
-    0%,100%{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(255,255,255,.4); }
-    50%{ box-shadow:0 0 0 3px #fff, 0 0 24px 8px rgba(255,255,255,.8); }
-  }
 
   label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); display:block; margin:16px 0 7px;}
   input[type=text], input[type=email], input[type=number]{
@@ -159,33 +135,6 @@
     transition:opacity .2s, transform .2s; z-index:200; white-space:nowrap;
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
-
-
-  /* 알림 레이어: 화면 전환 없이 현재 화면 위에 드롭다운으로 뜸 */
-  .noti-overlay{
-    display:none; position:absolute; inset:0; background:transparent;
-    z-index:300; padding:56px 16px 16px; box-sizing:border-box;
-  }
-  .noti-overlay.show{display:block;}
-  .noti-panel{
-    width:70%; margin-left:auto;
-    background:#fff; border-radius:18px; box-shadow:0 16px 40px rgba(0,0,0,.28);
-    max-height:calc(100% - 20px); display:flex; flex-direction:column; overflow:hidden;
-    animation:noti-drop .18s ease;
-  }
-  @keyframes noti-drop{ from{opacity:0; transform:translateY(-8px);} to{opacity:1; transform:translateY(0);} }
-  .noti-panel-head{display:flex; align-items:center; gap:10px; padding:16px 16px 10px; flex-shrink:0;}
-  .noti-panel-head h2{font-size:15px; font-weight:800; flex:1; margin:0;}
-  .noti-close{
-    width:26px; height:26px; border-radius:50%; background:var(--card); border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
-  }
-  .noti-panel-body{overflow-y:auto; padding:0 16px 16px;}
-  .noti-row{padding:12px 0; border-bottom:1px solid var(--line); cursor:pointer;}
-  .noti-row:last-child{border-bottom:none;}
-  .noti-title{font-size:13.5px; font-weight:700; line-height:1.4;}
-  .noti-unread-dot{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--brick); margin-right:6px;}
-  .noti-time{font-size:11.5px; color:var(--ink-soft); margin-top:4px;}
 
   /* bottom tabs */
   .tabbar{
@@ -230,7 +179,6 @@
     border:2px solid var(--ink); margin-left:-8px;
   }
   .member-chip:first-child{margin-left:0;}
-  .member-chip.pending{background:transparent; border:2px dashed rgba(255,255,255,.55); color:rgba(255,255,255,.8);}
   .invite-pill{
     display:flex; align-items:center; gap:5px;
     font-size:12px; font-weight:700; color:#fff; background:rgba(255,255,255,.16);
@@ -243,7 +191,6 @@
 
   .person-row{display:flex; align-items:center; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line);}
   .person-row:last-child{border-bottom:none;}
-  .pending-badge{font-size:11px; font-weight:700; color:var(--ink-soft); background:var(--paper); border:1px solid var(--line); border-radius:20px; padding:3px 9px; flex-shrink:0;}
   .avatar{
     width:34px;height:34px;border-radius:50%; background:#EDEAE1; color:var(--ink);
     display:flex;align-items:center;justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0;
@@ -254,18 +201,13 @@
   .pamt.pos{color:var(--teal-deep);}
   .pamt.neg{color:var(--brick);}
 
+  .cat-row{display:flex; align-items:center; gap:10px; padding:10px 4px;}
   .cat-badge{width:30px;height:30px;border-radius:9px; display:flex;align-items:center;justify-content:center; color:#fff; font-size:12px; font-weight:800; flex-shrink:0;}
-
-  /* 카테고리별 요약: 전체 100%를 하나의 막대로 표현 + 아래 범례 */
-  .cat-stackbar{display:flex; width:100%; height:14px; border-radius:7px; overflow:hidden; background:var(--paper); margin-bottom:6px;}
-  .cat-stackbar .seg{height:100%; margin-right:2px;}
-  .cat-stackbar .seg:last-child{margin-right:0;}
-  .cat-legend-row{display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line);}
-  .cat-legend-row:last-child{border-bottom:none;}
-  .cat-swatch{width:10px; height:10px; border-radius:3px; flex-shrink:0;}
-  .cat-legend-row .name{flex:1; font-size:13.5px; font-weight:700;}
-  .cat-legend-row .amt{font-size:12px; color:var(--ink-soft); font-variant-numeric:tabular-nums;}
-  .cat-legend-row .pct{font-size:13.5px; font-weight:800; width:36px; text-align:right; flex-shrink:0; font-variant-numeric:tabular-nums;}
+  .cat-bar-wrap{flex:1;}
+  .cat-bar-track{height:6px; border-radius:4px; background:#EDEAE1; overflow:hidden; margin-top:5px;}
+  .cat-bar-fill{height:100%; border-radius:4px;}
+  .cat-top{display:flex; justify-content:space-between; font-size:12.5px; font-weight:700;}
+  .cat-top .amt{font-variant-numeric:tabular-nums; color:var(--ink-soft); font-weight:600;}
 
   /* expense list - receipt style */
   .receipt{
@@ -364,7 +306,7 @@
   <div class="screen active" id="screen-login">
     <div class="pad" style="padding-top:90px;">
       <h2 class="big">정산일지</h2>
-      <div class="guide-callout">여행에서 함께 쓴 돈, 카카오로 로그인하고<br/>가장 간단하게 정산해보세요.</div>
+      <p class="sub">여행에서 함께 쓴 돈, 카카오로 로그인하고<br/>가장 간단하게 정산해보세요.</p>
       <div style="margin-top:22px;">
         <button class="btn btn-kakao" id="login-btn" onclick="doKakaoLogin()">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
@@ -386,7 +328,7 @@
   <div class="screen" id="screen-onboarding">
     <div class="pad" style="padding-top:70px;">
       <h2 class="big">계좌 등록</h2>
-      <div class="guide-callout">카카오 프로필에서 이름을 가져왔어요.<br/>정산 결과를 주고받을 계좌번호만 등록해주세요.</div>
+      <p class="sub">카카오 프로필에서 이름을 가져왔어요.<br/>정산 결과를 주고받을 계좌번호만 등록해주세요.</p>
       <label class="field-label">이름 <span style="font-weight:400; color:#B7B2A2;">(카카오 프로필)</span></label>
       <input type="text" id="ob-name" placeholder="예) 김민지" oninput="onObInput()"/>
       <label class="field-label">은행</label>
@@ -403,19 +345,14 @@
   <div class="screen" id="screen-groups">
     <div class="topbar">
       <h1 id="groups-greeting">내 그룹</h1>
-      <div class="bell-btn" onclick="openNotifications()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5z"/><path d="M9.5 17a2.5 2.5 0 0 0 5 0"/></svg>
-        <div class="bell-dot" id="noti-dot" style="display:none;"></div>
-      </div>
     </div>
 
     <!-- ---- GNB Tab: 홈 ---- -->
     <div id="groups-tab-home" class="pad" style="flex:1; display:block;">
       <div class="quick-actions" style="margin-top:0; margin-bottom:18px;">
-        <button class="btn btn-primary" id="create-group-entry-btn" onclick="dismissGroupCreateCoach(); nav('screen-create-group')">＋ 새 그룹 만들기</button>
+        <button class="btn btn-primary" onclick="nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
-      <p class="sub" id="group-create-hint" style="display:none; margin:0; text-align:center;">그룹을 만들고 정산을 시작해요</p>
       <div id="groups-list-wrap">
         <!-- JS renders group rows -->
       </div>
@@ -490,18 +427,6 @@
     </div>
   </div>
 
-  <!-- ================= 02d. 초대 대기 중 멤버와 매칭 ================= -->
-  <div class="screen" id="screen-join-match">
-    <div class="topbar">
-      <div class="back" onclick="nav('screen-join-group')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
-      <h1>그룹에 있는 멤버인가요?</h1>
-    </div>
-    <div class="pad">
-      <p class="sub">이미 등록된 멤버 중에 본인이 있으면 선택해주세요.<br/>지금까지 등록된 지출이 그대로 연결돼요.</p>
-      <div id="join-match-list"></div>
-    </div>
-  </div>
-
   <!-- ================= 그룹 내부 (지출 / 정산) ================= -->
   <div class="screen" id="screen-group" style="position:relative;">
     <div class="group-header" style="padding-top:40px;">
@@ -515,31 +440,37 @@
       <div class="gtotal" id="gh-total">₩0</div>
       <div class="members-strip" id="gh-members" style="cursor:pointer;" onclick="nav('screen-group-invite')"></div>
       <div style="display:flex; gap:8px; margin-top:12px;">
-        <div class="invite-pill on-dark" id="invite-member-btn" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="nav('screen-group-invite')">
+        <div class="invite-pill" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="shareInviteViaKakao()">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
-          멤버 초대
+          카카오톡 초대
         </div>
-        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="copyInviteCode()">초대 코드 복사</div>
+        <div class="invite-pill" style="flex:1; justify-content:center;" onclick="copyInviteCode()">코드 복사</div>
       </div>
     </div>
 
+    <div class="toggle-group" style="margin:14px 22px;">
+      <div class="opt active" data-gvtab="expense" onclick="setGroupView('expense')">지출</div>
+      <div class="opt" data-gvtab="settle" onclick="setGroupView('settle')">정산</div>
+      <div class="opt" data-gvtab="stats" onclick="setGroupView('stats')">통계</div>
+    </div>
+
     <!-- ---- View: 지출 업로드/내역 (기본 화면) ---- -->
-    <div id="view-expense" class="pad" style="flex:1; display:block; padding-top:18px;">
+    <div id="view-expense" class="pad" style="flex:1; display:block; padding-top:0;">
       <div id="expense-list-wrap"></div>
     </div>
 
     <!-- ---- View: 정산(최소송금) ---- -->
-    <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:18px;">
-      <p class="sub" style="margin-bottom:14px; margin-top:0;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요. 지출을 등록하면 정산 결과도 실시간으로 바로 반영돼요.</p>
+    <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:0;">
+      <p class="sub" style="margin-bottom:14px; margin-top:16px;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요. 지출을 등록하면 정산 결과도 실시간으로 바로 반영돼요.</p>
       <div id="settle-list-wrap"></div>
     </div>
 
-    <!-- ---- View: 요약(카테고리별/인원별) ---- -->
-    <div id="view-stats" class="pad" style="flex:1; display:none; padding-top:18px;">
-      <div class="date-label" style="margin-top:0;">카테고리별</div>
-      <div class="card" id="home-category-view"></div>
-      <div class="date-label">인원별</div>
+    <!-- ---- View: 통계(인원별/카테고리별 요약) ---- -->
+    <div id="view-stats" class="pad" style="flex:1; display:none; padding-top:0;">
+      <div class="date-label" style="margin-top:16px;">인원별</div>
       <div class="card" id="home-person-view"></div>
+      <div class="date-label">카테고리별</div>
+      <div class="card" id="home-category-view"></div>
     </div>
 
     <div class="fab" id="expense-fab" onclick="openExpenseForm()">
@@ -547,17 +478,13 @@
     </div>
 
     <div class="tabbar">
-      <div class="tab active" data-gvtab="expense" onclick="setGroupView('expense')">
-        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v16l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3V3z"/><path d="M9 7.5h6M9 11h6"/></svg>
-        <span>지출</span>
+      <div class="tab active" data-gtab="home" onclick="goGlobalHome()">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>
+        <span>홈</span>
       </div>
-      <div class="tab" data-gvtab="settle" onclick="setGroupView('settle')">
-        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h10m0 0-3-3m3 3-3 3M17 16H7m0 0 3-3m-3 3 3 3"/></svg>
-        <span>정산</span>
-      </div>
-      <div class="tab" data-gvtab="stats" onclick="setGroupView('stats')">
-        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20V14M12 20V9M18 20V5"/></svg>
-        <span>요약</span>
+      <div class="tab" data-gtab="profile" onclick="goGlobalProfile()">
+        <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-6.8 7.5-6.8s7.5 2.8 7.5 6.8"/></svg>
+        <span>프로필</span>
       </div>
     </div>
   </div>
@@ -565,26 +492,14 @@
   <!-- ================= 그룹 멤버 초대(그룹 내부에서) ================= -->
   <div class="screen" id="screen-group-invite">
     <div class="topbar">
-      <div class="back" onclick="openGroup(state.activeGroupId)"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <div class="back" onclick="nav('screen-group')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
       <h1>멤버 목록</h1>
     </div>
     <div class="pad">
-      <p class="sub">이 그룹에 참여 중인 멤버예요. 초대는 그룹 화면 상단의<br/>카카오톡/초대 코드 복사 버튼으로 언제든 할 수 있어요.</p>
+      <p class="sub">이 그룹에 참여 중인 멤버예요. 초대는 그룹 화면 상단의<br/>카카오톡/코드 복사 버튼으로 언제든 할 수 있어요.</p>
       <div class="card" id="gi-member-list"></div>
-      <label class="field-label">아직 앱에 안 들어온 친구 몫도 미리 계산에 넣고 싶다면</label>
-      <div style="display:flex; gap:8px;">
-        <input type="text" id="gi-add-name" placeholder="이름 입력" style="flex:1;" oninput="onGiAddNameInput()"/>
-        <button class="btn btn-outline" id="gi-add-btn" style="width:auto; padding:0 18px;" disabled onclick="addPendingMember()">추가</button>
-      </div>
-      <div id="gi-batch-invite" style="display:none; margin-top:14px;">
-        <button class="btn" style="background:#FEE500; color:#191600;" onclick="sendBatchInvite()">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
-          <span id="gi-batch-invite-label">대기 중인 친구들에게 카카오톡으로 한 번에 초대 보내기</span>
-        </button>
-      </div>
     </div>
   </div>
-
 
   <!-- ================= 지출 등록 폼 ================= -->
   <div class="screen" id="screen-expense-form">
@@ -632,19 +547,6 @@
   </div>
 
   <div class="toast" id="toast">복사되었습니다</div>
-
-  <!-- ================= 알림 레이어 (오버레이) ================= -->
-  <div class="noti-overlay" id="noti-overlay" onclick="if(event.target===this) closeNotifications()">
-    <div class="noti-panel">
-      <div class="noti-panel-head">
-        <h2>알림</h2>
-        <div class="noti-close" onclick="closeNotifications()">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#16223B" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg>
-        </div>
-      </div>
-      <div class="noti-panel-body" id="noti-list-wrap"></div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -674,8 +576,6 @@ let state = {
   groups: [],
   activeGroupId: null,
   expenseDraft: null,
-  notifications: [], // 전역 알림 내역 (최신순)
-  pendingJoinGroupId: null, // 초대코드 참여 시, 초대 대기 중 멤버와 매칭하는 동안 잠깐 들고 있는 그룹 id
 };
 
 function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,8); }
@@ -686,49 +586,36 @@ function genInviteCode(){
   return s;
 }
 
-/* 데모용 시드 멤버/지출을 이미 만들어진 그룹(g)에 채워 넣음.
-   첫 그룹은 코치마크로 안내하며 직접 만들게 해야 해서, 로그인 시점이 아니라
-   그 첫 그룹이 실제로 생성된 순간에 호출됨 (createGroup 참고). */
-function fillDemoContent(g, currentUser){
+/* 데모용 시드 멤버 (사용자가 로그인하면 이 그룹에 함께 참여) */
+function seedDemoGroup(currentUser){
   const m1 = {id:uid('m'), name:'박서연', bank:'카카오뱅크', account:'3333-01-1234567'};
   const m2 = {id:uid('m'), name:'김도윤', bank:'국민은행', account:'123456-04-123456'};
   const m3 = {id:uid('m'), name:'이하준', bank:'신한은행', account:'110-123-456789'};
   const me = currentUser;
-  g.members.push(m1, m2, m3);
+  const members = [me, m1, m2, m3];
+
+  const group = {
+    id: uid('g'),
+    name: '제주도 우정여행',
+    inviteCode: genInviteCode(),
+    members: members,
+    expenses: [],
+  };
 
   const mk = (title, amount, catId, payer, participantIds, dateLabel) => ({
     id: uid('e'), title, amount, category:catId, payerId:payer.id,
     participantIds, dateLabel, photoUrl:null,
   });
-  const all = g.members.map(m=>m.id);
+  const all = members.map(m=>m.id);
 
-  g.expenses.push(mk('애월 게스트하우스 2박', 360000, 'lodging', m1, all, '10월 12일'));
-  g.expenses.push(mk('공항 렌터카 3일', 210000, 'transport', m2, all, '10월 12일'));
-  g.expenses.push(mk('흑돼지 저녁식사', 128000, 'food', me, all, '10월 12일'));
-  g.expenses.push(mk('스노클링 체험', 180000, 'activity', m1, [me.id, m1.id, m2.id], '10월 13일'));
-  g.expenses.push(mk('오후 카페', 24000, 'food', m3, [m1.id, m3.id], '10월 13일'));
-  g.expenses.push(mk('기념품 쇼핑', 56000, 'shopping', me, all, '10월 14일'));
-}
+  group.expenses.push(mk('애월 게스트하우스 2박', 360000, 'lodging', m1, all, '10월 12일'));
+  group.expenses.push(mk('공항 렌터카 3일', 210000, 'transport', m2, all, '10월 12일'));
+  group.expenses.push(mk('흑돼지 저녁식사', 128000, 'food', me, all, '10월 12일'));
+  group.expenses.push(mk('스노클링 체험', 180000, 'activity', m1, [me.id, m1.id, m2.id], '10월 13일'));
+  group.expenses.push(mk('오후 카페', 24000, 'food', m3, [m1.id, m3.id], '10월 13일'));
+  group.expenses.push(mk('기념품 쇼핑', 56000, 'shopping', me, all, '10월 14일'));
 
-/* 데모용 알림 시드: 지출 등록 1건 + 멤버 참여 1건 예시를 미리 채워둠 */
-function seedDemoNotifications(g){
-  const joined = g.members.find(m=>m.name==='이하준');
-  if(joined){
-    state.notifications.push({
-      id: uid('n'), type:'member_joined', groupId:g.id, memberId:joined.id,
-      title:`${joined.name}님이 [${g.name}] 그룹에 참여했어요`,
-      timeLabel:'10월 11일', read:true,
-    });
-  }
-  const lastExpense = g.expenses[g.expenses.length-1];
-  if(lastExpense){
-    const payer = g.members.find(m=>m.id===lastExpense.payerId);
-    state.notifications.unshift({
-      id: uid('n'), type:'expense', groupId:g.id, expenseId:lastExpense.id,
-      title:`${payer?payer.name:'누군가'}님이 [${g.name}]에 내역을 추가했어요`,
-      timeLabel:lastExpense.dateLabel, read:false,
-    });
-  }
+  return group;
 }
 
 /* =========================================================
@@ -790,11 +677,13 @@ function finishOnboarding(){
   afterAuthed();
 }
 function afterAuthed(){
-  // 첫 로그인 직후엔 그룹이 실제로 하나도 없어야 "＋ 새 그룹 만들기" 안내가 자연스러움 —
-  // 데모 데이터는 그 첫 그룹을 실제로 만들 때 채워 넣음 (createGroup 참고)
+  if(state.groups.length === 0){
+    // 데모 그룹을 현재 로그인한 사용자로 시드
+    const g = seedDemoGroup(state.currentUser);
+    state.groups.push(g);
+  }
   document.getElementById('groups-greeting').textContent = state.currentUser.name + '님의 그룹';
   setGroupsTab('home');
-  renderNotiDot();
   nav('screen-groups');
 }
 
@@ -815,10 +704,8 @@ function renderGroupsList(){
       <div class="arrow">›</div>
     </div>
   `).join('');
-  // 그룹이 없을 때의 안내는 버튼 아래 group-create-hint 카드 하나로 통일 —
-  // 여기서 또 "아직 참여한 그룹이 없어요" 같은 안내를 중복으로 보여주지 않음
-  wrap.innerHTML = rows;
-  updateGroupCreateHint();
+  const empty = state.groups.length===0 ? `<div class="empty"><div class="big-icon">＋</div>아직 참여한 그룹이 없어요.<br/>새 그룹을 만들거나 초대코드로 참여해보세요.</div>` : '';
+  wrap.innerHTML = rows + empty;
 }
 
 /* ---- 홈 화면 GNB: 홈 / 프로필 ---- */
@@ -869,37 +756,16 @@ function onNewGroupInput(){
 }
 function createGroup(){
   const name = document.getElementById('new-group-name').value.trim();
-  const isFirstGroup = state.groups.length === 0;
   const g = {
     id: uid('g'), name, inviteCode: genInviteCode(),
     members: [state.currentUser], expenses: [],
   };
-  if(isFirstGroup){
-    // 첫 그룹은 방금 코치마크로 만들게 안내한 그룹 — 곧바로 둘러볼 수 있게 데모 멤버/지출/알림을 채워 넣음
-    fillDemoContent(g, state.currentUser);
-    seedDemoNotifications(g);
-  }
   state.groups.unshift(g);
   state.activeGroupId = g.id;
   document.getElementById('new-group-name').value = '';
   document.getElementById('create-group-btn').disabled = true;
   openGroup(g.id);
 }
-
-/* ---- 첫 그룹 만들기 안내 (유저당 1회): 로그인/계좌등록 화면과 같은
-   .guide-callout 카드로 통일, 버튼 아래에 노출. 초대 쪽도 지출 empty
-   state에서 같은 .guide-callout으로 안내함 (renderExpenseTab 참고),
-   별도 버튼을 또 만들지 않음. ---- */
-function dismissGroupCreateCoach(){
-  if(state.currentUser) state.currentUser.seenGroupCreateCoach = true;
-  updateGroupCreateHint();
-}
-function updateGroupCreateHint(){
-  const show = !!state.currentUser && !state.currentUser.seenGroupCreateCoach && state.groups.length===0;
-  document.getElementById('group-create-hint').style.display = show ? 'block' : 'none';
-  document.getElementById('create-group-entry-btn').classList.toggle('guide-target', show);
-}
-
 function copyInviteCode(){
   const g = getActiveGroup();
   if(!g) return;
@@ -924,72 +790,8 @@ function joinGroupByCode(){
     document.getElementById('join-error').style.display = 'block';
     return;
   }
+  if(!g.members.find(m=>m.id===state.currentUser.id)) g.members.push(state.currentUser);
   document.getElementById('join-code-input').value='';
-  if(g.members.find(m=>m.id===state.currentUser.id)){
-    openGroup(g.id);
-    return;
-  }
-  const pending = g.members.filter(m=>m.pending);
-  if(pending.length > 0){
-    // 아직 초대 대기 중인(이름만 있는) 멤버가 있으면, 본인이 그 중 하나인지 먼저 확인
-    state.pendingJoinGroupId = g.id;
-    renderJoinMatchScreen(g, pending);
-    nav('screen-join-match');
-    return;
-  }
-  g.members.push(state.currentUser);
-  addNotification('member_joined', {groupId:g.id, memberId:state.currentUser.id});
-  renderGroupsList();
-  openGroup(g.id);
-}
-
-/* ---- 초대 대기 중 멤버와 매칭: 이름만으로 미리 넣어둔 멤버를 실제 계정과 연결 ---- */
-function renderJoinMatchScreen(g, pending){
-  const wrap = document.getElementById('join-match-list');
-  wrap.innerHTML = pending.map(m=>`
-    <div class="group-row" onclick="confirmJoinMatch('${m.id}')">
-      <div class="group-thumb">${m.name.slice(0,1)}</div>
-      <div class="meta">
-        <div class="name">${m.name}</div>
-        <div class="sum">이 이름으로 등록된 지출과 연결돼요</div>
-      </div>
-      <div class="arrow">›</div>
-    </div>`).join('') + `
-    <div class="group-row" onclick="confirmJoinMatch(null)">
-      <div class="group-thumb" style="background:var(--ink-soft);">＋</div>
-      <div class="meta"><div class="name">아니요, 새 멤버예요</div></div>
-      <div class="arrow">›</div>
-    </div>`;
-}
-function mergePendingMember(g, placeholderId){
-  const idx = g.members.findIndex(m=>m.id===placeholderId);
-  if(idx===-1) return;
-  const oldId = g.members[idx].id;
-  g.members[idx] = state.currentUser;
-  g.expenses.forEach(e=>{
-    if(e.payerId===oldId) e.payerId = state.currentUser.id;
-    e.participantIds = e.participantIds.map(id => id===oldId ? state.currentUser.id : id);
-    if(e.customShares && e.customShares[oldId]!==undefined){
-      e.customShares[state.currentUser.id] = e.customShares[oldId];
-      delete e.customShares[oldId];
-    }
-  });
-}
-function confirmJoinMatch(placeholderId){
-  const g = state.groups.find(gr=>gr.id===state.pendingJoinGroupId);
-  if(!g) return;
-  if(placeholderId){
-    // 같은 초대 링크가 여러 명에게 한 번에 가다 보니, 목록에서 엉뚱한 이름을 잘못 누르는 걸
-    // 막기 위해 한 번 더 확인 — 실수로 다른 사람 지출 내역이 나한테 연결되는 걸 방지
-    const m = g.members.find(mm=>mm.id===placeholderId);
-    if(!confirm(`${m.name}님 본인이 맞나요?\n확인하면 이 이름으로 등록된 지출이 전부 내 걸로 연결돼요.`)) return;
-    mergePendingMember(g, placeholderId);
-    showToast('기존에 등록된 멤버와 연결됐어요');
-  } else {
-    g.members.push(state.currentUser);
-    addNotification('member_joined', {groupId:g.id, memberId:state.currentUser.id});
-  }
-  state.pendingJoinGroupId = null;
   renderGroupsList();
   openGroup(g.id);
 }
@@ -1004,15 +806,14 @@ function openGroup(id){
   const g = getActiveGroup();
   document.getElementById('gh-name').textContent = g.name;
   document.getElementById('gh-total').innerHTML = won(groupTotal(g)) + ' <small>총 사용</small>';
-  document.getElementById('gh-members').innerHTML = g.members.map(m=>`<div class="member-chip ${m.pending?'pending':''}" title="${m.name}">${m.name.slice(0,1)}</div>`).join('');
-  document.getElementById('invite-member-btn').classList.toggle('guide-target', g.members.length===1);
+  document.getElementById('gh-members').innerHTML = g.members.map(m=>`<div class="member-chip" title="${m.name}">${m.name.slice(0,1)}</div>`).join('');
   setGroupView('expense');
   nav('screen-group');
 }
 
-/* 그룹 내부 뷰: 지출(기본) / 정산(최소송금) / 요약(카테고리별·인원별) */
+/* 그룹 내부 뷰: 지출(기본) / 정산(최소송금 + 인원별·카테고리별 요약) */
 function setGroupView(view){
-  document.querySelectorAll('#screen-group .tabbar .tab[data-gvtab]').forEach(o=>o.classList.toggle('active', o.dataset.gvtab===view));
+  document.querySelectorAll('#screen-group .toggle-group .opt[data-gvtab]').forEach(o=>o.classList.toggle('active', o.dataset.gvtab===view));
   document.getElementById('view-expense').style.display = view==='expense' ? 'block':'none';
   document.getElementById('view-settle').style.display = view==='settle' ? 'block':'none';
   document.getElementById('view-stats').style.display = view==='stats' ? 'block':'none';
@@ -1021,8 +822,9 @@ function setGroupView(view){
   if(view==='settle') renderSettleTab();
   if(view==='stats') renderHomeTab();
 }
-/* 그룹 화면 상단 back 버튼: 전역 홈으로 이동 */
+/* 하단 전역 GNB: 그룹 화면에서도 항상 홈/프로필로 이동 */
 function goGlobalHome(){ nav('screen-groups'); setGroupsTab('home'); }
+function goGlobalProfile(){ nav('screen-groups'); setGroupsTab('profile'); }
 
 function computeBalances(g){
   const balances = {};
@@ -1073,30 +875,21 @@ function renderHomeTab(){
   }).join('');
   document.getElementById('home-person-view').innerHTML = g.expenses.length===0 ? `<div class="empty">아직 등록된 지출이 없어요.</div>` : personHtml;
 
-  // 카테고리별: 전체 100%를 한 막대로 보여주고, 아래 범례로 항목별 금액·비중을 나열
+  // 카테고리별
   const byCat = {};
   g.expenses.forEach(e=>{ byCat[e.category] = (byCat[e.category]||0) + e.amount; });
-  const sortedCats = CATEGORIES.filter(c=>byCat[c.id]).sort((a,b)=>byCat[b.id]-byCat[a.id]);
-  if(sortedCats.length===0){
-    document.getElementById('home-category-view').innerHTML = `<div class="empty">아직 등록된 지출이 없어요.</div>`;
-  } else {
-    const stackHtml = sortedCats.map(c=>{
-      const pct = (byCat[c.id]/total)*100;
-      return `<div class="seg" style="width:${pct}%; background:${c.color};"></div>`;
-    }).join('');
-    const legendHtml = sortedCats.map(c=>{
-      const amt = byCat[c.id];
-      const pct = Math.round((amt/total)*100);
-      return `<div class="cat-legend-row">
-        <div class="cat-swatch" style="background:${c.color};"></div>
-        <div class="name">${c.label}</div>
-        <div class="amt">${won(amt)}</div>
-        <div class="pct">${pct}%</div>
-      </div>`;
-    }).join('');
-    document.getElementById('home-category-view').innerHTML =
-      `<div class="cat-stackbar">${stackHtml}</div>${legendHtml}`;
-  }
+  const catHtml = CATEGORIES.filter(c=>byCat[c.id]).sort((a,b)=>byCat[b.id]-byCat[a.id]).map(c=>{
+    const amt = byCat[c.id];
+    const pct = Math.round((amt/total)*100);
+    return `<div class="cat-row">
+      <div class="cat-badge" style="background:${c.color};">${c.label.slice(0,1)}</div>
+      <div class="cat-bar-wrap">
+        <div class="cat-top"><span>${c.label}</span><span class="amt">${won(amt)} · ${pct}%</span></div>
+        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%; background:${c.color};"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.</div>`;
 }
 
 /* ---- 지출 탭(03) ---- */
@@ -1104,18 +897,9 @@ function renderExpenseTab(){
   const g = getActiveGroup();
   const wrap = document.getElementById('expense-list-wrap');
   if(g.expenses.length===0){
-    // 아직 아무도 초대 안 했으면(=나 혼자) "멤버부터 초대하라"는 안내만, 이미 멤버가
-    // 있으면 "지출을 추가하라"는 안내만 — 두 메시지를 동시에 보여주지 않고 상태에 따라 하나만.
-    // "어떤 버튼인지"는 문구가 아니라 FAB 자체를 강조해서 보여줌 (멤버 초대 버튼과 동일한 방식)
-    document.getElementById('expense-fab').classList.toggle('guide-target', g.members.length>1);
-    if(g.members.length===1){
-      wrap.innerHTML = `<div class="empty">정산할 친구를 초대해주세요.</div>`;
-    } else {
-      wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>첫 지출을 추가해보세요.</div>`;
-    }
+    wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.</div>`;
     return;
   }
-  document.getElementById('expense-fab').classList.remove('guide-target');
   // group by dateLabel
   const groups = {};
   g.expenses.forEach(e=>{ (groups[e.dateLabel] = groups[e.dateLabel]||[]).push(e); });
@@ -1177,7 +961,7 @@ function openExpenseForm(expenseId){
   ).join('');
 
   const payerSel = document.getElementById('ex-payer');
-  payerSel.innerHTML = g.members.map(m=>`<option value="${m.id}" ${m.id===state.expenseDraft.payerId?'selected':''}>${m.name}${m.id===state.currentUser.id?' (나)':''}${m.pending?' (대기중)':''}</option>`).join('');
+  payerSel.innerHTML = g.members.map(m=>`<option value="${m.id}" ${m.id===state.expenseDraft.payerId?'selected':''}>${m.name}${m.id===state.currentUser.id?' (나)':''}</option>`).join('');
 
   document.querySelectorAll('#ex-split-toggle .opt').forEach(o=>o.classList.toggle('active', o.dataset.split===splitMode));
   document.getElementById('ex-split-summary').style.display = 'none';
@@ -1270,7 +1054,7 @@ function renderParticipants(){
     }
     return `<div class="check-row" onclick="toggleParticipant('${m.id}')">
       <div class="checkbox ${on?'on':''}">${on?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M4 12l6 6L20 6"/></svg>':''}</div>
-      <div class="cname">${m.name}${m.id===state.currentUser.id?' (나)':''}${m.pending?' (대기중)':''}</div>
+      <div class="cname">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
       <div class="split-col">${shareDisplay}</div>
     </div>`;
   }).join('');
@@ -1344,7 +1128,7 @@ function submitExpense(){
   } else {
     const today = new Date();
     const dateLabel = (today.getMonth()+1)+'월 '+today.getDate()+'일';
-    const newExpense = {
+    g.expenses.unshift({
       id: uid('e'), title, amount,
       category: state.expenseDraft.category,
       payerId: state.expenseDraft.payerId,
@@ -1352,68 +1136,12 @@ function submitExpense(){
       splitMode: state.expenseDraft.splitMode,
       customShares: finalizeCustomShares(amount),
       dateLabel, photoUrl: state.expenseDraft.photoUrl,
-    };
-    g.expenses.unshift(newExpense);
-    addNotification('expense', {groupId:g.id, expenseId:newExpense.id});
+    });
     showToast('지출이 등록되었습니다');
   }
   nav('screen-group');
   setGroupView('expense');
 }
-/* ---- 알림 내역 ---- */
-function addNotification(type, payload){
-  const g = state.groups.find(gr=>gr.id===payload.groupId);
-  if(!g) return;
-  let title;
-  if(type==='expense'){
-    const e = g.expenses.find(x=>x.id===payload.expenseId);
-    if(!e) return;
-    const payer = g.members.find(m=>m.id===e.payerId);
-    title = `${payer?payer.name:'누군가'}님이 [${g.name}]에 내역을 추가했어요`;
-  } else if(type==='member_joined'){
-    const m = g.members.find(mm=>mm.id===payload.memberId);
-    if(!m) return;
-    title = `${m.name}님이 [${g.name}] 그룹에 참여했어요`;
-  }
-  state.notifications.unshift({
-    id: uid('n'), type, groupId: g.id,
-    expenseId: payload.expenseId || null,
-    title, timeLabel:'방금', read:false,
-  });
-  renderNotiDot();
-}
-function renderNotiDot(){
-  document.getElementById('noti-dot').style.display = state.notifications.some(n=>!n.read) ? 'block' : 'none';
-}
-function openNotifications(){
-  renderNotifications();
-  document.getElementById('noti-overlay').classList.add('show');
-}
-function closeNotifications(){
-  document.getElementById('noti-overlay').classList.remove('show');
-}
-function renderNotifications(){
-  const wrap = document.getElementById('noti-list-wrap');
-  if(state.notifications.length===0){
-    wrap.innerHTML = `<div class="empty"><div class="big-icon">🔔</div>아직 도착한 알림이 없어요.</div>`;
-    return;
-  }
-  wrap.innerHTML = state.notifications.map(n=>`
-    <div class="noti-row" onclick="openNotification('${n.id}')">
-      <div class="noti-title">${n.read?'':'<span class="noti-unread-dot"></span>'}${n.title}</div>
-      <div class="noti-time">${n.timeLabel}</div>
-    </div>`).join('');
-}
-/* 알림 종류와 상관없이 지출내역(지출 탭)으로 랜딩 — 멤버 목록은 딱히 할 액션이 없어서 제외 */
-function openNotification(id){
-  const n = state.notifications.find(x=>x.id===id);
-  if(!n) return;
-  n.read = true;
-  renderNotiDot();
-  closeNotifications();
-  openGroup(n.groupId);
-}
-
 function deleteExpense(){
   const g = getActiveGroup();
   const id = state.expenseDraft.editingId;
@@ -1538,31 +1266,7 @@ function renderGroupInviteScreen(){
     <div class="person-row">
       <div class="avatar">${m.name.slice(0,1)}</div>
       <div class="pname" style="flex:1;">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
-      ${m.pending ? `<span class="pending-badge">초대 대기 중</span>` : ''}
     </div>`).join('');
-  document.getElementById('gi-add-name').value = '';
-  document.getElementById('gi-add-btn').disabled = true;
-  const pendingCount = g.members.filter(m=>m.pending).length;
-  document.getElementById('gi-batch-invite').style.display = pendingCount > 0 ? 'block' : 'none';
-  document.getElementById('gi-batch-invite-label').textContent =
-    pendingCount > 0 ? `대기 중인 ${pendingCount}명에게 카카오톡으로 한 번에 초대 보내기` : '';
-}
-function onGiAddNameInput(){
-  const v = document.getElementById('gi-add-name').value.trim();
-  document.getElementById('gi-add-btn').disabled = !v;
-}
-function addPendingMember(){
-  const g = getActiveGroup();
-  const name = document.getElementById('gi-add-name').value.trim();
-  if(!g || !name) return;
-  g.members.push({id: uid('m'), name, pending: true});
-  renderGroupInviteScreen();
-  showToast(`${name}님을 추가했어요`);
-}
-function sendBatchInvite(){
-  // 카카오톡 공유 시트는 원래 여러 명/채팅방을 한 번에 체크해서 보낼 수 있어서,
-  // 대기 중인 멤버 전체를 대상으로 한 번만 호출하면 됨
-  shareInviteViaKakao();
 }
 document.getElementById('screen-group-invite').addEventListener('transitionstart', ()=>{});
 const _origNav = nav;
