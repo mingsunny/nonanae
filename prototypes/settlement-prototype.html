@@ -141,7 +141,7 @@
 
   /* 알림 레이어: 화면 전환 없이 현재 화면 위에 드롭다운으로 뜸 */
   .noti-overlay{
-    display:none; position:absolute; inset:0; background:rgba(22,34,59,.35);
+    display:none; position:absolute; inset:0; background:transparent;
     z-index:300; padding:56px 16px 16px; box-sizing:border-box;
   }
   .noti-overlay.show{display:block;}
@@ -225,13 +225,18 @@
   .pamt.pos{color:var(--teal-deep);}
   .pamt.neg{color:var(--brick);}
 
-  .cat-row{display:flex; align-items:center; gap:10px; padding:10px 4px;}
   .cat-badge{width:30px;height:30px;border-radius:9px; display:flex;align-items:center;justify-content:center; color:#fff; font-size:12px; font-weight:800; flex-shrink:0;}
-  .cat-bar-wrap{flex:1;}
-  .cat-bar-track{height:6px; border-radius:4px; background:#EDEAE1; overflow:hidden; margin-top:5px;}
-  .cat-bar-fill{height:100%; border-radius:4px;}
-  .cat-top{display:flex; justify-content:space-between; font-size:12.5px; font-weight:700;}
-  .cat-top .amt{font-variant-numeric:tabular-nums; color:var(--ink-soft); font-weight:600;}
+
+  /* 카테고리별 요약: 전체 100%를 하나의 막대로 표현 + 아래 범례 */
+  .cat-stackbar{display:flex; width:100%; height:14px; border-radius:7px; overflow:hidden; background:var(--paper); margin-bottom:6px;}
+  .cat-stackbar .seg{height:100%; margin-right:2px;}
+  .cat-stackbar .seg:last-child{margin-right:0;}
+  .cat-legend-row{display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line);}
+  .cat-legend-row:last-child{border-bottom:none;}
+  .cat-swatch{width:10px; height:10px; border-radius:3px; flex-shrink:0;}
+  .cat-legend-row .name{flex:1; font-size:13.5px; font-weight:700;}
+  .cat-legend-row .amt{font-size:12px; color:var(--ink-soft); font-variant-numeric:tabular-nums;}
+  .cat-legend-row .pct{font-size:13.5px; font-weight:800; width:36px; text-align:right; flex-shrink:0; font-variant-numeric:tabular-nums;}
 
   /* expense list - receipt style */
   .receipt{
@@ -941,21 +946,30 @@ function renderHomeTab(){
   }).join('');
   document.getElementById('home-person-view').innerHTML = g.expenses.length===0 ? `<div class="empty">아직 등록된 지출이 없어요.</div>` : personHtml;
 
-  // 카테고리별
+  // 카테고리별: 전체 100%를 한 막대로 보여주고, 아래 범례로 항목별 금액·비중을 나열
   const byCat = {};
   g.expenses.forEach(e=>{ byCat[e.category] = (byCat[e.category]||0) + e.amount; });
-  const catHtml = CATEGORIES.filter(c=>byCat[c.id]).sort((a,b)=>byCat[b.id]-byCat[a.id]).map(c=>{
-    const amt = byCat[c.id];
-    const pct = Math.round((amt/total)*100);
-    return `<div class="cat-row">
-      <div class="cat-badge" style="background:${c.color};">${c.label.slice(0,1)}</div>
-      <div class="cat-bar-wrap">
-        <div class="cat-top"><span>${c.label}</span><span class="amt">${won(amt)} · ${pct}%</span></div>
-        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%; background:${c.color};"></div></div>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('home-category-view').innerHTML = catHtml || `<div class="empty">아직 등록된 지출이 없어요.</div>`;
+  const sortedCats = CATEGORIES.filter(c=>byCat[c.id]).sort((a,b)=>byCat[b.id]-byCat[a.id]);
+  if(sortedCats.length===0){
+    document.getElementById('home-category-view').innerHTML = `<div class="empty">아직 등록된 지출이 없어요.</div>`;
+  } else {
+    const stackHtml = sortedCats.map(c=>{
+      const pct = (byCat[c.id]/total)*100;
+      return `<div class="seg" style="width:${pct}%; background:${c.color};"></div>`;
+    }).join('');
+    const legendHtml = sortedCats.map(c=>{
+      const amt = byCat[c.id];
+      const pct = Math.round((amt/total)*100);
+      return `<div class="cat-legend-row">
+        <div class="cat-swatch" style="background:${c.color};"></div>
+        <div class="name">${c.label}</div>
+        <div class="amt">${won(amt)}</div>
+        <div class="pct">${pct}%</div>
+      </div>`;
+    }).join('');
+    document.getElementById('home-category-view').innerHTML =
+      `<div class="cat-stackbar">${stackHtml}</div>${legendHtml}`;
+  }
 }
 
 /* ---- 지출 탭(03) ---- */
@@ -1260,6 +1274,7 @@ function renderNotifications(){
       <div class="ramt" style="font-size:11px; font-weight:600; color:var(--ink-soft);">${n.timeLabel}</div>
     </div>`).join('');
 }
+/* 알림 종류와 상관없이 지출내역(지출 탭)으로 랜딩 — 멤버 목록은 딱히 할 액션이 없어서 제외 */
 function openNotification(id){
   const n = state.notifications.find(x=>x.id===id);
   if(!n) return;
@@ -1267,11 +1282,6 @@ function openNotification(id){
   renderNotiDot();
   closeNotifications();
   openGroup(n.groupId);
-  if(n.type==='expense'){
-    openExpenseForm(n.expenseId);
-  } else if(n.type==='member_joined'){
-    nav('screen-group-invite');
-  }
 }
 
 function deleteExpense(){
