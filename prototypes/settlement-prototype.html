@@ -145,9 +145,19 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
-  /* 첫 방문 코치마크: 화면 전체를 덮는 catcher 위, 타겟 요소만 거대한 box-shadow 구멍으로 밝게 남겨 스포트라이트처럼 보이게 함 */
-  .coach-catcher{position:absolute; inset:0; z-index:400; cursor:pointer;}
-  .coach-highlight{position:relative; z-index:401 !important; box-shadow:0 0 0 9999px rgba(22,34,59,.55) !important; pointer-events:auto;}
+  /* 첫 방문 코치마크: catcher가 .phone 전체를 균일하게 딤 처리하고(헤더·GNB 포함),
+     타겟 위치만 clip-path로 구멍을 뚫어 원래 요소가 그대로 밝게 보이도록 함.
+     (이전엔 타겟 자신의 box-shadow로 딤을 흉내냈는데, 스크롤 컨테이너의
+     overflow에 가려 헤더/GNB처럼 그 바깥 영역은 딤이 안 되는 문제가 있었음) */
+  .coach-catcher{position:absolute; inset:0; z-index:400; cursor:pointer; background:rgba(22,34,59,.6); transition:clip-path .2s ease;}
+  .coach-highlight{
+    position:relative; z-index:401 !important; border-radius:14px;
+    animation:coach-pulse 1.3s ease-in-out infinite;
+  }
+  @keyframes coach-pulse{
+    0%,100%{ box-shadow:0 0 0 4px rgba(255,255,255,.85), 0 0 16px 2px rgba(255,255,255,.35); }
+    50%{ box-shadow:0 0 0 4px rgba(255,255,255,.85), 0 0 28px 8px rgba(255,255,255,.65); }
+  }
   .coach-tip-text{
     display:none; position:absolute; left:22px; right:22px; z-index:402;
     color:#fff; font-size:13.5px; font-weight:700; line-height:1.5; text-align:center;
@@ -866,9 +876,16 @@ function showCoach(key, targetId, text, placement){
   const tip = document.getElementById('coach-tip-text');
   tip.textContent = text;
   tip.style.display = 'block';
-  document.getElementById('coach-catcher').style.display = 'block';
+  const catcher = document.getElementById('coach-catcher');
+  catcher.style.display = 'block';
   const phoneRect = document.querySelector('.phone').getBoundingClientRect();
   const r = target.getBoundingClientRect();
+  // catcher는 .phone 전체(헤더·GNB 포함)를 딤 처리하고, 타겟 위치에만 clip-path로 구멍을 뚫음
+  const pad = 6;
+  const w = phoneRect.width, h = phoneRect.height;
+  const x1 = Math.max(0, r.left - phoneRect.left - pad), y1 = Math.max(0, r.top - phoneRect.top - pad);
+  const x2 = Math.min(w, r.right - phoneRect.left + pad), y2 = Math.min(h, r.bottom - phoneRect.top + pad);
+  catcher.style.clipPath = `path(evenodd, "M0,0 H${w} V${h} H0 Z M${x1},${y1} H${x2} V${y2} H${x1} Z")`;
   if(placement==='below'){
     tip.style.top = (r.bottom - phoneRect.top + 14) + 'px';
     tip.style.bottom = 'auto';
@@ -879,7 +896,9 @@ function showCoach(key, targetId, text, placement){
 }
 function hideCoach(){
   document.querySelectorAll('.coach-highlight').forEach(el=>el.classList.remove('coach-highlight'));
-  document.getElementById('coach-catcher').style.display = 'none';
+  const catcher = document.getElementById('coach-catcher');
+  catcher.style.display = 'none';
+  catcher.style.clipPath = '';
   document.getElementById('coach-tip-text').style.display = 'none';
   activeCoachKey = null;
 }
@@ -898,7 +917,7 @@ function dismissCurrentCoach(){
 function maybeShowGroupCreateCoach(){
   if(!state.currentUser || state.currentUser.seenGroupCreateCoach) return;
   if(state.groups.length > 0) return;
-  setTimeout(()=>showCoach('groupCreate', 'create-group-entry-btn', '여기를 눌러 첫 그룹을 만들어보세요', 'below'), 250);
+  setTimeout(()=>showCoach('groupCreate', 'create-group-entry-btn', '함께 갈 여행 이름으로 그룹을 만들어보세요', 'below'), 250);
 }
 function maybeShowInviteCoach(){
   if(!state.currentUser || state.currentUser.seenInviteCoach) return;
