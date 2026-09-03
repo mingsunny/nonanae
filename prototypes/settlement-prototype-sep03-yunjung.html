@@ -100,14 +100,14 @@
   h2.big{font-size:24px; font-weight:800; margin:0 0 6px; letter-spacing:-.02em;}
   p.sub{font-size:13.5px; color:var(--ink-soft); margin:0 0 24px; line-height:1.5;}
 
-  /* 왜/어떻게 이 행동이 필요한지 강조하는 가이드 박스. 어떤 버튼을 눌러야 하는지
-     가리킬 때는 .guide-callout-arrow 아이콘을 같이 넣어서 방향을 알려줌 */
+  /* 왜 이 행동이 필요한지 강조하는 가이드 박스 (로그인/계좌등록 화면) */
   .guide-callout{
-    display:flex; align-items:center; gap:8px;
     background:#EAF4F3; border-radius:12px; padding:12px 14px; margin:0 0 22px;
     font-size:13px; font-weight:700; color:var(--teal-deep); line-height:1.5;
   }
-  .guide-callout-arrow{flex-shrink:0;}
+
+  /* 어떤 버튼을 눌러야 하는지는 문구가 아니라 버튼 자체를 초록색으로 감싸서 알려줌 */
+  .guide-target{box-shadow:0 0 0 3px var(--teal-deep);}
 
   label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); display:block; margin:16px 0 7px;}
   input[type=text], input[type=email], input[type=number]{
@@ -403,10 +403,7 @@
         <button class="btn btn-primary" id="create-group-entry-btn" onclick="dismissGroupCreateCoach(); nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
-      <div class="guide-callout" id="group-create-hint" style="display:none;">
-        <svg class="guide-callout-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12V2M7 2 3 6M7 2l4 4"/></svg>
-        <span>그룹을 만들고 정산을 시작해요</span>
-      </div>
+      <p class="sub" id="group-create-hint" style="display:none; margin:0;">그룹을 만들고 정산을 시작해요</p>
       <div id="groups-list-wrap">
         <!-- JS renders group rows -->
       </div>
@@ -506,7 +503,7 @@
       <div class="gtotal" id="gh-total">₩0</div>
       <div class="members-strip" id="gh-members" style="cursor:pointer;" onclick="nav('screen-group-invite')"></div>
       <div style="display:flex; gap:8px; margin-top:12px;">
-        <div class="invite-pill" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="nav('screen-group-invite')">
+        <div class="invite-pill" id="invite-member-btn" style="flex:1; justify-content:center; background:#FEE500; color:#191600;" onclick="nav('screen-group-invite')">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
           멤버 초대
         </div>
@@ -887,7 +884,8 @@ function dismissGroupCreateCoach(){
 }
 function updateGroupCreateHint(){
   const show = !!state.currentUser && !state.currentUser.seenGroupCreateCoach && state.groups.length===0;
-  document.getElementById('group-create-hint').style.display = show ? 'flex' : 'none';
+  document.getElementById('group-create-hint').style.display = show ? 'block' : 'none';
+  document.getElementById('create-group-entry-btn').classList.toggle('guide-target', show);
 }
 
 function copyInviteCode(){
@@ -995,6 +993,7 @@ function openGroup(id){
   document.getElementById('gh-name').textContent = g.name;
   document.getElementById('gh-total').innerHTML = won(groupTotal(g)) + ' <small>총 사용</small>';
   document.getElementById('gh-members').innerHTML = g.members.map(m=>`<div class="member-chip ${m.pending?'pending':''}" title="${m.name}">${m.name.slice(0,1)}</div>`).join('');
+  document.getElementById('invite-member-btn').classList.toggle('guide-target', g.members.length===1);
   setGroupView('expense');
   nav('screen-group');
 }
@@ -1096,10 +1095,7 @@ function renderExpenseTab(){
     // 아직 아무도 초대 안 했으면(=나 혼자) "멤버부터 초대하라"는 안내만, 이미 멤버가
     // 있으면 "지출을 추가하라"는 안내만 — 두 메시지를 동시에 보여주지 않고 상태에 따라 하나만
     if(g.members.length===1){
-      wrap.innerHTML = `<div class="guide-callout">
-        <svg class="guide-callout-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12V2M7 2 3 6M7 2l4 4"/></svg>
-        <span>정산할 친구를 초대해주세요</span>
-      </div>`;
+      wrap.innerHTML = `<div class="empty">정산할 친구를 초대해주세요.</div>`;
     } else {
       wrap.innerHTML = `<div class="empty">
         <div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.
