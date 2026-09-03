@@ -570,12 +570,11 @@
         <input type="text" id="gi-add-name" placeholder="이름 입력" style="flex:1;" oninput="onGiAddNameInput()"/>
         <button class="btn btn-outline" id="gi-add-btn" style="width:auto; padding:0 18px;" disabled onclick="addPendingMember()">추가</button>
       </div>
-      <div id="gi-invite-prompt" style="display:none; margin-top:10px; padding:12px 14px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
-        <div id="gi-invite-prompt-text" style="font-size:13px; font-weight:700; margin-bottom:10px;"></div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn" style="background:#FEE500; color:#191600; width:auto; padding:10px 14px; font-size:13px;" onclick="sendPendingInvite()">카카오톡으로 보내기</button>
-          <button class="btn btn-outline" style="width:auto; padding:10px 14px; font-size:13px;" onclick="dismissPendingInvitePrompt()">나중에</button>
-        </div>
+      <div id="gi-batch-invite" style="display:none; margin-top:14px;">
+        <button class="btn" style="background:#FEE500; color:#191600;" onclick="sendBatchInvite()">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="#191600"><path d="M12 3C6.48 3 2 6.48 2 10.78c0 2.75 1.83 5.16 4.58 6.54-.2.73-.73 2.66-.83 3.07-.13.5.18.5.39.36.16-.11 2.6-1.76 3.66-2.48.71.1 1.44.16 2.2.16 5.52 0 10-3.48 10-7.78S17.52 3 12 3z"/></svg>
+          <span id="gi-batch-invite-label">대기 중인 친구들에게 카카오톡으로 한 번에 초대 보내기</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1590,7 +1589,10 @@ function renderGroupInviteScreen(){
     </div>`).join('');
   document.getElementById('gi-add-name').value = '';
   document.getElementById('gi-add-btn').disabled = true;
-  document.getElementById('gi-invite-prompt').style.display = 'none';
+  const pendingCount = g.members.filter(m=>m.pending).length;
+  document.getElementById('gi-batch-invite').style.display = pendingCount > 0 ? 'block' : 'none';
+  document.getElementById('gi-batch-invite-label').textContent =
+    pendingCount > 0 ? `대기 중인 ${pendingCount}명에게 카카오톡으로 한 번에 초대 보내기` : '';
 }
 function onGiAddNameInput(){
   const v = document.getElementById('gi-add-name').value.trim();
@@ -1603,16 +1605,11 @@ function addPendingMember(){
   g.members.push({id: uid('m'), name, pending: true});
   renderGroupInviteScreen();
   showToast(`${name}님을 추가했어요`);
-  // 이름만 등록해두고 끝나면 그 사람은 초대받은 적이 없는 상태라, 바로 카카오톡 초대를 이어서 제안
-  document.getElementById('gi-invite-prompt-text').textContent = `${name}님에게 지금 카카오톡으로 초대를 보낼까요?`;
-  document.getElementById('gi-invite-prompt').style.display = 'block';
 }
-function sendPendingInvite(){
+function sendBatchInvite(){
+  // 카카오톡 공유 시트는 원래 여러 명/채팅방을 한 번에 체크해서 보낼 수 있어서,
+  // 대기 중인 멤버 전체를 대상으로 한 번만 호출하면 됨
   shareInviteViaKakao();
-  dismissPendingInvitePrompt();
-}
-function dismissPendingInvitePrompt(){
-  document.getElementById('gi-invite-prompt').style.display = 'none';
 }
 document.getElementById('screen-group-invite').addEventListener('transitionstart', ()=>{});
 const _origNav = nav;
