@@ -225,6 +225,7 @@
     border:2px solid var(--ink); margin-left:-8px;
   }
   .member-chip:first-child{margin-left:0;}
+  .member-chip.pending{background:transparent; border:2px dashed rgba(255,255,255,.55); color:rgba(255,255,255,.8);}
   .invite-pill{
     display:flex; align-items:center; gap:5px;
     font-size:12px; font-weight:700; color:#fff; background:rgba(255,255,255,.16);
@@ -237,6 +238,7 @@
 
   .person-row{display:flex; align-items:center; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line);}
   .person-row:last-child{border-bottom:none;}
+  .pending-badge{font-size:11px; font-weight:700; color:var(--ink-soft); background:var(--paper); border:1px solid var(--line); border-radius:20px; padding:3px 9px; flex-shrink:0;}
   .avatar{
     width:34px;height:34px;border-radius:50%; background:#EDEAE1; color:var(--ink);
     display:flex;align-items:center;justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0;
@@ -482,6 +484,18 @@
     </div>
   </div>
 
+  <!-- ================= 02d. 초대 대기 중 멤버와 매칭 ================= -->
+  <div class="screen" id="screen-join-match">
+    <div class="topbar">
+      <div class="back" onclick="nav('screen-join-group')"><svg viewBox="0 0 24 24" fill="none" stroke="#16223B" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <h1>그룹에 있는 멤버인가요?</h1>
+    </div>
+    <div class="pad">
+      <p class="sub">이미 등록된 멤버 중에 본인이 있으면 선택해주세요.<br/>지금까지 등록된 지출이 그대로 연결돼요.</p>
+      <div id="join-match-list"></div>
+    </div>
+  </div>
+
   <!-- ================= 그룹 내부 (지출 / 정산) ================= -->
   <div class="screen" id="screen-group" style="position:relative;">
     <div class="group-header" style="padding-top:40px;">
@@ -551,6 +565,11 @@
     <div class="pad">
       <p class="sub">이 그룹에 참여 중인 멤버예요. 초대는 그룹 화면 상단의<br/>카카오톡/코드 복사 버튼으로 언제든 할 수 있어요.</p>
       <div class="card" id="gi-member-list"></div>
+      <label class="field-label">아직 앱에 안 들어온 친구 몫도 미리 계산에 넣고 싶다면</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="gi-add-name" placeholder="이름 입력" style="flex:1;" oninput="onGiAddNameInput()"/>
+        <button class="btn btn-outline" id="gi-add-btn" style="width:auto; padding:0 18px;" disabled onclick="addPendingMember()">추가</button>
+      </div>
     </div>
   </div>
 
@@ -647,6 +666,7 @@ let state = {
   activeGroupId: null,
   expenseDraft: null,
   notifications: [], // 전역 알림 내역 (최신순)
+  pendingJoinGroupId: null, // 초대코드 참여 시, 초대 대기 중 멤버와 매칭하는 동안 잠깐 들고 있는 그룹 id
 };
 
 function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,8); }
@@ -959,11 +979,68 @@ function joinGroupByCode(){
     document.getElementById('join-error').style.display = 'block';
     return;
   }
-  if(!g.members.find(m=>m.id===state.currentUser.id)){
+  document.getElementById('join-code-input').value='';
+  if(g.members.find(m=>m.id===state.currentUser.id)){
+    openGroup(g.id);
+    return;
+  }
+  const pending = g.members.filter(m=>m.pending);
+  if(pending.length > 0){
+    // 아직 초대 대기 중인(이름만 있는) 멤버가 있으면, 본인이 그 중 하나인지 먼저 확인
+    state.pendingJoinGroupId = g.id;
+    renderJoinMatchScreen(g, pending);
+    nav('screen-join-match');
+    return;
+  }
+  g.members.push(state.currentUser);
+  addNotification('member_joined', {groupId:g.id, memberId:state.currentUser.id});
+  renderGroupsList();
+  openGroup(g.id);
+}
+
+/* ---- 초대 대기 중 멤버와 매칭: 이름만으로 미리 넣어둔 멤버를 실제 계정과 연결 ---- */
+function renderJoinMatchScreen(g, pending){
+  const wrap = document.getElementById('join-match-list');
+  wrap.innerHTML = pending.map(m=>`
+    <div class="group-row" onclick="confirmJoinMatch('${m.id}')">
+      <div class="group-thumb">${m.name.slice(0,1)}</div>
+      <div class="meta">
+        <div class="name">${m.name}</div>
+        <div class="sum">이 이름으로 등록된 지출과 연결돼요</div>
+      </div>
+      <div class="arrow">›</div>
+    </div>`).join('') + `
+    <div class="group-row" onclick="confirmJoinMatch(null)">
+      <div class="group-thumb" style="background:var(--ink-soft);">＋</div>
+      <div class="meta"><div class="name">아니요, 새 멤버예요</div></div>
+      <div class="arrow">›</div>
+    </div>`;
+}
+function mergePendingMember(g, placeholderId){
+  const idx = g.members.findIndex(m=>m.id===placeholderId);
+  if(idx===-1) return;
+  const oldId = g.members[idx].id;
+  g.members[idx] = state.currentUser;
+  g.expenses.forEach(e=>{
+    if(e.payerId===oldId) e.payerId = state.currentUser.id;
+    e.participantIds = e.participantIds.map(id => id===oldId ? state.currentUser.id : id);
+    if(e.customShares && e.customShares[oldId]!==undefined){
+      e.customShares[state.currentUser.id] = e.customShares[oldId];
+      delete e.customShares[oldId];
+    }
+  });
+}
+function confirmJoinMatch(placeholderId){
+  const g = state.groups.find(gr=>gr.id===state.pendingJoinGroupId);
+  state.pendingJoinGroupId = null;
+  if(!g) return;
+  if(placeholderId){
+    mergePendingMember(g, placeholderId);
+    showToast('기존에 등록된 멤버와 연결됐어요');
+  } else {
     g.members.push(state.currentUser);
     addNotification('member_joined', {groupId:g.id, memberId:state.currentUser.id});
   }
-  document.getElementById('join-code-input').value='';
   renderGroupsList();
   openGroup(g.id);
 }
@@ -978,7 +1055,7 @@ function openGroup(id){
   const g = getActiveGroup();
   document.getElementById('gh-name').textContent = g.name;
   document.getElementById('gh-total').innerHTML = won(groupTotal(g)) + ' <small>총 사용</small>';
-  document.getElementById('gh-members').innerHTML = g.members.map(m=>`<div class="member-chip" title="${m.name}">${m.name.slice(0,1)}</div>`).join('');
+  document.getElementById('gh-members').innerHTML = g.members.map(m=>`<div class="member-chip ${m.pending?'pending':''}" title="${m.name}">${m.name.slice(0,1)}</div>`).join('');
   setGroupView('expense');
   nav('screen-group');
 }
@@ -1141,7 +1218,7 @@ function openExpenseForm(expenseId){
   ).join('');
 
   const payerSel = document.getElementById('ex-payer');
-  payerSel.innerHTML = g.members.map(m=>`<option value="${m.id}" ${m.id===state.expenseDraft.payerId?'selected':''}>${m.name}${m.id===state.currentUser.id?' (나)':''}</option>`).join('');
+  payerSel.innerHTML = g.members.map(m=>`<option value="${m.id}" ${m.id===state.expenseDraft.payerId?'selected':''}>${m.name}${m.id===state.currentUser.id?' (나)':''}${m.pending?' (대기중)':''}</option>`).join('');
 
   document.querySelectorAll('#ex-split-toggle .opt').forEach(o=>o.classList.toggle('active', o.dataset.split===splitMode));
   document.getElementById('ex-split-summary').style.display = 'none';
@@ -1234,7 +1311,7 @@ function renderParticipants(){
     }
     return `<div class="check-row" onclick="toggleParticipant('${m.id}')">
       <div class="checkbox ${on?'on':''}">${on?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M4 12l6 6L20 6"/></svg>':''}</div>
-      <div class="cname">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
+      <div class="cname">${m.name}${m.id===state.currentUser.id?' (나)':''}${m.pending?' (대기중)':''}</div>
       <div class="split-col">${shareDisplay}</div>
     </div>`;
   }).join('');
@@ -1502,7 +1579,22 @@ function renderGroupInviteScreen(){
     <div class="person-row">
       <div class="avatar">${m.name.slice(0,1)}</div>
       <div class="pname" style="flex:1;">${m.name}${m.id===state.currentUser.id?' (나)':''}</div>
+      ${m.pending ? `<span class="pending-badge">초대 대기 중</span>` : ''}
     </div>`).join('');
+  document.getElementById('gi-add-name').value = '';
+  document.getElementById('gi-add-btn').disabled = true;
+}
+function onGiAddNameInput(){
+  const v = document.getElementById('gi-add-name').value.trim();
+  document.getElementById('gi-add-btn').disabled = !v;
+}
+function addPendingMember(){
+  const g = getActiveGroup();
+  const name = document.getElementById('gi-add-name').value.trim();
+  if(!g || !name) return;
+  g.members.push({id: uid('m'), name, pending: true});
+  renderGroupInviteScreen();
+  showToast(`${name}님을 추가했어요`);
 }
 document.getElementById('screen-group-invite').addEventListener('transitionstart', ()=>{});
 const _origNav = nav;
