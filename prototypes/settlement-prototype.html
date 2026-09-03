@@ -145,14 +145,6 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
-  /* 첫 그룹 만들기 안내: 딤 없이 화살표+텍스트만 (빈 홈 화면엔 어차피 다른 콘텐츠가 없어서
-     딤으로 시선을 뺏을 필요가 없음) */
-  .group-create-hint{display:none; text-align:center; margin-bottom:12px; color:var(--teal-deep);}
-  .group-create-hint svg{display:block; margin:0 auto;}
-  .group-create-hint-text{font-size:13px; font-weight:700; margin-top:2px;}
-
-  /* 지출 empty state: 헤더의 "멤버 초대" 버튼을 가리키는 안내 (버튼 중복 없이 위쪽을 가리킴) */
-  .list-invite-hint-text{font-size:13px; font-weight:700; color:var(--teal-deep); margin-top:6px;}
 
   /* 알림 레이어: 화면 전환 없이 현재 화면 위에 드롭다운으로 뜸 */
   .noti-overlay{
@@ -404,14 +396,11 @@
 
     <!-- ---- GNB Tab: 홈 ---- -->
     <div id="groups-tab-home" class="pad" style="flex:1; display:block;">
-      <div class="group-create-hint" id="group-create-hint">
-        <svg width="18" height="24" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v18M9 20l-6-6M9 20l6-6"/></svg>
-        <div class="group-create-hint-text">그룹을 만들고 정산을 시작해요</div>
-      </div>
       <div class="quick-actions" style="margin-top:0; margin-bottom:18px;">
         <button class="btn btn-primary" id="create-group-entry-btn" onclick="dismissGroupCreateCoach(); nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
+      <div class="guide-callout" id="group-create-hint" style="display:none;">그룹을 만들고 정산을 시작해요</div>
       <div id="groups-list-wrap">
         <!-- JS renders group rows -->
       </div>
@@ -812,7 +801,7 @@ function renderGroupsList(){
       <div class="arrow">›</div>
     </div>
   `).join('');
-  // 그룹이 없을 때의 안내는 버튼 위 group-create-hint 화살표 하나로 통일 —
+  // 그룹이 없을 때의 안내는 버튼 아래 group-create-hint 카드 하나로 통일 —
   // 여기서 또 "아직 참여한 그룹이 없어요" 같은 안내를 중복으로 보여주지 않음
   wrap.innerHTML = rows;
   updateGroupCreateHint();
@@ -883,10 +872,10 @@ function createGroup(){
   openGroup(g.id);
 }
 
-/* ---- 첫 그룹 만들기 안내 (유저당 1회): 빈 홈 화면엔 다른 콘텐츠가 없어서
-   딤 처리 없이 버튼 위 화살표+텍스트로만 안내. 초대 쪽은 별도 버튼을
-   또 만들지 않고, 지출 empty state에서 헤더의 "멤버 초대" 버튼을
-   가리키는 화살표 안내로 대신함 (renderExpenseTab 참고). ---- */
+/* ---- 첫 그룹 만들기 안내 (유저당 1회): 로그인/계좌등록 화면과 같은
+   .guide-callout 카드로 통일, 버튼 아래에 노출. 초대 쪽도 지출 empty
+   state에서 같은 .guide-callout으로 안내함 (renderExpenseTab 참고),
+   별도 버튼을 또 만들지 않음. ---- */
 function dismissGroupCreateCoach(){
   if(state.currentUser) state.currentUser.seenGroupCreateCoach = true;
   updateGroupCreateHint();
@@ -1102,10 +1091,7 @@ function renderExpenseTab(){
     // 아직 아무도 초대 안 했으면(=나 혼자) "멤버부터 초대하라"는 안내만, 이미 멤버가
     // 있으면 "지출을 추가하라"는 안내만 — 두 메시지를 동시에 보여주지 않고 상태에 따라 하나만
     if(g.members.length===1){
-      wrap.innerHTML = `<div class="empty">
-        <svg width="18" height="24" viewBox="0 0 18 24" fill="none" stroke="var(--teal-deep)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 22V4M9 4l-6 6M9 4l6 6"/></svg>
-        <div class="list-invite-hint-text">위에서 친구를 초대해보세요</div>
-      </div>`;
+      wrap.innerHTML = `<div class="guide-callout">위에서 친구를 초대해보세요</div>`;
     } else {
       wrap.innerHTML = `<div class="empty">
         <div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.
@@ -1139,10 +1125,11 @@ function renderExpenseTab(){
 function openExpenseForm(expenseId){
   const g = getActiveGroup();
   const editing = expenseId ? g.expenses.find(e=>e.id===expenseId) : null;
-  // 토스트는 몇 초면 사라져서 놓치기 쉬워서, 폼 상단에 계속 떠 있는 배너로 — 새로 등록할 때만
+  // 멤버가 이미 여러 명이면 아래 "함께 사용한 인원" 목록만 봐도 알 수 있어서 굳이 또 알려줄 필요
+  // 없음 — 나 혼자일 때(=까먹고 혼자 등록할 위험이 있을 때)만 새로 등록하는 경우에 띄움
   const banner = document.getElementById('ex-headcount-banner');
-  if(!editing){
-    banner.textContent = `현재 ${g.members.length}명으로 정산돼요`;
+  if(!editing && g.members.length===1){
+    banner.textContent = '현재 나 혼자라 나 혼자 낸 걸로 기록돼요';
     banner.style.display = 'block';
   } else {
     banner.style.display = 'none';
