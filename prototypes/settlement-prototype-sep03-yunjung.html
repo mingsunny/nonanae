@@ -486,12 +486,12 @@
       <div id="settle-list-wrap"></div>
     </div>
 
-    <!-- ---- View: 통계(인원별/카테고리별 요약) ---- -->
+    <!-- ---- View: 요약(카테고리별/인원별) ---- -->
     <div id="view-stats" class="pad" style="flex:1; display:none; padding-top:18px;">
-      <div class="date-label" style="margin-top:0;">인원별</div>
-      <div class="card" id="home-person-view"></div>
-      <div class="date-label">카테고리별</div>
+      <div class="date-label" style="margin-top:0;">카테고리별</div>
       <div class="card" id="home-category-view"></div>
+      <div class="date-label">인원별</div>
+      <div class="card" id="home-person-view"></div>
     </div>
 
     <div class="fab" id="expense-fab" onclick="openExpenseForm()">
@@ -509,7 +509,7 @@
       </div>
       <div class="tab" data-gvtab="stats" onclick="setGroupView('stats')">
         <svg class="tab-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20V14M12 20V9M18 20V5"/></svg>
-        <span>통계</span>
+        <span>요약</span>
       </div>
     </div>
   </div>
@@ -877,7 +877,7 @@ function openGroup(id){
   nav('screen-group');
 }
 
-/* 그룹 내부 뷰: 지출(기본) / 정산(최소송금 + 인원별·카테고리별 요약) */
+/* 그룹 내부 뷰: 지출(기본) / 정산(최소송금) / 요약(카테고리별·인원별) */
 function setGroupView(view){
   document.querySelectorAll('#screen-group .tabbar .tab[data-gvtab]').forEach(o=>o.classList.toggle('active', o.dataset.gvtab===view));
   document.getElementById('view-expense').style.display = view==='expense' ? 'block':'none';
