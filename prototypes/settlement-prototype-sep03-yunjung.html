@@ -1105,16 +1105,17 @@ function renderExpenseTab(){
   const wrap = document.getElementById('expense-list-wrap');
   if(g.expenses.length===0){
     // 아직 아무도 초대 안 했으면(=나 혼자) "멤버부터 초대하라"는 안내만, 이미 멤버가
-    // 있으면 "지출을 추가하라"는 안내만 — 두 메시지를 동시에 보여주지 않고 상태에 따라 하나만
+    // 있으면 "지출을 추가하라"는 안내만 — 두 메시지를 동시에 보여주지 않고 상태에 따라 하나만.
+    // "어떤 버튼인지"는 문구가 아니라 FAB 자체를 강조해서 보여줌 (멤버 초대 버튼과 동일한 방식)
+    document.getElementById('expense-fab').classList.toggle('guide-target', g.members.length>1);
     if(g.members.length===1){
       wrap.innerHTML = `<div class="empty">정산할 친구를 초대해주세요.</div>`;
     } else {
-      wrap.innerHTML = `<div class="empty">
-        <div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>오른쪽 아래 버튼으로 첫 지출을 추가해보세요.
-      </div>`;
+      wrap.innerHTML = `<div class="empty"><div class="big-icon">＋</div>아직 등록된 지출이 없어요.<br/>첫 지출을 추가해보세요.</div>`;
     }
     return;
   }
+  document.getElementById('expense-fab').classList.remove('guide-target');
   // group by dateLabel
   const groups = {};
   g.expenses.forEach(e=>{ (groups[e.dateLabel] = groups[e.dateLabel]||[]).push(e); });
