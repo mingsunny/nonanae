@@ -570,6 +570,13 @@
         <input type="text" id="gi-add-name" placeholder="이름 입력" style="flex:1;" oninput="onGiAddNameInput()"/>
         <button class="btn btn-outline" id="gi-add-btn" style="width:auto; padding:0 18px;" disabled onclick="addPendingMember()">추가</button>
       </div>
+      <div id="gi-invite-prompt" style="display:none; margin-top:10px; padding:12px 14px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
+        <div id="gi-invite-prompt-text" style="font-size:13px; font-weight:700; margin-bottom:10px;"></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" style="background:#FEE500; color:#191600; width:auto; padding:10px 14px; font-size:13px;" onclick="sendPendingInvite()">카카오톡으로 보내기</button>
+          <button class="btn btn-outline" style="width:auto; padding:10px 14px; font-size:13px;" onclick="dismissPendingInvitePrompt()">나중에</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1583,6 +1590,7 @@ function renderGroupInviteScreen(){
     </div>`).join('');
   document.getElementById('gi-add-name').value = '';
   document.getElementById('gi-add-btn').disabled = true;
+  document.getElementById('gi-invite-prompt').style.display = 'none';
 }
 function onGiAddNameInput(){
   const v = document.getElementById('gi-add-name').value.trim();
@@ -1595,6 +1603,16 @@ function addPendingMember(){
   g.members.push({id: uid('m'), name, pending: true});
   renderGroupInviteScreen();
   showToast(`${name}님을 추가했어요`);
+  // 이름만 등록해두고 끝나면 그 사람은 초대받은 적이 없는 상태라, 바로 카카오톡 초대를 이어서 제안
+  document.getElementById('gi-invite-prompt-text').textContent = `${name}님에게 지금 카카오톡으로 초대를 보낼까요?`;
+  document.getElementById('gi-invite-prompt').style.display = 'block';
+}
+function sendPendingInvite(){
+  shareInviteViaKakao();
+  dismissPendingInvitePrompt();
+}
+function dismissPendingInvitePrompt(){
+  document.getElementById('gi-invite-prompt').style.display = 'none';
 }
 document.getElementById('screen-group-invite').addEventListener('transitionstart', ()=>{});
 const _origNav = nav;
