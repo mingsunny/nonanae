@@ -813,8 +813,9 @@ function renderGroupsList(){
       <div class="arrow">›</div>
     </div>
   `).join('');
-  const empty = state.groups.length===0 ? `<div class="empty"><div class="big-icon">＋</div>아직 참여한 그룹이 없어요.<br/>새 그룹을 만들거나 초대코드로 참여해보세요.</div>` : '';
-  wrap.innerHTML = rows + empty;
+  // 그룹이 없을 때의 안내는 버튼 위 group-create-hint 화살표 하나로 통일 —
+  // 여기서 또 "아직 참여한 그룹이 없어요" 같은 안내를 중복으로 보여주지 않음
+  wrap.innerHTML = rows;
   updateGroupCreateHint();
 }
 
