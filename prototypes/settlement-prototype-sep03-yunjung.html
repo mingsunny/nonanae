@@ -589,6 +589,7 @@
       <h1 id="ex-form-title">지출 추가</h1>
     </div>
     <div class="pad" style="padding-bottom:100px;">
+      <div id="ex-headcount-banner" class="guide-callout" style="display:none;"></div>
       <label class="field-label">사용 금액</label>
       <input type="number" id="ex-amount" placeholder="0" oninput="renderParticipants(); validateExpenseForm();"/>
 
@@ -1138,7 +1139,14 @@ function renderExpenseTab(){
 function openExpenseForm(expenseId){
   const g = getActiveGroup();
   const editing = expenseId ? g.expenses.find(e=>e.id===expenseId) : null;
-  if(!editing) showToast(`현재 ${g.members.length}명으로 정산돼요`);
+  // 토스트는 몇 초면 사라져서 놓치기 쉬워서, 폼 상단에 계속 떠 있는 배너로 — 새로 등록할 때만
+  const banner = document.getElementById('ex-headcount-banner');
+  if(!editing){
+    banner.textContent = `현재 ${g.members.length}명으로 정산돼요`;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
 
   document.getElementById('ex-amount').value = editing ? editing.amount : '';
   document.getElementById('ex-title').value = editing ? editing.title : '';
