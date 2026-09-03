@@ -106,8 +106,13 @@
     font-size:13px; font-weight:700; color:var(--teal-deep); line-height:1.5;
   }
 
-  /* 어떤 버튼을 눌러야 하는지는 문구가 아니라 버튼 자체를 초록색으로 감싸서 알려줌 */
-  .guide-target{box-shadow:0 0 0 3px var(--teal-deep);}
+  /* 어떤 버튼을 눌러야 하는지는 문구가 아니라 버튼 자체를 강조해서 알려줌 —
+     테두리만으론 눈에 안 띄어서 은은하게 커졌다 작아지는 초록 글로우로 */
+  .guide-target{animation:guide-target-pulse 1.6s ease-in-out infinite;}
+  @keyframes guide-target-pulse{
+    0%,100%{ box-shadow:0 0 0 3px var(--teal-deep), 0 0 10px 2px rgba(14,124,123,.35); }
+    50%{ box-shadow:0 0 0 3px var(--teal-deep), 0 0 22px 7px rgba(14,124,123,.65); }
+  }
 
   label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); display:block; margin:16px 0 7px;}
   input[type=text], input[type=email], input[type=number]{
@@ -403,7 +408,7 @@
         <button class="btn btn-primary" id="create-group-entry-btn" onclick="dismissGroupCreateCoach(); nav('screen-create-group')">＋ 새 그룹 만들기</button>
         <button class="btn btn-outline" onclick="nav('screen-join-group')">초대코드 입력</button>
       </div>
-      <p class="sub" id="group-create-hint" style="display:none; margin:0;">그룹을 만들고 정산을 시작해요</p>
+      <p class="sub" id="group-create-hint" style="display:none; margin:0; text-align:center;">그룹을 만들고 정산을 시작해요</p>
       <div id="groups-list-wrap">
         <!-- JS renders group rows -->
       </div>
