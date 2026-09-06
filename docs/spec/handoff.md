@@ -19,6 +19,7 @@
 | 11. 지출 추가/수정 폼 | | 초안 |
 | 12. 멤버 초대 | | 초안 |
 | 13. 알림 (전역 오버레이) | | 초안 |
+| 14. 비밀번호 재설정 | | 초안 |
 
 ## 작업 프로세스
 
@@ -26,4 +27,8 @@
 
 ## 이슈 / 블로커
 
-- **로그인 방식 미확정** (2026-09-06): 프로토타입 HTML은 카카오 로그인으로 구현돼 있지만, 실제 서비스에서 카카오 로그인으로 갈지는 아직 정해지지 않음. [01-login.md](01-login.md), [02-onboarding.md](02-onboarding.md), [schema.md](schema.md#user)는 우선 범용 "유저 ID" 기반으로 가정해 작성함 — 로그인 방식이 확정되면 관련 문서 재검토 필요.
+- ~~**로그인 방식 미확정**~~ → ~~해결됨: 카카오 소셜 로그인(v1)으로 확정~~ → **재변경됨** (2026-09-06): 로그인 기본 수단이 **이메일+비밀번호로 재확정**되고, 카카오는 구글과 함께 추가 연동 옵션으로 격하됨. [01-login.md](01-login.md), [02-onboarding.md](02-onboarding.md), [04-profile.md](04-profile.md), [06-join-group.md](06-join-group.md), [conventions.md](conventions.md#정식-회원--게스트-참가자), [schema.md](schema.md#user) 모두 이 기준으로 업데이트 완료. 근거: [PLAN-sep03-yunjung.md](../../PLAN-sep03-yunjung.md) "결정된 질문 10" 참고.
+- **비밀번호 재설정 화면 신규 필요** (2026-09-06): 이메일 로그인 도입에 따라 [14-password-reset.md](14-password-reset.md)를 초안으로 등록함 — 담당자 미배정, 작성 필요.
+- **이메일 인증 필수 여부 미정** (2026-09-06): 회원가입 후 이메일 인증을 강제할지, 인증 없이도 이용을 허용할지 정책 결정 필요 ([01-login.md](01-login.md) 예외처리 참고).
+- **소셜 계정 자동 연동 시 계정 탈취 위험 — 구현 전 필수 결정** (2026-09-06): 구글/카카오 로그인이 반환한 이메일이 기존 이메일 가입 계정과 일치할 때 자동으로 연동 처리하면, 소셜 제공자가 이메일 소유를 검증하지 않는 경우 계정 탈취로 이어질 수 있음. [01-login.md](01-login.md) 예외처리, [schema.md](schema.md#user) 참고 — 보안에 직결되는 항목이라 구현 시작 전 반드시 정책을 확정할 것.
+- **참가자 비로그인 참여(게스트) 결정 반영 필요** (2026-09-06): 참가자는 정식 로그인 없이 닉네임+PIN 경량 세션으로도 참여할 수 있도록 결정됨. [01-login.md](01-login.md), [02-onboarding.md](02-onboarding.md), [03-group-list.md](03-group-list.md), [04-profile.md](04-profile.md)는 이 기준으로 업데이트 완료. [06-join-group.md](06-join-group.md), [07-join-match.md](07-join-match.md), [09-group-settle.md](09-group-settle.md), [12-group-invite.md](12-group-invite.md)는 아직 "초안" 상태라 본문은 비어있지만, 담당자가 작성 시 반드시 확인해야 할 내용을 문서 상단에 콜아웃으로 남겨둠. 공통 개념/비교표는 [conventions.md](conventions.md#정식-회원--게스트-참가자) 참고. 근거와 전체 흐름은 [PLAN-sep03-yunjung.md](../../PLAN-sep03-yunjung.md) "결정된 질문 9" 참고.
