@@ -345,7 +345,6 @@
   }
   .flow-account .acc-text{font-size:12.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums;}
   .flow-account .copy-hint{font-size:10.5px; color:var(--teal); font-weight:700;}
-  .press-bar{position:absolute; left:0; bottom:0; height:3px; background:var(--teal); width:0%;}
 
   .empty{text-align:center; padding:50px 20px; color:var(--ink-soft); font-size:13px; line-height:1.6;}
   .empty .big-icon{font-size:26px; margin-bottom:10px; color:#C7C2B3;}
@@ -530,7 +529,7 @@
 
     <!-- ---- View: 정산(최소송금) ---- -->
     <div id="view-settle" class="pad" style="flex:1; display:none; padding-top:18px;">
-      <p class="sub" style="margin-bottom:14px; margin-top:0;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 길게 누르면 복사돼요. 지출을 등록하면 정산 결과도 실시간으로 바로 반영돼요.</p>
+      <p class="sub" style="margin-bottom:14px; margin-top:0;">가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 탭하면 복사돼요. 지출을 등록하면 정산 결과도 실시간으로 바로 반영돼요.</p>
       <div id="settle-list-wrap"></div>
     </div>
 
@@ -1485,13 +1484,9 @@ function renderSettleTab(){
     let account = '';
     if(interactive && to.account){
       account = `
-      <div class="flow-account"
-           onmousedown="startLongPress('${to.account}', this)"
-           onmouseup="cancelLongPress(this)" onmouseleave="cancelLongPress(this)"
-           ontouchstart="startLongPress('${to.account}', this)" ontouchend="cancelLongPress(this)">
+      <div class="flow-account" onclick="copyAccount('${to.account}', this)">
         <div class="acc-text">${to.bank} ${to.account}</div>
-        <div class="copy-hint">길게 눌러 계좌번호 복사</div>
-        <div class="press-bar"></div>
+        <div class="copy-hint">탭해서 계좌번호 복사</div>
       </div>`;
     } else if(interactive && !to.account){
       account = `<div class="flow-account"><div class="acc-text" style="color:var(--brick);">계좌 미등록 — ${to.name}님에게 직접 확인해주세요</div></div>`;
@@ -1507,35 +1502,16 @@ function renderSettleTab(){
     </div>`;
   };
 
-  const mineSummary = mine.length>1 ? `<div class="date-label" style="margin-top:0;">내가 보낼 돈 · 총 ${mine.length}건 ${won(mine.reduce((s,t)=>s+t.amount,0))}</div>` : '';
-
   const ordered = [...mine.map(t=>({t, interactive:true})), ...others.map(t=>({t, interactive:false}))];
-  wrap.innerHTML = mineSummary + ordered.map(({t, interactive})=>renderRow(t, interactive)).join('');
+  wrap.innerHTML = ordered.map(({t, interactive})=>renderRow(t, interactive)).join('');
 }
 
-/* 롱프레스로 계좌번호 복사 */
-let __pressTimer=null, __pressStart=0;
-function startLongPress(account, el){
-  __pressStart = Date.now();
-  const bar = el.querySelector('.press-bar');
-  bar.style.transition = 'width .55s linear';
-  requestAnimationFrame(()=> bar.style.width='100%');
-  __pressTimer = setTimeout(()=>{
-    copyToClipboard(account);
-    showToast('계좌번호가 복사되었습니다');
-    el.closest('.flow-row').classList.add('press');
-    setTimeout(()=> el.closest('.flow-row').classList.remove('press'), 350);
-    resetPressBar(el);
-  }, 550);
-}
-function cancelLongPress(el){
-  clearTimeout(__pressTimer);
-  resetPressBar(el);
-}
-function resetPressBar(el){
-  const bar = el.querySelector('.press-bar');
-  bar.style.transition = 'none';
-  bar.style.width = '0%';
+/* 계좌 영역 탭 → 바로 복사 */
+function copyAccount(account, el){
+  copyToClipboard(account);
+  showToast('계좌번호가 복사되었습니다');
+  el.closest('.flow-row').classList.add('press');
+  setTimeout(()=> el.closest('.flow-row').classList.remove('press'), 350);
 }
 function copyToClipboard(text){
   if(navigator.clipboard && navigator.clipboard.writeText){
