@@ -51,7 +51,9 @@
 - 대기 중 멤버 추가: 새 `group_members` 행 생성
   - `pending_name`에 입력한 이름 저장
   - `user_id`는 NULL
-- 개인화 초대 코드 형식: `{group.invite_code}-{group_members.id}` — 이 코드로 들어오면 그 group_members.id 자리에 자동 연결(대기 중 멤버가 아니면 무시하고 신규 멤버로 처리)
+- 개인화 초대 코드 형식: `{group.invite_code}-{group_members.id}`
+  - 이 코드로 들어오면 그 group_members.id 자리에 자동 연결
+  - 대기 중 멤버가 아니면 무시하고 신규 멤버로 처리
 
 ## 6. 예외 처리
 
