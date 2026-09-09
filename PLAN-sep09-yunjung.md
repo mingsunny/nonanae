@@ -11,7 +11,7 @@ users (id, kakao_id NULLABLE, name, created_at)
 - `id` 카카오 로그인과 무관하게 유저에 자동으로 생기는 내부 식별자
    - 게스트인 경우에도 발급
 - `kakao_id`가 NULLABLE인 이유: 게스트 가입(카카오 로그인 없이 가입) 시 값이 없을 수 있음
-   — 게스트인 경우 (NULL) 별도의 인증과 식별 기능 없음.
+   - 게스트인 경우 (NULL) 별도의 인증과 식별 기능 없음.
 - `name`: 최초엔 카카오 닉네임, 이후 사용자가 직접 수정 가능
 
 ### bank_accounts
