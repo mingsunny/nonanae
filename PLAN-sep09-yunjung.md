@@ -23,8 +23,6 @@ bank_accounts (id, user_id FK, bank_name, account_number, created_at)
 - `id` 은행계좌 등록시 자동으로 생기는 내부 식별자
 - `user_id FK` 계좌 주인의 `user_id`
 - `bank name` 은행계좌 등록시 유저가 선택한 은행 명
-   - 은행(18종): 카카오뱅크, 토스뱅크, 케이뱅크, 국민은행, 신한은행, 우리은행, 하나은행, 농협은행, 기업은행, SC제일은행, 씨
-티은행, 우체국, 새마을금고, 신협, 부산은행, 대구은행, 광주은행, 경남은행
 - `account number` 은행계좌 등록시 유저가 입력한 계좌번호
    - 유저당 0개 또는 1개만 존재
 - `created_at` 은행계좌 등록 일시
