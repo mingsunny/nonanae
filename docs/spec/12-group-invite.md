@@ -70,4 +70,4 @@
 
 | 버전 | 날짜 | 변경 내용 |
 |---|---|---|
-| v1.0 | 2026-09-10 | 프로토타입(`settlement-prototype-sep06-yunjung.html`) 기준 초안 작성 (08~11과 동일한 표+불릿 형식) |
+| v1.0 | 2026-09-10 | 프로토타입(`settlement-prototype-sep06-yunjung.html`) 기준 초안 작성 |
