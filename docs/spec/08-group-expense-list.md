@@ -74,8 +74,14 @@
 
 ## 5. 데이터
 
-- `expenses`: id, group_id, paid_by(결제자의 `group_members.id`, user_id 아님), title, amount, category, spent_at(사용 날짜), receipt_image_url, split_type — 참여자/분담액은 이 테이블이 아니라 `expense_participants`(group_member_id, share_amount)에 별도 저장(PLAN-sep09-yunjung.md 참고)
-- 결제자/참여자 이름 표시: 정식 가입·게스트 멤버는 `users.name`, 대기 중 멤버는 `group_members.pending_name`
+| 화면에 쓰이는 값 | 데이터 출처 |
+|---|---|
+| 항목명, 금액, 카테고리, 영수증 유무 | `expenses`: title, amount, category, receipt_image_url |
+| 사용 날짜(그룹핑·정렬 기준) | `expenses.spent_at` |
+| 결제자 이름 | `expenses.paid_by`(→ `group_members.id`) → 정식/게스트 멤버면 `users.name`, 대기 중 멤버면 `group_members.pending_name` |
+| 참여자 수, "(일부)" 여부 | `expense_participants`에 저장된 group_member_id 개수를 그룹 전체 멤버 수와 비교 |
+
+- 참여자별 분담액 자체는 08엔 안 보임(개수만 표시) — 테이블 정의는 `PLAN-sep09-yunjung.md` 참고
 - 정렬: 날짜 그룹은 `spent_at` 기준 최신순
 
 ## 6. 예외 처리
