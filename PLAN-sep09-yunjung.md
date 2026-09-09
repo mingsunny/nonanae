@@ -29,32 +29,48 @@ bank_accounts (id, user_id FK, bank_name, account_number, created_at)
 ```
 groups (id, name, invite_code UNIQUE, created_by FK, created_at)
 ```
-- PLAN-sep03과 동일(변경 없음)
+- `id`: 그룹 생성 시 자동으로 생기는 내부 식별자
+- `name`: 그룹(여행) 이름
+- `invite_code`: 초대코드, 그룹마다 고유(UNIQUE)
+- `created_by FK`: 그룹을 만든 사람
+- `created_at`: 그룹 생성 일시
 
 ### group_members
 ```
-group_members (group_id FK, user_id FK NULLABLE, pending_name NULLABLE, role, joined_at, PRIMARY KEY(group_id, 임시 id))
+group_members (id, group_id FK, user_id FK NULLABLE, pending_name NULLABLE, role, joined_at)
 ```
-- `user_id`가 NULL이면 대기 중(앱 미가입) 멤버 — 이 경우 `pending_name`에 12에서 입력한 이름이 들어감
-- 대기 중 멤버가 실제로 앱에 가입해 매칭되면(07) `user_id`를 채우고 `pending_name`은 더 이상 안 씀
-- ⚠️ PLAN-sep03의 원래 정의는 `PRIMARY KEY(group_id, user_id)`였는데, `user_id`가 NULL일 수 있게 되면서 복합키가 깨짐 — 실제 구현 시 별도 `id` 컬럼 필요(위에 "임시 id"로 표시)
+- `id`: 그룹멤버 행 자체의 내부 식별자
+   - 기존엔 `PRIMARY KEY(group_id, user_id)`였는데, `user_id`가 NULL일 수 있게 되면서 복합키가 깨져서 별도 `id` 필요
+- `group_id FK`
+- `user_id FK` — NULLABLE. 대기 중(앱 미가입) 멤버는 NULL
+- `pending_name` — `user_id`가 NULL일 때만 사용. 12에서 이름만으로 추가된 멤버의 이름
+   - 대기 중 멤버가 나중에 앱에 가입해 매칭되면(07) `user_id`를 채우고 `pending_name`은 더 이상 안 씀
+- `role`: owner | member
+- `joined_at`: 그룹에 들어온 일시
 
 ### expenses
 ```
 expenses (id, group_id FK, paid_by FK, title, amount, category, receipt_image_url NULLABLE, split_type, spent_at, created_at)
 ```
-- `paid_by`: 결제자(users FK)
-- `title`: 항목명, 필수(예: "흑돼지 저녁식사") — PLAN-sep03의 `memo`(선택 메모)를 대체
-- `category`: 6종 enum — 숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
-- `split_type`: equal | ratio | amount
-- `spent_at`: 사용 날짜(사용자가 폼에서 직접 선택, 기본값 오늘) — `created_at`(등록 시각)과 별개
+- `id`: 지출 등록 시 자동으로 생기는 내부 식별자
+- `group_id FK`
+- `paid_by FK`: 결제자
+- `title`: 항목명, 필수 입력(예: "흑돼지 저녁식사")
+- `amount`: 지출 금액
+- `category`: 카테고리 6종 — 숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
+- `receipt_image_url` — NULLABLE. 영수증 사진, 선택 입력
+- `split_type`: 나누기 방식 — equal | ratio | amount
+- `spent_at`: 사용 날짜. 유저가 폼에서 직접 선택, 기본값 오늘
+- `created_at`: 지출 등록 일시
 
 ### expense_participants
 ```
-expense_participants (expense_id FK, user_id FK, share_amount NULLABLE, PRIMARY KEY(expense_id, user_id))
+expense_participants (expense_id FK, user_id FK, share_amount NULLABLE)
 ```
-- 지출 1건의 참여자 목록 + 분담액
-- `share_amount`: `split_type='equal'`이면 NULL(매번 계산), `ratio`/`amount`면 등록 시점에 정수(원 단위)로 확정해서 저장
+- `expense_id FK`
+- `user_id FK`
+   - 위 둘을 합쳐 PRIMARY KEY(한 지출에 같은 사람이 두 번 참여자로 안 들어감)
+- `share_amount` — NULLABLE. `split_type`이 equal이면 NULL(매번 계산), ratio/amount면 등록 시점에 정수(원 단위)로 확정해서 저장
 
 ## 잔액/정산 계산 로직 (업데이트)
 
