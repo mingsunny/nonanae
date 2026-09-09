@@ -84,6 +84,19 @@ expense_participants (expense_id FK, group_member_id FK, share_amount NULLABLE)
    - `split_type`이 equal이면 NULL, 매번 계산
    - `split_type`이 ratio/amount면 등록 시점에 정수(원 단위)로 확정해서 저장
 
+### notifications
+```
+notifications (id, group_id FK, group_member_id FK NULLABLE, type, title, created_at, read)
+```
+- `id` 알림 생성 시 자동으로 생기는 내부 식별자
+- `group_id FK` 어느 그룹에서 발생한 알림인지
+- `group_member_id FK` NULLABLE — 이벤트를 일으킨 사람(지출 등록자 또는 새로 참여한 멤버)
+   - 지출 등록 알림이면 결제자, 멤버 참여 알림이면 그 새 멤버
+- `type` expense(지출 등록) | member_joined(멤버 참여) — 마스터 데이터 참고
+- `title` 화면에 보여줄 문구, 생성 시점에 이름을 채워서 고정 저장(나중에 이름이 바뀌어도 알림 문구는 그대로)
+- `created_at` 알림 생성 일시(화면엔 상대 시간으로 표시)
+- `read` 읽음 여부, 기본값 false
+
 ## 마스터 데이터
 
 지금 프로토타입 코드 안에만 있고 문서에는 없던 고정 값 목록.
@@ -112,3 +125,5 @@ expense_participants (expense_id FK, group_member_id FK, share_amount NULLABLE)
 | 09 정산 | 위 잔액 계산 결과, 이름(`users.name` 또는 대기 중이면 `group_members.pending_name`), `bank_accounts`(계좌) | 없음(조회 전용, 클립보드 복사만) |
 | 10 요약 | 위 잔액 계산 결과, `expenses.category` 집계, 이름(09와 동일) | 없음(조회 전용) |
 | 11 지출 폼 | `group_members`(결제자/참여자 선택지) | `expenses`: title, amount, category, receipt_image_url, split_type, spent_at, paid_by 신규 행 또는 수정 / `expense_participants`: group_member_id, share_amount 신규/수정/삭제 |
+| 12 멤버 초대 | `group_members`(멤버 목록) | `group_members`: pending_name 신규 행(대기 중 멤버 추가) |
+| 13 알림 | `notifications` | `notifications.read` 수정(읽음 처리) |
