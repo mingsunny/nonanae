@@ -62,14 +62,14 @@ expenses (id, group_id FK, paid_by FK, title, amount, category, receipt_image_ur
 - `id` 지출 등록 시 자동으로 생기는 내부 식별자
 - `group_id FK`
 - `paid_by FK` 결제자의 `group_members.id`(`user_id`가 아님)
-   — 대기 중 유저도 결제자로 지정될 수 있어서, 로그인 계정 없이도 존재하는 `group_members.id`를 참조
+   - 대기 중 유저도 결제자로 지정될 수 있어서, 로그인 계정 없이도 존재하는 `group_members.id`를 참조
 - `title` 유저가 입력한 항목명
 - `amount` 유저가 입력한 지출 금액
 - `category` 카테고리 6종
-   -  숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
+   - 숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
 - `receipt_image_url` 영수증 사진 업로드 (NULLABLE)
 - `split_type` 나누기 방식
-   — equal | ratio | amount
+   - equal | ratio | amount
 - `spent_at` 유저가 선택한 날짜. 기본값 오늘
 - `created_at` 지출 등록 일시
 
