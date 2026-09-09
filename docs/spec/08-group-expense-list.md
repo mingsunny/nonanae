@@ -36,7 +36,7 @@
 - 그룹 상세로 들어오면 하단 탭바가 앱 전역 탭(홈/프로필, 03 참고)에서 그룹 내부 탭(지출/정산/요약)으로 바뀜
 - 3개 탭: 지출(08, 기본값) / 정산(09) / 요약(10) — 탭 전환 시 화면 자체는 그대로 두고 콘텐츠 영역만 교체(헤더·탭바는 고정)
 - 현재 선택된 탭만 강조 색상으로 표시
-- FAB(＋)는 지출 탭에서만 노출(§3.6 참고)
+- FAB(＋)는 지출 탭에서만 노출(§3.5 참고)
 
 ### 3.3 지출 목록
 
@@ -67,8 +67,8 @@
 
 ## 5. 데이터
 
-- `expenses`: id, group_id, title, amount, category, payer_id, participant_ids, spent_at(사용 날짜), receipt_image_url, split_type, custom_shares
-- `group_members`: 결제자/참여자 이름 표시에 사용
+- `expenses`: id, group_id, paid_by(결제자의 `group_members.id`, user_id 아님), title, amount, category, spent_at(사용 날짜), receipt_image_url, split_type — 참여자/분담액은 이 테이블이 아니라 `expense_participants`(group_member_id, share_amount)에 별도 저장(PLAN-sep09-yunjung.md 참고)
+- 결제자/참여자 이름 표시: 정식 가입·게스트 멤버는 `users.name`, 대기 중 멤버는 `group_members.pending_name`
 - 정렬: 날짜 그룹은 `spent_at` 기준 최신순, 그룹 내부는 정렬하지 않음(등록 순서 유지)
 
 ## 6. 예외 처리

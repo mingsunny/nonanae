@@ -63,9 +63,9 @@
 ## 5. 데이터
 
 - **결제자 목록**: 이 그룹의 멤버 전원(정식 가입 + 대기 중 + 게스트) 노출
-  - 선택한 결제자를 `paid_by`로 저장 → 09/10의 결제 합(paid) 집계 대상
+  - 선택한 결제자의 `group_members.id`를 `expenses.paid_by`에 저장(`user_id` 아님 — 대기 중 멤버도 결제자로 지정될 수 있어서) → 09/10의 결제 합(paid) 집계 대상
 - **참여자 목록**: 그룹 멤버 중 일부/전체 선택
-  - 선택한 멤버를 `expense_participants`에 한 명당 한 행씩 저장
+  - 선택한 멤버의 `group_members.id`를 `expense_participants.group_member_id`에 한 명당 한 행씩 저장
 - **금액 분담 로직**: 균등/비율/금액 중 선택한 방식으로 참여자별 몫을 정함
   - 선택한 방식을 `split_type`으로 저장, 확정된 몫은 `expense_participants.share_amount`에 저장(균등은 매번 계산이라 저장 안 함)
   - 배분 규칙(나머지 처리 등) 상세는 `PLAN-sep09-yunjung.md` 참고
