@@ -111,4 +111,4 @@ expense_participants (expense_id FK, group_member_id FK, share_amount NULLABLE)
 | 08 지출 목록 | `expenses`, `expense_participants`(참여자 수만), `group_members`(이름) | 없음(조회 전용) |
 | 09 정산 | 위 잔액 계산 결과, 이름(`users.name` 또는 대기 중이면 `group_members.pending_name`), `bank_accounts`(계좌) | 없음(조회 전용, 클립보드 복사만) |
 | 10 요약 | 위 잔액 계산 결과, `expenses.category` 집계, 이름(09와 동일) | 없음(조회 전용) |
-| 11 지출 폼 | `group_members`(결제자/참여자 선택지) | `expenses` 신규 행 또는 수정, `expense_participants` 신규/수정/삭제 |
+| 11 지출 폼 | `group_members`(결제자/참여자 선택지) | `expenses`: title, amount, category, receipt_image_url, split_type, spent_at, paid_by 신규 행 또는 수정 / `expense_participants`: group_member_id, share_amount 신규/수정/삭제 |
