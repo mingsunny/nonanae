@@ -75,6 +75,16 @@ expense_participants (expense_id FK, group_member_id FK, share_amount NULLABLE)
    - 위 둘을 합쳐 PRIMARY KEY(한 지출에 같은 사람이 두 번 참여자로 안 들어감)
 - `share_amount` — NULLABLE. `split_type`이 equal이면 NULL(매번 계산), ratio/amount면 등록 시점에 정수(원 단위)로 확정해서 저장
 
+## 마스터 데이터
+
+지금 프로토타입 코드 안에만 있고 문서에는 없던 고정 값 목록.
+
+- **카테고리(6종)**: 숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
+- **은행(18종)**: 카카오뱅크, 토스뱅크, 케이뱅크, 국민은행, 신한은행, 우리은행, 하나은행, 농협은행, 기업은행, SC제일은행, 씨티은행, 우체국, 새마을금고, 신협, 부산은행, 대구은행, 광주은행, 경남은행
+- **split_type(3종)**: equal(균등) / ratio(비율) / amount(금액)
+- **group_members.role(2종)**: owner / member
+- **알림 type(2종)**: expense(지출 등록) / member_joined(멤버 참여)
+
 ## 잔액/정산 계산 로직 (업데이트)
 
 1. **잔액 계산**: 멤버별 `balance = 결제 합(paid_by 기준 amount 합) - 부담 합(참여자로 지정된 지출들의 share 합)`
