@@ -19,28 +19,29 @@ users (id, kakao_id NULLABLE, name, created_at)
 bank_accounts (id, user_id FK, bank_name, account_number, created_at)
 ```
 - `id` 은행계좌 등록시 자동으로 생기는 내부 식별자
-- `user_id FK`
+- `user_id FK` 계좌 주인의 `user_id`
 - `bank name` 은행계좌 등록시 유저가 선택한 은행 명
+   - 은행(18종): 카카오뱅크, 토스뱅크, 케이뱅크, 국민은행, 신한은행, 우리은행, 하나은행, 농협은행, 기업은행, SC제일은행, 씨
+티은행, 우체국, 새마을금고, 신협, 부산은행, 대구은행, 광주은행, 경남은행
 - `account number` 은행계좌 등록시 유저가 입력한 계좌번호
    - 유저당 0개 또는 1개만 존재
-- `created_at` 은행계좌 등록 일시 (YYYY-MM-DD HH:MM:SS)
+- `created_at` 은행계좌 등록 일시
 
 ### groups
 ```
 groups (id, name, invite_code UNIQUE, created_by FK, created_at)
 ```
 - `id`: 그룹 생성 시 자동으로 생기는 내부 식별자
-- `name`: 그룹(여행) 이름
-- `invite_code`: 초대코드, 그룹마다 고유(UNIQUE)
-- `created_by FK`: 그룹을 만든 사람
+- `name`: 유저가 입력한 그룹(여행) 이름
+- `invite_code`: 그룹 생성 시 자동으로 생기는 초대코드, 그룹마다 고유(UNIQUE)
+- `created_by FK`: 그룹을 만든 유저의 `user_id`
 - `created_at`: 그룹 생성 일시
 
 ### group_members
 ```
-group_members (id, group_id FK, user_id FK NULLABLE, pending_name NULLABLE, role, joined_at)
+group_members (id, group_id FK, user_id FK, pending_name NULLABLE, role, joined_at)
 ```
 - `id`: 그룹멤버 행 자체의 내부 식별자
-   - 기존엔 `PRIMARY KEY(group_id, user_id)`였는데, `user_id`가 NULL일 수 있게 되면서 복합키가 깨져서 별도 `id` 필요
 - `group_id FK`
 - `user_id FK` — NULLABLE. 대기 중(앱 미가입) 멤버는 NULL
 - `pending_name` — `user_id`가 NULL일 때만 사용. 12에서 이름만으로 추가된 멤버의 이름
@@ -54,13 +55,15 @@ expenses (id, group_id FK, paid_by FK, title, amount, category, receipt_image_ur
 ```
 - `id`: 지출 등록 시 자동으로 생기는 내부 식별자
 - `group_id FK`
-- `paid_by FK`: 결제자
-- `title`: 항목명, 필수 입력(예: "흑돼지 저녁식사")
-- `amount`: 지출 금액
-- `category`: 카테고리 6종 — 숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
-- `receipt_image_url` — NULLABLE. 영수증 사진, 선택 입력
-- `split_type`: 나누기 방식 — equal | ratio | amount
-- `spent_at`: 사용 날짜. 유저가 폼에서 직접 선택, 기본값 오늘
+- `paid_by FK`: 결제자의 `user_id`
+- `title`: 유저가 입력한 항목명
+- `amount`: 유저가 입력한 지출 금액
+- `category`: 카테고리 6종
+   -  숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
+- `receipt_image_url` NULLABLE. 영수증 사진 업로드
+- `split_type`: 나누기 방식
+   — equal | ratio | amount
+- `spent_at`: 유저가 선택한 날짜. 기본값 오늘
 - `created_at`: 지출 등록 일시
 
 ### expense_participants
