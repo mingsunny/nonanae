@@ -20,7 +20,7 @@
 ## 2. 진입 조건
 
 - 로그인 + 계좌 등록 완료(02 온보딩)한 사용자
-- 이 그룹의 멤버(group_members)로 등록되어 있을 것
+- 이 그룹의 멤버(Member)로 등록되어 있을 것
 
 ## 3. UI 구성
 
@@ -45,14 +45,14 @@
 
 ### 3.3 지출 목록
 
-- 사용 날짜 (`spent_at`) 단위로 묶어서 표시
+- 사용 날짜 (`Expense.spentAt`) 단위로 묶어서 표시
 - 사용 날짜는 최신순(내림차순)으로 정렬
 - 같은 날짜 그룹 안 항목 순서는 별도로 정렬하지 않음(등록/수정된 순서 그대로 노출)
 
 ### 3.4 개별 지출 항목
 
 - 카테고리 배지(아이콘/색상), 항목명, 금액(우측 정렬)
-- {결제자} 표시 (`paid_by`)
+- {결제자} 표시 (`Expense.paidBy`)
 - N명 나눔, 참여자가 전체보다 적으면 "(일부)" 추가
 - 개별 지출 항목 클릭 시, 11 지출 폼이 수정 모드로 열림
   - 기존 값 프리필
@@ -74,17 +74,15 @@
 
 ## 5. 데이터
 
-- 총 금액: `expenses.amount`의 합계(같은 `group_id`인 지출 전체)
-- 그룹 내 멤버: `group_members`(같은 `group_id`인 행 전체)
-- 항목 명: `expenses.title`
-- 금액: `expenses.amount`
-- 카테고리: `expenses.category`
-- 영수증 유무: `expenses.receipt_image_url`
-- 사용 날짜: `expenses.spent_at`
-- 결제자 이름: `expenses.paid_by`(→ `group_members.id`)
-  - 정식/게스트 멤버면 `users.name`
-  - 대기 중 멤버면 `group_members.pending_name`
-- 결제 (참여자) 인원: `expense_participants`에 저장된 group_member_id 개수를 그룹 전체 멤버 수와 비교
+- 총 금액: `Expense.amount`의 합계(같은 `groupId`인 지출 전체)
+- 그룹 내 멤버: `Group.members`(같은 그룹의 Member 전체)
+- 항목 명: `Expense.title`
+- 금액: `Expense.amount`
+- 카테고리: `Expense.category`
+- 영수증 유무: `Expense.receiptImageUrl`
+- 사용 날짜: `Expense.spentAt`
+- 결제자 이름: `Expense.paidBy`(→ `Member.id`), 이름 표시는 schema.md의 이름 결정 순서 참고(대기중=Member.name / 게스트=Member.nickname / 정식회원=User.name)
+- 결제 (참여자) 인원: `ExpenseParticipant`에 저장된 memberId 개수를 그룹 전체 멤버 수와 비교
 
 ## 6. 예외 처리
 

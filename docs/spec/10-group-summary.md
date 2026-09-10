@@ -55,13 +55,12 @@
 
 ## 5. 데이터
 
-- 카테고리 6종: `expenses.category` 노출
-- 카테고리별 합계: `expenses.category`별로 `amount` 합
+- 카테고리 6종: `Expense.category` 노출
+- 카테고리별 합계: `Expense.category`별로 `amount` 합
 - 인원별 목록: 그룹 멤버 전원(정식 가입 멤버 + 대기 중 멤버 + 게스트 포함)을 대상으로 표시
-  - 정식 가입·게스트 멤버는 `users.name`
-  - 대기 중 멤버는 `group_members.pending_name`
-- 인원별 결제 합(paid): `expenses.paid_by`별로 `amount` 합
-- 인원별 보낼/받을 금액(잔액): {결제 합} - {부담해야 할 금액 합}
+  - 이름 표시는 schema.md의 이름 결정 순서 참고(대기중=Member.name / 게스트=Member.nickname / 정식회원=User.name)
+- 인원별 결제 합(paid): `Expense.paidBy`별로 `amount` 합
+- 인원별 보낼/받을 금액(잔액): {결제 합} - {부담해야 할 금액 합} (schema.md 계산 로직 참고)
 
 ## 6. 예외 처리
 
