@@ -25,9 +25,7 @@
 ### 3.1 멤버 목록
 
 - 아바타: 이름 첫글자 노출
-- 이름
-  - 정식 가입·게스트 멤버는 `users.name`
-  - 대기 중 멤버는 `group_members.pending_name`
+- 이름: schema.md의 이름 결정 순서 참고(대기중=Member.name / 게스트=Member.nickname / 정식회원=User.name)
 - 배지: 대기 중 멤버는 "초대 대기 중" 배지
 - 대기 중 멤버는 그 옆에 "초대 보내기" 링크가 각각 붙음(멤버 한 명당 하나, 일괄 버튼 아님)
 
@@ -47,12 +45,12 @@
 
 ## 5. 데이터
 
-- 멤버 목록: `group_members`(같은 group_id인 행 전체)
-- 대기 중 멤버 추가: 새 `group_members` 행 생성
-  - `pending_name`에 입력한 이름 저장
-  - `user_id`는 NULL
-- 개인화 초대 코드 형식: `{group.invite_code}-{group_members.id}`
-  - 이 코드로 들어오면 그 group_members.id 자리에 자동 연결
+- 멤버 목록: `Group.members`(같은 그룹의 Member 전체)
+- 대기 중 멤버 추가: 새 `Member` 행 생성
+  - `name`에 입력한 이름 저장
+  - `userId`는 null
+- 개인화 초대 코드 형식: `{Group.inviteCode}-{Member.id}`
+  - 이 코드로 들어오면 그 Member.id 자리에 자동 연결
   - 대기 중 멤버가 아니면 무시하고 신규 멤버로 처리
 
 ## 6. 예외 처리
