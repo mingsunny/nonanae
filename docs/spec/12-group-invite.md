@@ -25,7 +25,7 @@
 ### 3.1 멤버 목록
 
 - 아바타: 이름 첫글자 노출
-- 이름: schema.md의 이름 결정 순서 참고(대기중=Member.name / 게스트=Member.nickname / 정식회원=User.name)
+- 이름: schema.md의 이름 결정 순서 참고(대기중 또는 게스트(둘 다 `userId` 없음)=Member.name / 정식회원=User.name)
 - 배지: 대기 중 멤버는 "초대 대기 중" 배지
 - 대기 중 멤버는 그 옆에 "초대 보내기" 링크가 각각 붙음(멤버 한 명당 하나, 일괄 버튼 아님)
 
@@ -69,3 +69,4 @@
 | 버전 | 날짜 | 변경 내용 |
 |---|---|---|
 | v1.0 | 2026-09-10 | 프로토타입(`settlement-prototype-sep06-yunjung.html`) 기준 초안 작성 |
+| v1.1 | 2026-09-12 | 게스트 재입장 PIN 인증 제외 확정에 따라 "Member.nickname" 표현을 "Member.name"으로 정정(닉네임 필드 자체가 없음) |
