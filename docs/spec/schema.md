@@ -2,7 +2,7 @@
 
 ## 엔티티 목록
 
-- User — 이메일 가입 또는 구글·카카오 연동으로 가입한 실제 앱 사용자, 또는 닉네임+PIN으로 참여한 게스트 참가자 (`authProvider`로 구분, [conventions.md](conventions.md#정식-회원--게스트-참가자) 참고)
+- User — 이메일로 가입한 실제 앱 사용자, 또는 로그인 없이 참여한 게스트 참가자 (`authProvider`로 구분, [conventions.md](conventions.md#정식-회원--게스트-참가자) 참고)
 - Group — 정산 그룹(여행 단위)
 - Member — 그룹에 속한 인원. 실제 User(정식 회원 또는 게스트)이거나, 아직 앱에 가입하지 않은 "미가입 멤버"(이름만 있는 placeholder)일 수 있음 ([12-group-invite.md](12-group-invite.md) 참고)
 - Expense — 그룹 내 지출 1건
@@ -11,25 +11,23 @@
 
 ## User
 
-> ✅ 로그인 방식 재확정 (2026-09-06, 카카오 단독에서 전환): **이메일+비밀번호가 기본**, 구글·카카오는 추가 연동 옵션. 이메일/구글/카카오 중 하나 이상으로 식별 가능해야 하며 셋 다 병행 보유 가능(계정 연동). 게스트 참가자는 `authProvider: 'guest'`, `email`/`kakaoId`/`googleId` 모두 null인 경량 User row로 취급 ([06-join-group.md](06-join-group.md) 참고).
+> ✅ 로그인 방식 확정 (2026-09-12, sep10 프로토타입 기준): **이메일+비밀번호만 지원, 구글·카카오 연동 로그인은 스펙에서 제외**. `googleId`/`kakaoId` 필드 삭제. 게스트 참가자는 `authProvider: 'guest'`, `email`이 null인 경량 User row로 취급하나, 이 게스트 모델(PIN 인증 등)이 sep10에서도 유효한지는 미확인 — [06-join-group.md](06-join-group.md) 참고.
 
 로그인([01-login.md](01-login.md)) 후 최초 1회 온보딩([02-onboarding.md](02-onboarding.md))에서 생성됨. 게스트는 [06-join-group.md](06-join-group.md)의 닉네임+PIN 참여 시점에 생성됨.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | id | string | 내부 식별자 (`uid('u')`로 생성) |
-| authProvider | 'email' \| 'kakao' \| 'google' \| 'guest' | 계정을 최초로 만든 수단. 이후 다른 소셜을 추가 연동해도 이 값은 최초 가입 수단 그대로 유지 |
-| email | string \| null | 정식 회원 식별자(UNIQUE). 이메일 가입·구글 연동·카카오 연동 모두 이 값으로 계정을 매칭. 게스트는 null |
+| authProvider | 'email' \| 'guest' | 계정 종류. 정식 회원은 항상 'email' (구글·카카오 연동은 스펙에서 제외, 2026-09-12) |
+| email | string \| null | 정식 회원 식별자(UNIQUE). 게스트는 null |
 | emailVerified | boolean | 이메일 인증 여부. 인증 필수화 여부는 미정([01-login.md](01-login.md) 참고) — 기본값 false |
-| passwordHash | string \| null | bcrypt 해시. 이메일로 가입한 경우 필수, 구글·카카오로만 가입하고 이메일 가입 이력이 없으면 null (비밀번호 없이 소셜 로그인만 사용) |
-| kakaoId | string \| null | 카카오 연동 식별자. 연동 안 했으면 null, 게스트는 null |
-| googleId | string \| null | 구글 연동 식별자. 연동 안 했으면 null, 게스트는 null |
-| name | string | 이름. 구글·카카오 연동 가입은 소셜 프로필 이름/닉네임으로 자동 채움, 이메일 가입은 공란에서 시작. 온보딩/프로필에서 수정 가능. 게스트는 이름 없음(Member.nickname 사용, 아래 참고) |
+| passwordHash | string \| null | bcrypt 해시. 정식 회원은 필수, 게스트는 null |
+| name | string | 이름. 회원가입 시 직접 입력, 온보딩/프로필에서 수정 가능. 게스트는 이름 없음(Member.nickname 사용, 아래 참고) |
 | bank | string \| null | 은행명. [공통 은행 목록](conventions.md#은행-목록) 중 하나. 게스트는 null |
 | account | string \| null | 계좌번호. 형식 검증 없는 자유 텍스트 (현재 프로토타입 기준). 게스트는 null |
 | seenGroupCreateCoach | boolean | 첫 그룹 생성 코치마크([03-group-list.md](03-group-list.md))를 이미 봤는지 여부. 1회성 안내 노출 제어용. 게스트는 해당 화면에 진입하지 않으므로 미사용 |
 
-> `email`이 UNIQUE이므로, 구글/카카오 로그인 시 반환된 이메일이 이미 존재하는 계정과 일치하면 신규 계정을 만들지 않고 해당 계정에 `kakaoId`/`googleId`만 채워 연동 처리한다. 단, 소셜 제공자가 이메일 소유를 검증했다는 보장이 없는 경우 자동 연동은 계정 탈취 위험이 있음 — [01-login.md](01-login.md) 예외처리 참고.
+> `email`은 회원가입 시 중복 체크로만 쓰이는 UNIQUE 식별자. 소셜 로그인 연동이 없어 계정 자동 매칭/탈취 위험 시나리오는 해당 없음.
 
 ## Group
 
@@ -131,3 +129,4 @@
 - 2026-09-06: 참가자용 닉네임+PIN 게스트 분기 결정에 따라 User의 로그인 방식을 카카오로 확정(`kakaoId`, `authProvider` 추가)하고, Member에 게스트 인증 관련 필드(`nickname`/`pinHash`/`failedAttempts`/`lockedUntil`) 추가 (민선)
 - 2026-09-06: 로그인 기본 수단을 카카오 단독에서 이메일+비밀번호 기본, 구글·카카오 연동 추가로 전환. User에 `email`/`emailVerified`/`passwordHash`/`googleId` 추가, `authProvider`에 `'email'`/`'google'` 추가 (민선)
 - 2026-09-10: 08~13 화면(지출/정산/요약/폼/초대/알림) 스키마를 이 문서에 통합. Member에 `id` 추가(Expense.paidBy 등이 참조할 안정적인 키가 없어서), Expense 필드 채움, ExpenseParticipant·Notification 엔티티 추가, 마스터 데이터/계산 로직 섹션 추가. 은행계좌는 별도 엔티티로 분리하지 않고 User.bank/User.account 그대로 유지
+- 2026-09-12: sep10 프로토타입 기준으로 **구글·카카오 연동 로그인을 스펙에서 제외**. User에서 `googleId`/`kakaoId` 필드 삭제, `authProvider`를 `'email' | 'guest'`로 축소, 소셜 계정 자동 연동/탈취 위험 관련 서술 삭제 (민선)
