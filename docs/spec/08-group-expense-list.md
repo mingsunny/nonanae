@@ -81,7 +81,7 @@
 - 카테고리: `Expense.category`
 - 영수증 유무: `Expense.receiptImageUrl`
 - 사용 날짜: `Expense.spentAt`
-- 결제자 이름: `Expense.paidBy`(→ `Member.id`), 이름 표시는 schema.md의 이름 결정 순서 참고(대기중=Member.name / 게스트=Member.nickname / 정식회원=User.name)
+- 결제자 이름: `Expense.paidBy`(→ `Member.id`), 이름 표시는 schema.md의 이름 결정 순서 참고(대기중 또는 게스트(둘 다 `userId` 없음)=Member.name / 정식회원=User.name)
 - 결제 (참여자) 인원: `ExpenseParticipant`에 저장된 memberId 개수를 그룹 전체 멤버 수와 비교
 
 ## 6. 예외 처리
