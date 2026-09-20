@@ -1,8 +1,14 @@
+/* "새 그룹 만들기"와 "초대코드 입력"은 한 줄에 나란히, 폭은 반반 (프로토타입 quick-actions) */
 .actions {
   display: flex;
-  flex-direction: column;
   gap: 10px;
   margin-bottom: 18px;
+}
+
+.actions > button {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--space-sm);
 }
 
 .hint {

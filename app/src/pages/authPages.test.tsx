@@ -4,7 +4,15 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { requestPasswordReset, resetMockData, signIn, signOut, signUp } from '../api'
+import {
+  createGroup,
+  joinAsNewAccountMember,
+  requestPasswordReset,
+  resetMockData,
+  signIn,
+  signOut,
+  signUp,
+} from '../api'
 import ToastHost from '../components/common/Toast'
 import { routes } from '../routes/router'
 import { useAppStore } from '../store/appStore'
@@ -219,6 +227,22 @@ describe('03 그룹 목록', () => {
 
     await userEvent.click(screen.getByRole('link', { name: /제주도 여행/ }))
     expect(pathOf(router)).toBe('/groups/g_jeju/expenses')
+  })
+
+  it('가장 최근에 만들거나 참여한 그룹이 위에 나온다', async () => {
+    await createGroup('부산 여행')
+    await new Promise((resolve) => setTimeout(resolve, 5)) // 같은 밀리초에 들어온 것으로 겹치지 않게
+    await joinAsNewAccountMember('g_test42')
+    await state().refresh()
+
+    renderApp('/groups')
+    await screen.findByText('테스트님의 그룹')
+
+    // 만든 순서(제주도 → 부산)나 그룹 생성 순서가 아니라, 내가 가장 나중에 들어온 그룹(초대코드 테스트방)부터
+    const names = screen.getAllByRole('link').map((l) => l.textContent ?? '')
+    const order = ['초대코드 테스트방', '부산 여행', '제주도 여행'].map((n) => names.findIndex((t) => t.includes(n)))
+    expect(order.every((i) => i >= 0)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
   })
 
   it('"초대코드 입력"은 초대코드 화면으로 간다', async () => {
@@ -442,15 +466,30 @@ describe('06·07 초대코드로 참여', () => {
 })
 
 describe('14 비밀번호 재설정', () => {
-  it('가입된 이메일이든 아니든 같은 안내를 보여준다', async () => {
+  const linkSentGuide = '입력하신 이메일로 재설정 링크를 보냈어요. 메일함을 확인해주세요.'
+
+  it('링크를 보내면 로그인 화면으로 돌아가 안내를 띄운다. 가입된 이메일이든 아니든 같은 안내다', async () => {
     for (const email of ['a@naver.com', 'nobody@example.com']) {
       vi.spyOn(console, 'info').mockImplementation(() => {})
-      renderApp('/password-reset')
+      const router = renderApp('/password-reset')
       await fill('이메일', email)
       await click('재설정 링크 보내기')
-      expect(await screen.findByText('입력하신 이메일로 재설정 링크를 보냈어요')).toBeTruthy()
+      expect(await screen.findByText(linkSentGuide)).toBeTruthy()
+      expect(pathOf(router)).toBe('/login')
+      expect(screen.getByLabelText('비밀번호')).toBeTruthy() // 인트로가 아니라 로그인 화면
       cleanup()
     }
+  })
+
+  it('로그인 화면의 재설정 안내는 화면을 벗어났다 돌아오면 사라진다', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    renderApp('/password-reset')
+    await fill('이메일', 'a@naver.com')
+    await click('재설정 링크 보내기')
+    await screen.findByText(linkSentGuide)
+    await click('뒤로가기')
+    await click('로그인')
+    expect(screen.queryByText(linkSentGuide)).toBeNull()
   })
 
   it('링크로 들어와 새 비밀번호를 정하면 로그인 화면으로 가고, 새 비밀번호로 로그인된다', async () => {
@@ -464,7 +503,7 @@ describe('14 비밀번호 재설정', () => {
     expect(screen.getByText('비밀번호가 일치해요.')).toBeTruthy()
     await userEvent.click(change)
 
-    expect(await screen.findByText('비밀번호가 변경되었습니다')).toBeTruthy()
+    expect(await screen.findByText('비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.')).toBeTruthy()
     expect(pathOf(router)).toBe('/login')
     expect(await screen.findByLabelText('비밀번호')).toBeTruthy()
     await signOut()

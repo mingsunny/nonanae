@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
+import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { paths } from '../../routes/paths'
@@ -12,11 +13,13 @@ interface Props {
   /** 회원가입으로 넘어갈 때 이메일을 이어 쓰도록 부모가 들고 있음 (01 액션 & 결과) */
   email: string
   onEmailChange: (email: string) => void
+  /** 화면 위에 보여줄 안내 (예: 비밀번호 재설정 링크를 보냈다는 안내) */
+  notice?: string | null
   onBack: () => void
 }
 
 /** 01 로그인 */
-export default function LoginScreen({ email, onEmailChange, onBack }: Props) {
+export default function LoginScreen({ email, onEmailChange, notice, onBack }: Props) {
   const navigate = useNavigate()
   const signIn = useAppStore((s) => s.signIn)
   const [password, setPassword] = useState('')
@@ -43,6 +46,7 @@ export default function LoginScreen({ email, onEmailChange, onBack }: Props) {
     <div>
       <Topbar title="로그인" onBack={onBack} />
       <form className={styles.body} onSubmit={submit}>
+        {notice && <Callout>{notice}</Callout>}
         <label className={fields.label} htmlFor="login-email">
           이메일
         </label>

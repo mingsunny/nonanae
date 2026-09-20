@@ -7,7 +7,6 @@ import Callout from '../components/common/Callout'
 import fields from '../components/common/Field.module.css'
 import Topbar from '../components/common/Topbar'
 import { paths } from '../routes/paths'
-import { showToast } from '../store/toastStore'
 import styles from './PasswordResetPage.module.css'
 
 /**
@@ -23,11 +22,17 @@ export default function PasswordResetPage() {
 /** 이 화면의 진입점은 로그인 화면이라, 돌아갈 때도 인트로가 아니라 로그인 화면으로 간다 */
 const loginState = { step: 'login' }
 
+/**
+ * 링크를 보낸 뒤/비밀번호를 바꾼 뒤엔 이 화면에 머물지 않고 로그인 화면으로 돌아가, 그 위에 안내 박스를 띄운다.
+ * 링크 발송 안내는 가입된 이메일인지와 무관하게 항상 같은 문구다 (14 예외처리: 계정 존재 여부 노출 방지).
+ */
+const linkSentState = { step: 'login', notice: '입력하신 이메일로 재설정 링크를 보냈어요. 메일함을 확인해주세요.' }
+const passwordChangedState = { step: 'login', notice: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.' }
+
 /** 1단계: 이메일 입력 → 링크 발송 */
 function RequestStep() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const canSubmit = email.trim().includes('@')
 
@@ -37,7 +42,7 @@ function RequestStep() {
     setBusy(true)
     try {
       await requestPasswordReset(email)
-      setSent(true)
+      navigate(paths.login, { replace: true, state: linkSentState })
     } finally {
       setBusy(false)
     }
@@ -47,30 +52,25 @@ function RequestStep() {
     <div>
       <Topbar title="비밀번호 재설정" onBack={() => navigate(paths.login, { state: loginState })} />
       <div className={styles.body}>
-        {sent ? (
-          // 가입된 이메일인지와 무관하게 항상 같은 문구 (14 예외처리: 계정 존재 여부 노출 방지)
-          <Callout>입력하신 이메일로 재설정 링크를 보냈어요</Callout>
-        ) : (
-          <form onSubmit={submit}>
-            <Callout>가입하신 이메일을 입력하시면 비밀번호 재설정 링크를 보내드려요</Callout>
-            <label className={fields.label} htmlFor="reset-email">
-              이메일
-            </label>
-            <input
-              id="reset-email"
-              className={fields.input}
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <div className={styles.submit}>
-              <Button type="submit" disabled={!canSubmit || busy}>
-                재설정 링크 보내기
-              </Button>
-            </div>
-          </form>
-        )}
+        <form onSubmit={submit}>
+          <Callout>가입하신 이메일을 입력하시면 비밀번호 재설정 링크를 보내드려요</Callout>
+          <label className={fields.label} htmlFor="reset-email">
+            이메일
+          </label>
+          <input
+            id="reset-email"
+            className={fields.input}
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <div className={styles.submit}>
+            <Button type="submit" disabled={!canSubmit || busy}>
+              재설정 링크 보내기
+            </Button>
+          </div>
+        </form>
         <div className={styles.back}>
           <Link to={paths.login} state={loginState} className={fields.textLink}>
             로그인으로 돌아가기
@@ -110,8 +110,7 @@ function NewPasswordStep({ token }: { token: string }) {
     setBusy(true)
     try {
       await resetPassword(token, password)
-      showToast('비밀번호가 변경되었습니다')
-      navigate(paths.login, { replace: true, state: loginState })
+      navigate(paths.login, { replace: true, state: passwordChangedState })
     } catch (err) {
       setError(err instanceof Error ? err.message : '비밀번호를 바꾸지 못했어요')
       setBusy(false)

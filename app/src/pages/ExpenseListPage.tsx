@@ -8,7 +8,7 @@ import type { GroupDetail } from '../domain/types'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
 import styles from './ExpenseListPage.module.css'
 
-/** 08. 그룹 지출 내역 — 사용 날짜별로 묶어 최신 날짜부터. 같은 날 안에서는 등록된 순서 그대로. */
+/** 08. 그룹 지출 내역 — 사용 날짜별로 묶어 최신 날짜부터. 같은 날 안에서는 최근에 등록한 지출이 위. */
 export default function ExpenseListPage() {
   const group = useCurrentGroup()
   if (!group) return null
@@ -18,11 +18,18 @@ export default function ExpenseListPage() {
 function ExpenseList({ group }: { group: GroupDetail }) {
   const { nameOf } = useGroupView(group)
   const isEmpty = group.expenses.length === 0
-  // 아직 나 혼자면 "친구 초대"를, 멤버가 있으면 "첫 지출 추가"를 안내 — FAB를 강조해 어느 버튼인지 알려줌
-  const highlightFab = isEmpty && group.members.length > 1
+
+  // 최근에 등록한 지출이 위로: 등록 시각(createdAt) 내림차순으로 먼저 줄 세운 뒤 날짜별로 묶는다.
+  // 등록 시각이 같으면 나중에 들어온 것이 위. 수정해도 createdAt은 그대로라 자리가 바뀌지 않는다.
+  const newestFirst = group.expenses
+    .map((expense, index) => ({ expense, index }))
+    .sort((a, b) =>
+      a.expense.createdAt < b.expense.createdAt ? 1 : a.expense.createdAt > b.expense.createdAt ? -1 : b.index - a.index,
+    )
+    .map(({ expense }) => expense)
 
   const byDate = new Map<string, typeof group.expenses>()
-  for (const expense of group.expenses) {
+  for (const expense of newestFirst) {
     byDate.set(expense.spentAt, [...(byDate.get(expense.spentAt) ?? []), expense])
   }
   const dates = [...byDate.keys()].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
@@ -65,11 +72,7 @@ function ExpenseList({ group }: { group: GroupDetail }) {
       ))}
 
       <div className={styles.fabWrap}>
-        <Link
-          to={paths.expenseNew(group.id)}
-          className={highlightFab ? `${styles.fab} ${styles.glow}` : styles.fab}
-          aria-label="지출 추가"
-        >
+        <Link to={paths.expenseNew(group.id)} className={styles.fab} aria-label="지출 추가">
           <PlusIcon size={22} />
         </Link>
       </div>

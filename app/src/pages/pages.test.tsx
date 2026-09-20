@@ -98,6 +98,21 @@ describe('그룹 헤더 (08/09/10 공용)', () => {
 })
 
 describe('08 지출 내역', () => {
+  it('같은 날짜 안에서는 최근에 등록한 지출이 위에 나온다 (수정해도 자리는 그대로)', () => {
+    // 시드의 10월 12일 지출 3건: e_1(가장 먼저 등록) → e_2 → e_3(가장 나중에 등록)
+    renderAt('/groups/g_jeju/expenses')
+    const t = text()
+    expect(t.indexOf('흑돼지 저녁식사')).toBeLessThan(t.indexOf('공항 렌터카 3일'))
+    expect(t.indexOf('공항 렌터카 3일')).toBeLessThan(t.indexOf('애월 게스트하우스 2박'))
+    cleanup()
+
+    // e_1을 수정해도(createdAt 유지) 맨 아래에 그대로 있다
+    patchGroup((g) => ({ expenses: g.expenses.map((e) => (e.id === 'e_1' ? { ...e, title: '애월 숙소(수정)' } : e)) }))
+    renderAt('/groups/g_jeju/expenses')
+    const edited = text()
+    expect(edited.indexOf('공항 렌터카 3일')).toBeLessThan(edited.indexOf('애월 숙소(수정)'))
+  })
+
   it('날짜는 최신순, 항목에 결제자·나눔 인원(일부 표시)', () => {
     renderAt('/groups/g_jeju/expenses')
     const t = text()
@@ -114,11 +129,11 @@ describe('08 지출 내역', () => {
     expect(await screen.findByText('지출 수정')).toBeTruthy()
   })
 
-  it('지출이 없을 때: 나 혼자면 초대 안내, 멤버가 있으면 첫 지출 안내 + FAB 강조', () => {
+  it('지출이 없을 때: 나 혼자면 초대 안내, 멤버가 있으면 첫 지출 안내. 어느 쪽이든 FAB는 강조 효과가 없다', () => {
     patchGroup(() => ({ expenses: [] }))
     renderAt('/groups/g_jeju/expenses')
     expect(text()).toContain('아직 등록된 지출이 없어요.')
-    expect(screen.getByRole('link', { name: '지출 추가' }).className).toContain('glow')
+    expect(screen.getByRole('link', { name: '지출 추가' }).className).not.toContain('glow')
     cleanup()
 
     patchGroup((g) => ({ expenses: [], members: g.members.slice(0, 1) }))
