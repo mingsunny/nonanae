@@ -65,7 +65,8 @@ export function loadDb(): MockDb {
   } catch {
     // localStorage 접근 불가/파싱 실패 → 시드로 시작
   }
-  return createSeed()
+  // 앱을 처음 열면 로그인 전 상태 — 인트로(01)부터 보인다
+  return createSeed(Date.now(), { signedIn: false })
 }
 
 export function saveDb(db: MockDb): void {

@@ -510,9 +510,12 @@ export async function resetPassword(token: string, newPassword: string): Promise
   commit()
 }
 
-/** 개발용: 목업 데이터를 시드 상태로 되돌림 (브라우저 콘솔의 window.__resetMockData()로도 호출 가능) */
-export async function resetMockData(): Promise<void> {
+/**
+ * 개발용: 목업 데이터를 시드 상태로 되돌림 (브라우저 콘솔의 window.__resetMockData()로도 호출 가능).
+ * 기본값은 테스트 계정으로 로그인된 상태(테스트가 전제), 실제 앱의 리셋은 signedIn: false로 인트로부터 시작한다.
+ */
+export async function resetMockData({ signedIn = true }: { signedIn?: boolean } = {}): Promise<void> {
   clearStoredDb()
-  db = createSeed()
+  db = createSeed(Date.now(), { signedIn })
   commit()
 }

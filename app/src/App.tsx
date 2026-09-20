@@ -5,10 +5,10 @@ import ToastHost from './components/common/Toast'
 import { router } from './routes/router'
 import { useAppStore } from './store/appStore'
 
-// 개발 중 목업 데이터를 시드 상태로 되돌리는 콘솔 함수: window.__resetMockData()
+// 개발 중 목업 데이터를 시드 상태로 되돌리는 콘솔 함수: window.__resetMockData() — 로그아웃 상태(인트로부터)로 시작
 if (import.meta.env.DEV) {
   ;(window as unknown as { __resetMockData: () => Promise<void> }).__resetMockData = async () => {
-    await resetMockData()
+    await resetMockData({ signedIn: false })
     window.location.reload()
   }
 }

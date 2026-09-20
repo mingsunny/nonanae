@@ -30,6 +30,28 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+describe('시작 상태', () => {
+  it('저장된 데이터가 없는 채로 앱을 처음 열면 로그아웃 상태다 (인트로부터 보이게)', async () => {
+    vi.resetModules()
+    const { clearStoredDb } = await import('./mockDb')
+    clearStoredDb()
+    const fresh = await import('./index')
+    expect((await fresh.fetchSnapshot()).session).toEqual({ userId: null, viewAsMemberId: null })
+  })
+
+  it('resetMockData는 기본이 테스트 계정 로그인 상태(테스트 전제), signedIn: false면 로그아웃 상태다', async () => {
+    await resetMockData()
+    expect((await fetchSnapshot()).session.userId).toBe('u_test')
+    await resetMockData({ signedIn: false })
+    const snapshot = await fetchSnapshot()
+    expect(snapshot.session.userId).toBeNull()
+    expect(snapshot.groups).toEqual([])
+    // 로그아웃 상태여도 데모 데이터는 그대로라, 테스트 계정으로 로그인하면 데모 그룹이 보인다
+    await signIn('a@naver.com', 'aaaaaaaa')
+    expect((await fetchSnapshot()).groups.map((g) => g.id)).toEqual(['g_jeju'])
+  })
+})
+
 describe('signIn', () => {
   it('테스트 계정으로 로그인하면 세션이 그 계정이 된다', async () => {
     await signOut()
