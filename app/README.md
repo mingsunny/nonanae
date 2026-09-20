@@ -23,6 +23,7 @@ src/
   styles/       tokens.css(DESIGN.md 토큰), global.css
 ```
 
+- 상태관리는 zustand, 정산 계산은 프론트에서 수행(`schema.md` 계산 로직).
 - 스타일은 CSS Modules(`*.module.css`) + `tokens.css`의 CSS 변수.
 - URL 경로는 `docs/spec/conventions.md`의 표를 따른다. 화면 이동은 `paths`를 통해서만.
 - 담당: 01~07·14 민선 / 08~13 케이디.

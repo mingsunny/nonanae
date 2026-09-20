@@ -222,7 +222,9 @@ expense_participants (expense_id FK, user_id FK, share_amount NULLABLE, PRIMARY 
 
 > ✅ **2026-09-20 팀 협의로 프론트엔드 스택 변경**: Next.js 대신 **React + Vite + TypeScript**로 구현하기로 확정. 스타일링은 **CSS Modules**, 백엔드는 **Supabase**(민선 담당). 화면 담당은 01~07·14번 민선, 08~13번 케이디. 아래 목록에서 취소선은 이 결정으로 대체된 이전 추천.
 >
-> 미정: 상태관리 방식, 이메일 인증/비밀번호 재설정 메일 발송 방식(Supabase Auth 사용 여부 포함), 배포 대상(Vercel 등), 정산 계산을 프론트에서 할지 서버에서 할지.
+> 같은 날 추가 확정: 상태관리는 **zustand**, 정산 계산(`schema.md` 계산 로직)은 **프론트에서 수행**(Supabase에는 계산용 서버가 없고, 그룹 규모가 2~15명이라 성능 문제 없음).
+>
+> 미정(백엔드 담당 민선이 정할 것): 이메일 인증/비밀번호 재설정 메일 발송 방식(Supabase Auth 사용 여부 포함), 게스트(계정 없음)의 Supabase 데이터 접근 방식(RLS 설계). 배포 대상(Vercel 등)도 미정.
 >
 > 화면 URL 경로는 [docs/spec/conventions.md](docs/spec/conventions.md#url-경로-라우팅) 참고.
 
