@@ -49,7 +49,7 @@
 
 .tagline {
   margin: 0;
-  font-size: 14px;
+  font-size: 1.3125rem; /* 21px = 이전 14px의 1.5배 */
   color: var(--ink-soft);
   line-height: 1.6;
 }
