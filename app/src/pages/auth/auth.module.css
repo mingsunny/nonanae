@@ -1,0 +1,68 @@
+.body {
+  padding: var(--space-sm) 20px var(--space-xl);
+}
+
+.submit {
+  margin-top: var(--space-md);
+}
+
+.switch {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.forgot {
+  margin-top: var(--space-md);
+  text-align: center;
+}
+
+/* 인트로: 로고+태그라인은 화면 가운데, 버튼은 아래 */
+.intro {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+/* 1254x1254 정사각 이미지라 여백이 넉넉해서 태그라인 쪽으로 살짝 당김 */
+.logo {
+  margin: 0 0 -8px;
+  line-height: 0;
+}
+
+.logo img {
+  width: 260px;
+  max-width: 80%;
+  height: auto;
+}
+
+.tagline {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.actions {
+  padding: 0 20px 48px;
+}
+
+.actionGap {
+  margin-top: 10px;
+}
+
+.joinLink {
+  margin-top: 18px;
+  text-align: center;
+}

@@ -2,8 +2,9 @@
 // id는 프로토타입처럼 랜덤이 아니라 읽기 쉬운 고정값 — 테스트와 디버깅이 쉬워짐.
 //
 // 프로토타입은 "그룹이 하나도 없는 첫 로그인"을 재현하려고 데모 지출을 첫 그룹 생성 시점에 채웠지만,
-// 08~13 화면을 바로 확인할 수 있도록 여기서는 테스트 계정이 이미 데모 그룹의 방장으로 들어 있다.
-// 03/05 화면(첫 그룹 코치마크 등)을 구현할 때 필요하면 이 시드를 조정할 것.
+// 08~13 화면을 바로 확인할 수 있도록 여기서는 테스트 계정이 이미 데모 그룹의 방장으로 들어 있고,
+// 세션도 그 계정으로 로그인된 상태로 시작한다(개발 중 로그인 화면을 건너뛰려는 것 — 인트로/로그인 화면을
+// 보려면 프로필에서 로그아웃하거나 window.__resetMockData() 후 로그아웃). 신규 가입 계정은 그룹이 없는 상태로 시작한다.
 import type { Expense, ExpenseParticipant, Group, Member, Notification, User } from '../domain/types'
 import type { MockDb } from './mockDb'
 
@@ -113,5 +114,8 @@ export function createSeed(now: number = Date.now()): MockDb {
     expenses,
     expenseParticipants,
     notifications,
+    // 데모 유저들은 화면에 이름만 나오면 되므로 로그인 가능한 계정은 테스트 계정 하나뿐
+    credentials: { u_test: 'aaaaaaaa' },
+    passwordResets: [],
   }
 }

@@ -3,6 +3,7 @@ import * as api from '../api'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
+  Group,
   GroupDetail,
   Member,
   Notification,
@@ -31,6 +32,24 @@ interface AppState {
   removeExpense: (expenseId: string) => Promise<void>
   addPendingMember: (groupId: string, name: string) => Promise<Member>
   markNotificationRead: (notificationId: string) => Promise<void>
+
+  // 01/02/04: 로그인·가입·프로필
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (input: api.SignUpInput) => Promise<void>
+  /** 로그아웃. 로그인 없이 참여한 게스트가 그룹 화면에서 나갈 때도 쓴다. */
+  signOut: () => Promise<void>
+  deleteAccount: () => Promise<void>
+  updateProfile: (input: api.ProfileInput) => Promise<void>
+  markGroupCreateCoachSeen: () => Promise<void>
+
+  // 05: 그룹 생성
+  createGroup: (name: string) => Promise<Group>
+
+  // 06/07: 초대코드로 참여. 그룹 안으로 들어가는 결과가 나오면 그 그룹이 스토어에 들어 있도록 refresh까지 마친다.
+  resolveInviteCode: (raw: string) => Promise<api.JoinResolution>
+  joinAsExistingMember: (groupId: string, memberId: string) => Promise<void>
+  joinAsNewGuest: (groupId: string, name: string) => Promise<void>
+  joinAsNewAccountMember: (groupId: string) => Promise<void>
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -84,6 +103,64 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   markNotificationRead: async (notificationId) => {
     await api.markNotificationRead(notificationId)
+    await get().refresh()
+  },
+
+  signIn: async (email, password) => {
+    await api.signIn(email, password)
+    await get().refresh()
+  },
+
+  signUp: async (input) => {
+    await api.signUp(input)
+    await get().refresh()
+  },
+
+  signOut: async () => {
+    await api.signOut()
+    await get().refresh()
+  },
+
+  deleteAccount: async () => {
+    await api.deleteAccount()
+    await get().refresh()
+  },
+
+  updateProfile: async (input) => {
+    await api.updateProfile(input)
+    await get().refresh()
+  },
+
+  markGroupCreateCoachSeen: async () => {
+    await api.markGroupCreateCoachSeen()
+    await get().refresh()
+  },
+
+  createGroup: async (name) => {
+    const group = await api.createGroup(name)
+    await get().refresh()
+    return group
+  },
+
+  resolveInviteCode: async (raw) => {
+    const resolution = await api.resolveInviteCode(raw)
+    // 개인 초대 링크로 바로 연결된 경우 데이터가 바뀌었으므로 다시 불러옴 (재입장은 바뀐 게 없어도 무해)
+    if (resolution.kind === 'joined') await get().refresh()
+    return resolution
+  },
+
+  joinAsExistingMember: async (groupId, memberId) => {
+    await api.joinAsExistingMember(groupId, memberId)
+    await get().refresh()
+  },
+
+  joinAsNewGuest: async (groupId, name) => {
+    await api.joinAsNewGuest(groupId, name)
+    await get().refresh()
+  },
+
+  joinAsNewAccountMember: async (groupId) => {
+    await api.joinAsNewAccountMember(groupId)
     await get().refresh()
   },
 }))
