@@ -142,7 +142,7 @@ erDiagram
 > - [`supabase/migrations/20260920000000_init_schema.sql`](../../supabase/migrations/20260920000000_init_schema.sql) — 테이블, RLS, 가입/탈퇴 트리거, 그룹 생성·참여 RPC
 > - [`supabase/migrations/20260920000100_guest_support.sql`](../../supabase/migrations/20260920000100_guest_support.sql) — 게스트(익명 로그인) 지원. **위 파일을 먼저 실행한 뒤** 실행
 >
-> 적용 상태(2026-09-20): 마이그레이션 파일 작성까지 완료. Supabase 프로젝트에 실제로 적용했는지는 미확인 — 적용 전 대시보드에서 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 를 켜야 게스트 로그인이 동작함.
+> 적용 상태(2026-09-20): 마이그레이션 파일 작성까지 완료, **Supabase 프로젝트에는 아직 미적용** (문서 머지 후 이 SQL 그대로 적용 예정) — 적용 전 대시보드에서 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 를 켜야 게스트 로그인이 동작함.
 
 ### 스펙 → 테이블 대응
 
