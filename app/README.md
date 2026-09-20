@@ -9,6 +9,7 @@ npm install
 npm run dev      # 개발 서버
 npm run build    # 타입 체크 + 빌드
 npm run lint
+npm test         # 정산 계산 등 단위 테스트(vitest)
 ```
 
 ## 구조
@@ -19,6 +20,7 @@ src/
   layouts/      화면 공용 틀 (GroupLayout: 08/09/10 헤더 + 하단 탭바)
   pages/        화면 1개 = 파일 1개 (지금은 PagePlaceholder 자리표시자)
   components/common/  여러 화면이 함께 쓰는 컴포넌트
+  domain/       타입(types.ts)과 정산 계산(settlement.ts, 순수 함수 + 테스트). 출처: docs/spec/schema.md
   api/          데이터 접근 계층 (지금은 비어 있음. 화면은 여기 함수만 호출 → 나중에 Supabase로 교체)
   styles/       tokens.css(DESIGN.md 토큰), global.css
 ```
