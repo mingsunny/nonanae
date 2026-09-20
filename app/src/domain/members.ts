@@ -22,3 +22,14 @@ export function findMyMember(
   if (viewAsMemberId !== null) return members.find((m) => m.id === viewAsMemberId)
   return undefined
 }
+
+/** 송금 받을 계좌. 대기 중 멤버·게스트(userId 없음)는 계좌가 없으므로 null. */
+export function memberBankAccount(
+  member: Member,
+  usersById: Record<string, User>,
+): { bank: string; account: string } | null {
+  if (member.userId === null) return null
+  const user = usersById[member.userId]
+  if (!user?.bank || !user.account) return null
+  return { bank: user.bank, account: user.account }
+}

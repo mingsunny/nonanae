@@ -220,7 +220,7 @@ expense_participants (expense_id FK, user_id FK, share_amount NULLABLE, PRIMARY 
 
 ## 기술 스택 추천
 
-> ✅ **2026-09-20 팀 협의로 프론트엔드 스택 변경**: Next.js 대신 **React + Vite + TypeScript**로 구현하기로 확정. 스타일링은 **CSS Modules**, 백엔드는 **Supabase**(민선 담당). 화면 담당은 01~07·14번 민선, 08~13번 케이디. 아래 목록에서 취소선은 이 결정으로 대체된 이전 추천.
+> ✅ **2026-09-20 팀 협의로 프론트엔드 스택 변경**: Next.js 대신 **React + Vite + TypeScript**로 구현하기로 확정. 스타일링은 **CSS Modules**, 백엔드는 **Supabase**(민선 담당). 화면 담당은 01~07·14번 민선, 08~13번 kady. 아래 목록에서 취소선은 이 결정으로 대체된 이전 추천.
 >
 > 같은 날 추가 확정: 상태관리는 **zustand**, 정산 계산(`schema.md` 계산 로직)은 **프론트에서 수행**(Supabase에는 계산용 서버가 없고, 그룹 규모가 2~15명이라 성능 문제 없음).
 >

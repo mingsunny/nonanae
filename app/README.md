@@ -19,17 +19,19 @@ src/
   routes/       paths.ts(URL 경로 단일 출처), router.tsx(경로 ↔ 화면)
   layouts/      화면 공용 틀 (GroupLayout: 08/09/10 헤더 + 하단 탭바)
   pages/        화면 1개 = 파일 1개 (지금은 PagePlaceholder 자리표시자)
-  components/common/  여러 화면이 함께 쓰는 컴포넌트
-  domain/       타입(types.ts)과 정산 계산(settlement.ts, 순수 함수 + 테스트). 출처: docs/spec/schema.md
+  components/common/         여러 화면이 함께 쓰는 컴포넌트 (Button, Avatar, Toast, EmptyState, Field 스타일 등)
+  components/notifications/  13 알림: <NotificationBell />을 03 상단에 두면 종 아이콘 + 알림 패널이 동작
+  lib/          format(금액·날짜·상대시간), clipboard
+  domain/       타입(types.ts), 정산 계산(settlement.ts), 지출 폼 계산(expenseForm.ts) — 순수 함수 + 테스트. 출처: docs/spec/schema.md
   api/          데이터 접근 계층. 화면/스토어는 여기 함수만 호출 (지금은 mockDb.ts/mockSeed.ts의 목업, 나중에 Supabase로 교체)
-  store/        zustand 스토어(appStore.ts): 세션·그룹·알림 상태와 지출/멤버/알림 액션
+  store/        zustand 스토어(appStore.ts): 세션·그룹·알림 상태와 지출/멤버/알림 액션, hooks.ts(useCurrentGroup·useGroupView), toastStore.ts(showToast)
   styles/       tokens.css(DESIGN.md 토큰), global.css
 ```
 
 - 상태관리는 zustand, 정산 계산은 프론트에서 수행(`schema.md` 계산 로직).
 - 스타일은 CSS Modules(`*.module.css`) + `tokens.css`의 CSS 변수.
 - URL 경로는 `docs/spec/conventions.md`의 표를 따른다. 화면 이동은 `paths`를 통해서만.
-- 담당: 01~07·14 민선 / 08~13 케이디.
+- 담당: 01~07·14 민선 / 08~13 kady.
 
 ## 목업 데이터
 
@@ -37,3 +39,10 @@ src/
 - "초대코드 테스트방"(`TEST42`)에는 대기 중 멤버 "김민지"가 있고, 테스트 계정은 멤버가 아니다 (06/07 참여 흐름 확인용).
 - 상태는 localStorage(`nonanae:mock-db:v1`)에 저장된다. 처음 상태로 되돌리려면 개발 서버의 브라우저 콘솔에서 `window.__resetMockData()`.
 - 시드 정의: `src/api/mockSeed.ts` (프로토타입 sep19의 시드를 옮긴 것).
+
+## 화면 구현 현황
+
+| 화면 | 상태 |
+|---|---|
+| 08 지출 내역 · 09 정산 · 10 요약 · 11 지출 폼 · 12 멤버 초대 · 13 알림 | 구현됨 (kady) |
+| 01~07, 14 | 자리표시자 (민선). 03은 08~13을 오갈 수 있게 임시 목록만 있으니 통째로 교체하되 상단 `<NotificationBell />`은 유지 |

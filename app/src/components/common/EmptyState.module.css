@@ -1,0 +1,13 @@
+.empty {
+  padding: 50px var(--space-lg);
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: var(--fs-caption);
+  line-height: 1.6;
+}
+
+.icon {
+  margin-bottom: 10px;
+  font-size: 26px;
+  color: #c7c2b3;
+}
