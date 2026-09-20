@@ -1,0 +1,47 @@
+/* 디자인 토큰 — 출처: 저장소 루트 DESIGN.md. 값을 바꿀 땐 DESIGN.md도 함께 수정할 것. */
+:root {
+  /* color */
+  --paper: #f7f2e6;
+  --card: #ffffff;
+  --ink: #182a20;
+  --ink-soft: #5b6b5f;
+  --line: #e4dfcc;
+  --brand: #1f8a50;
+  --brand-deep: #175c38;
+  --brand-light: #dcf3e3;
+  --mint: #4ead6d;
+  --amber: #e3a23c;
+  --brick: #c1443c;
+
+  /* spacing (4px base) */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* shadow (스티커 느낌 1종) */
+  --shadow: 0 6px 16px -6px rgba(23, 92, 56, 0.18);
+
+  /* typography */
+  --font-display: 'Do Hyeon', 'Pretendard Variable', Pretendard, sans-serif;
+  --font-body: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fs-display-xl: 2rem;
+  --fs-display-l: 1.5rem;
+  --fs-title: 1.0625rem;
+  --fs-body: 0.9375rem;
+  --fs-caption: 0.8125rem;
+  --fs-label: 0.75rem;
+
+  /* layout */
+  --app-max-width: 480px;
+  --tabbar-height: 56px;
+}
