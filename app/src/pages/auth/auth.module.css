@@ -35,15 +35,15 @@
   text-align: center;
 }
 
-/* 1254x1254 정사각 이미지라 여백이 넉넉해서 태그라인 쪽으로 살짝 당김 */
+/* 정사각 이미지라 여백이 넉넉해서 태그라인 쪽으로 당김. 화면이 좁으면(390px보다) 화면 폭에 맞춰 줄어듦 */
 .logo {
-  margin: 0 0 -8px;
+  margin: 0 0 -12px;
   line-height: 0;
 }
 
 .logo img {
-  width: 260px;
-  max-width: 80%;
+  width: 390px;
+  max-width: 100%;
   height: auto;
 }
 
