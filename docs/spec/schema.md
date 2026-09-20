@@ -122,6 +122,173 @@
 
 ## 관계도
 
+```mermaid
+erDiagram
+    "auth.users" ||--o| profiles : "1:0..1 (정식 회원만)"
+    "auth.users" |o--o{ members : "guest_uid (익명 세션, 게스트)"
+    profiles |o--o{ members : "user_id (정식 회원)"
+    groups ||--o{ members : ""
+    groups ||--o{ expenses : ""
+    groups ||--o{ notifications : ""
+    members ||--o{ expenses : "paid_by"
+    expenses ||--o{ expense_participants : ""
+    members ||--o{ expense_participants : "member_id"
+    members |o--o{ notifications : "member_id"
+```
+
+## DB 구현 (Supabase / PostgreSQL)
+
+> 이 섹션은 실제 DB가 위 스펙을 어떻게 구현하는지의 **요약**이다. 컬럼·제약·정책의 원본은 SQL 파일이며, 둘이 다르면 SQL이 기준이다.
+> - [`supabase/migrations/20260920000000_init_schema.sql`](../../supabase/migrations/20260920000000_init_schema.sql) — 테이블, RLS, 가입/탈퇴 트리거, 그룹 생성·참여 RPC
+> - [`supabase/migrations/20260920000100_guest_support.sql`](../../supabase/migrations/20260920000100_guest_support.sql) — 게스트(익명 로그인) 지원. **위 파일을 먼저 실행한 뒤** 실행
+>
+> 적용 상태(2026-09-20): 마이그레이션 파일 작성까지 완료. Supabase 프로젝트에 실제로 적용했는지는 미확인 — 적용 전 대시보드에서 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 를 켜야 게스트 로그인이 동작함.
+
+### 스펙 → 테이블 대응
+
+| 스펙 엔티티 | 테이블 | 비고 |
+|---|---|---|
+| User | `auth.users` + `public.profiles` | 이메일·비밀번호·이메일 인증은 Supabase Auth가 관리(`email`, `encrypted_password`, `email_confirmed_at`). 스펙의 이름/은행/계좌/코치마크 플래그만 `profiles`에 저장 |
+| Group | `groups` | |
+| Member | `members` | 게스트·placeholder·정식 회원이 모두 이 테이블. 게스트 세션 연결용 `guest_uid` 추가 |
+| Expense | `expenses` | |
+| ExpenseParticipant | `expense_participants` | 정합성 보장용 `group_id` 추가(비정규화) |
+| Notification | `notifications` | |
+
+### 스펙과 다르게 구현된 부분
+
+- **id는 전부 uuid** — 프로토타입의 `uid('g')` 같은 문자열 대신 `gen_random_uuid()`
+- **User 분리**: 스펙의 `email`/`passwordHash`/`emailVerified`/`authProvider`는 `profiles`에 없음 (Auth가 담당). 회원가입 시 `signUp`의 `options.data`로 넘긴 `{name, bank, account}`를 트리거가 `profiles`로 복사하며, 셋 중 하나라도 없으면 가입이 실패함(스펙의 "가입 시 계좌 필수")
+- **게스트 구현**: 스펙의 "게스트는 User 없이 Member(`userId` null + `name`)" 를 **Supabase 익명 로그인**으로 구현. 익명 세션 id를 `members.guest_uid`에 저장해 "이 세션 = 이 멤버"로 인식함 (PIN 등 재입장 인증 없음은 스펙 그대로)
+- **탈퇴 처리 정책 확정**: 지출 기록은 유지하고, 탈퇴하는 사람의 이름을 `members.name`으로 옮겨 "이름 있는 미가입 멤버"로 남김 ([04-profile.md](04-profile.md)에 미정이던 항목)
+- 수치는 `bigint`(원 단위 정수), 날짜는 `date`/`timestamptz`
+
+### 테이블 정의
+
+**profiles** — 정식 회원 프로필
+
+| 컬럼 | 타입 | 제약 / 기본값 | 설명 |
+|---|---|---|---|
+| id | uuid | PK, FK → `auth.users(id)` ON DELETE CASCADE | Auth 계정과 같은 id |
+| name | text | NOT NULL, 공백 불가 | 이름 |
+| bank | text | NOT NULL, 공백 불가 | 은행명 ([공통 은행 목록](conventions.md#은행-목록) — 목록 검증은 앱에서, DB CHECK 없음) |
+| account | text | NOT NULL, 공백 불가 | 계좌번호 (형식 검증 없음) |
+| seen_group_create_coach | boolean | NOT NULL, 기본 false | 첫 그룹 생성 안내 확인 여부 |
+| created_at | timestamptz | NOT NULL, 기본 now() | |
+
+**groups**
+
+| 컬럼 | 타입 | 제약 / 기본값 | 설명 |
+|---|---|---|---|
+| id | uuid | PK | |
+| name | text | NOT NULL, 공백 불가 | 그룹(여행) 이름 |
+| invite_code | text | NOT NULL, UNIQUE, 기본 자동 생성 | 6자리 (헷갈리는 0/O/1/I 제외한 32자 알파벳). 그룹 생성 함수가 충돌 시 재시도 |
+| created_at | timestamptz | NOT NULL, 기본 now() | |
+
+**members**
+
+| 컬럼 | 타입 | 제약 / 기본값 | 설명 |
+|---|---|---|---|
+| id | uuid | PK | 지출·참여자·알림이 참조하는 안정적인 키 |
+| group_id | uuid | NOT NULL, FK → groups ON DELETE CASCADE | |
+| user_id | uuid | FK → profiles ON DELETE SET NULL | 정식 회원일 때만 |
+| guest_uid | uuid | FK → auth.users ON DELETE SET NULL | 게스트일 때 그 익명 세션 id. 익명 계정이 정리되면 null로 돌아가 이름만 남는 멤버가 됨 |
+| role | text | NOT NULL, 기본 'member', `owner`/`member` | |
+| name | text | 공백 불가 | `user_id`가 없을 때(placeholder·게스트)의 표시 이름 |
+| joined_at | timestamptz | NOT NULL, 기본 now() | |
+
+- `user_id` 또는 `name` 중 하나는 반드시 있음 / `user_id`와 `guest_uid`는 동시에 가질 수 없음
+- 한 그룹에서 같은 계정(`user_id`)·같은 익명 세션(`guest_uid`)은 한 번만 멤버가 될 수 있음
+- 그룹당 `owner`는 최대 1명 (unique 인덱스)
+- `UNIQUE (id, group_id)` — 지출/참여자가 "같은 그룹의 멤버만" 가리키도록 복합 FK에 사용
+
+**expenses**
+
+| 컬럼 | 타입 | 제약 / 기본값 | 설명 |
+|---|---|---|---|
+| id | uuid | PK | |
+| group_id | uuid | NOT NULL, FK → groups ON DELETE CASCADE | |
+| paid_by | uuid | NOT NULL, FK (paid_by, group_id) → members(id, group_id) | 결제자 멤버 (같은 그룹 멤버만 가능) |
+| title | text | NOT NULL, 공백 불가 | 항목명 |
+| amount | bigint | NOT NULL, > 0 | 금액(원) |
+| category | text | NOT NULL, `lodging`/`food`/`transport`/`activity`/`shopping`/`etc` | 숙소/식비/교통/액티비티/쇼핑/기타 |
+| receipt_image_url | text | | 영수증 (선택) |
+| split_type | text | NOT NULL, 기본 'equal', `equal`/`ratio`/`amount` | 나누기 방식 |
+| spent_at | date | NOT NULL, 기본 오늘 | 사용 날짜 (목록 정렬·그룹핑 기준) |
+| created_at | timestamptz | NOT NULL, 기본 now() | |
+
+- 인덱스: `(group_id, spent_at desc, created_at desc)` — 지출 목록 조회용
+
+**expense_participants**
+
+| 컬럼 | 타입 | 제약 / 기본값 | 설명 |
+|---|---|---|---|
+| expense_id | uuid | PK(복합), FK (expense_id, group_id) → expenses ON DELETE CASCADE | |
+| member_id | uuid | PK(복합), FK (member_id, group_id) → members | 참여자 멤버 |
+| group_id | uuid | NOT NULL | 지출과 멤버가 같은 그룹인지 복합 FK로 보장하려고 둔 비정규화 컬럼 |
+| share_amount | bigint | ≥ 0 또는 null | `equal`이면 null(매번 계산), `ratio`/`amount`면 확정된 원 단위 정수 |
+
+**notifications**
+
+| 컬럼 | 타입 | 제약 / 기본값 | 설명 |
+|---|---|---|---|
+| id | uuid | PK | |
+| group_id | uuid | NOT NULL, FK → groups ON DELETE CASCADE | |
+| member_id | uuid | FK → members ON DELETE SET NULL | 이벤트를 일으킨 멤버 |
+| type | text | NOT NULL, `expense`/`member_joined` | |
+| title | text | NOT NULL | 생성 시점에 이름을 채워 고정 저장한 문구 |
+| read | boolean | NOT NULL, 기본 false | 알림 1건당 읽음 플래그 1개 (스펙 그대로) |
+| created_at | timestamptz | NOT NULL, 기본 now() | |
+
+### 삭제 시 동작
+
+| 대상 | 결과 |
+|---|---|
+| 그룹 삭제 | 멤버·지출·알림이 함께 삭제되고, 지출에 딸린 참여자 행도 삭제됨 |
+| 지출 삭제 | 그 지출의 참여자 행 삭제 |
+| 멤버 삭제 | 결제자나 참여자로 쓰인 멤버는 삭제 불가 (멤버 삭제 기능은 스펙에 없음) |
+| 회원 탈퇴 | 삭제 직전 트리거가 이름을 `members.name`으로 복사 → `user_id`가 null로 바뀌며 이름 있는 미가입 멤버로 남음. 지출/정산 기록 유지 |
+| 익명 계정 정리 | 해당 멤버의 `guest_uid`만 null이 됨 (이름·기록 유지) |
+
+### 접근 권한 (RLS)
+
+모든 테이블에 RLS가 켜져 있고 `anon`(로그인 전) 역할은 전부 차단됨. 아래 "멤버"는 `user_id` 또는 `guest_uid`가 내 `auth.uid()`인 멤버(정식 회원·게스트 모두).
+
+| 테이블 | 조회 | 쓰기 |
+|---|---|---|
+| profiles | 내 프로필 + 같은 그룹 멤버의 프로필(정산 화면에서 송금 계좌를 보여줘야 해서 게스트도 포함) | 내 프로필만 수정. 생성은 가입 트리거만 |
+| groups | 멤버 | 그룹장만 수정·삭제. 생성은 `create_group()`만 |
+| members | 같은 그룹 멤버 | 멤버 누구나 이름만 있는 미가입 멤버(placeholder) 추가 가능. 참여·그룹장 지정은 RPC만 |
+| expenses, expense_participants | 같은 그룹 멤버 | 같은 그룹 멤버 누구나 등록·수정·삭제 |
+| notifications | 같은 그룹 멤버 | 같은 그룹 멤버가 추가·읽음 처리 |
+
+### 트리거 · 함수(RPC)
+
+| 이름 | 용도 |
+|---|---|
+| `on_auth_user_created` (트리거) | 회원가입 시 `raw_user_meta_data`의 name/bank/account로 `profiles` 생성. 익명 로그인은 건너뜀 |
+| `before_profile_delete` (트리거) | 탈퇴 시 멤버 행에 이름 보존 |
+| `create_group(p_name)` | [05](05-create-group.md) 그룹 + 그룹장 멤버를 한 번에 생성, group id 반환. **정식 회원만**(게스트 거부) |
+| `lookup_group_by_code(p_code)` | [06](06-join-group.md) 초대코드 확인 + [07](07-join-match.md) "나 고르기" 목록용 `{id, name, members[{id, name, claimed}]}` 반환. 잘못된 코드면 null |
+| `join_group(p_code, p_member_id, p_name)` | [06](06-join-group.md)/[07](07-join-match.md) 초대코드 참여. 정식 회원·게스트 공용 — `p_member_id`가 있으면 그 자리를 내 것으로, 없으면 새 멤버로 추가(게스트는 `p_name` 필수). 이미 멤버면 기존 멤버 id 반환. 새 멤버가 생기거나 정식 회원이 자리를 채울 때만 참여 알림 생성 |
+| `upgrade_guest(p_name, p_bank, p_account)` | [01](01-login.md) 게스트 → 정식 회원 전환. 프로필을 만들고, 그 세션이 게스트로 참여한 모든 그룹의 멤버 행을 내 계정에 연결(멤버 id 유지 → 지출 기록 이관 불필요) |
+| `is_group_member`, `is_group_owner`, `shares_group_with`, `is_anonymous_user` | RLS용 헬퍼 |
+
+### 앱 연동 규칙
+
+- **회원가입**: `signUp({ email, password, options: { data: { name, bank, account } } })` — 회원가입 1단계([01](01-login.md))·2단계([02](02-onboarding.md)) 입력값을 2단계 완료 시점에 한 번에 전달
+- **게스트 참여**: `signInAnonymously()` → `join_group(code, null, 이름)` (새 참여) 또는 `join_group(code, memberId)` (기존 자리 선택·재입장)
+- **개인화 초대코드** `코드-멤버ID`: 앱이 `-`로 잘라 코드는 `join_group`의 첫 인자, 멤버ID는 두 번째 인자로 전달
+- **게스트 → 정식 전환 순서**: `updateUser({ email, password })` → `refreshSession()` → `upgrade_guest(...)`. 새 계정으로 처음부터 가입하면 uid가 달라져 기록을 이관할 수 없음
+- **앱에서 직접 처리하는 것**: 지출 등록 알림 생성(`notifications` insert), `share_amount` 규칙(균등이면 null, 비율/금액이면 확정값 — 다른 테이블 값에 의존해서 CHECK로 못 검), 은행 목록·계좌번호 형식 검증
+
+### 알려진 제한 · 미결정
+
+- **알림 읽음이 알림 1건당 하나** — 그룹원이 여러 명이면 한 명이 읽으면 다른 사람에게도 읽음으로 보임. 사용자별 읽음이 필요하면 스펙과 테이블을 함께 바꿔야 함
+- **같은 그룹 멤버끼리 서로의 은행·계좌번호를 조회할 수 있음** — "보낼 사람에게만 보이기"는 화면에서만 제한됨. 데이터 수준 제한이 필요하면 뷰/함수 추가 필요
+- **익명 계정 남용 방지** 미설정 — 실서비스 전 CAPTCHA/레이트리밋 필요
+- **게스트 사칭 가능** — 재입장 시 본인 확인이 없어 같은 그룹의 누군가가 이름을 골라 그 자리를 가져갈 수 있음 (스펙에서 수용한 트레이드오프)
+
 ## 변경 이력
 
 - 2026-09-06: 참가자용 닉네임+PIN 게스트 분기 결정에 따라 User의 로그인 방식을 카카오로 확정(`kakaoId`, `authProvider` 추가)하고, Member에 게스트 인증 관련 필드(`nickname`/`pinHash`/`failedAttempts`/`lockedUntil`) 추가 (민선)
@@ -129,3 +296,4 @@
 - 2026-09-10: 08~13 화면(지출/정산/요약/폼/초대/알림) 스키마를 이 문서에 통합. Member에 `id` 추가(Expense.paidBy 등이 참조할 안정적인 키가 없어서), Expense 필드 채움, ExpenseParticipant·Notification 엔티티 추가, 마스터 데이터/계산 로직 섹션 추가. 은행계좌는 별도 엔티티로 분리하지 않고 User.bank/User.account 그대로 유지
 - 2026-09-12: sep10 프로토타입 기준으로 **구글·카카오 연동 로그인을 스펙에서 제외**. User에서 `googleId`/`kakaoId` 필드 삭제, 소셜 계정 자동 연동/탈취 위험 관련 서술 삭제 (민선)
 - 2026-09-12: **게스트 재입장 PIN 인증을 스펙에서 제외** 확정. 게스트는 `User` row 자체를 만들지 않는 것으로 모델 단순화 — User.authProvider에서 `'guest'` 제거(항상 `'email'`), Member에서 `nickname`/`pinHash`/`failedAttempts`/`lockedUntil` 필드 삭제(게스트는 placeholder와 동일하게 `userId: null` + `name`으로만 표현). "이름 표시 순서"를 2단계(`userId` 없음→Member.name, 있음→User.name)로 단순화 (민선)
+- 2026-09-20: Supabase DB 구현 정리 추가. 관계도(ER) 작성, 스펙→테이블 대응, 테이블 정의, RLS·RPC·삭제 동작, 앱 연동 규칙과 알려진 제한을 "DB 구현" 섹션에 기록. SQL 원본은 `supabase/migrations/` (민선)
