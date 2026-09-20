@@ -7,13 +7,16 @@ import ExpenseFormPage from '../pages/ExpenseFormPage'
 import ExpenseListPage from '../pages/ExpenseListPage'
 import GroupListPage from '../pages/GroupListPage'
 import JoinPage from '../pages/JoinPage'
-import LoginPage from '../pages/LoginPage'
 import MemberInvitePage from '../pages/MemberInvitePage'
 import NotFoundPage from '../pages/NotFoundPage'
 import PasswordResetPage from '../pages/PasswordResetPage'
 import ProfilePage from '../pages/ProfilePage'
 import SettlePage from '../pages/SettlePage'
 import SummaryPage from '../pages/SummaryPage'
+import AccountScreen from '../pages/auth/AccountScreen'
+import IntroScreen from '../pages/auth/IntroScreen'
+import LoginScreen from '../pages/auth/LoginScreen'
+import SignupScreen from '../pages/auth/SignupScreen'
 import RequireUser from './RequireUser'
 import { paths } from './paths'
 
@@ -22,8 +25,12 @@ import { paths } from './paths'
 export const routes: RouteObject[] = [
   { path: '/', element: <Navigate to={paths.groups} replace /> },
 
-  // 01·02: 인트로/로그인/회원가입은 한 경로 안의 단계, 06·07: 초대코드 참여도 한 경로 안의 단계
-  { path: 'login', element: <LoginPage /> },
+  // 01·02: 인트로 / 로그인 / 회원가입 1단계 / 2단계(계좌 등록)는 화면마다 경로가 따로 있다
+  { path: 'welcome', element: <IntroScreen /> },
+  { path: 'login', element: <LoginScreen /> },
+  { path: 'signup', element: <SignupScreen /> },
+  { path: 'signup/account', element: <AccountScreen /> },
+  // 06·07: 초대코드 참여는 한 경로 안의 단계
   { path: 'join', element: <JoinPage /> },
   { path: 'password-reset', element: <PasswordResetPage /> },
 

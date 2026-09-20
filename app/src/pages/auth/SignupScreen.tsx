@@ -1,22 +1,20 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { isEmailTaken } from '../../api'
-import type { SignupDraft } from '../LoginPage'
+import { paths } from '../../routes/paths'
+import { useAuthFlowStore } from '../../store/authFlowStore'
+import type { SignupDraft } from '../../store/authFlowStore'
 import styles from './auth.module.css'
 
-interface Props {
-  draft: SignupDraft
-  onChange: (patch: Partial<SignupDraft>) => void
-  onBack: () => void
-  onNext: () => void
-  onGoLogin: () => void
-}
-
-/** 01 회원가입 1단계 (이메일 / 비밀번호). 이 단계에서는 계정을 만들지 않고, 2단계(02) 제출 때 한 번에 만든다. */
-export default function SignupScreen({ draft, onChange, onBack, onNext, onGoLogin }: Props) {
+/** 01 회원가입 1단계 (`/signup`, 이메일 / 비밀번호). 이 단계에서는 계정을 만들지 않고, 2단계(02) 제출 때 한 번에 만든다. */
+export default function SignupScreen() {
+  const navigate = useNavigate()
+  const draft = useAuthFlowStore((s) => s.draft)
+  const patchDraft = useAuthFlowStore((s) => s.patchDraft)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -25,7 +23,7 @@ export default function SignupScreen({ draft, onChange, onBack, onNext, onGoLogi
   const canSubmit = draft.email.trim().includes('@') && draft.password.length > 0 && confirmed && matches
 
   function edit(patch: Partial<SignupDraft>) {
-    onChange(patch)
+    patchDraft(patch)
     setError(null)
   }
 
@@ -38,7 +36,7 @@ export default function SignupScreen({ draft, onChange, onBack, onNext, onGoLogi
         setError('이미 가입된 이메일이에요. 로그인해주세요.')
         return
       }
-      onNext()
+      navigate(paths.signupAccount)
     } finally {
       setBusy(false)
     }
@@ -46,7 +44,7 @@ export default function SignupScreen({ draft, onChange, onBack, onNext, onGoLogi
 
   return (
     <div>
-      <Topbar title="회원가입" onBack={onBack} />
+      <Topbar title="회원가입" onBack={() => navigate(paths.welcome)} />
       <form className={styles.body} onSubmit={submit}>
         <label className={fields.label} htmlFor="signup-email">
           이메일
@@ -101,7 +99,7 @@ export default function SignupScreen({ draft, onChange, onBack, onNext, onGoLogi
         </div>
         <p className={styles.switch}>
           이미 계정이 있으신가요?{' '}
-          <button type="button" className={fields.textLink} onClick={onGoLogin}>
+          <button type="button" className={fields.textLink} onClick={() => navigate(paths.login)}>
             로그인
           </button>
         </p>

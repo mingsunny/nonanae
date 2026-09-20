@@ -76,7 +76,7 @@ export default function JoinPage() {
       busy={busy}
       onSubmit={() => lookup(code)}
       // 로그인 상태면 그룹 목록으로, 아니면 인트로로 (06 액션 & 결과)
-      onBack={() => navigate(isLoggedIn ? paths.groups : paths.login)}
+      onBack={() => navigate(isLoggedIn ? paths.groups : paths.welcome)}
     />
   )
 }

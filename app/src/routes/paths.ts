@@ -1,7 +1,10 @@
 // URL 경로의 단일 출처. 표는 docs/spec/conventions.md "URL 경로 (라우팅)" 참고.
 // 화면에서 이동할 땐 문자열을 직접 쓰지 말고 이 함수/상수를 쓸 것.
 export const paths = {
+  welcome: '/welcome',
   login: '/login',
+  signup: '/signup',
+  signupAccount: '/signup/account',
   groups: '/groups',
   profile: '/profile',
   groupNew: '/groups/new',

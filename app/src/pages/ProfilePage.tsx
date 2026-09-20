@@ -47,7 +47,7 @@ function Profile({ user }: { user: User }) {
 
   // 로그아웃·탈퇴 후엔 인트로가 아니라 로그인 화면으로 (01 진입 경로). 화면을 먼저 옮긴 뒤 세션을 지운다.
   function leaveToLogin() {
-    navigate(paths.login, { replace: true, state: { step: 'login' } })
+    navigate(paths.login, { replace: true })
   }
 
   async function logout() {

@@ -35,7 +35,7 @@ function GroupShell({ group }: { group: GroupDetail }) {
 
   /** 로그인 없이 참여한 게스트에겐 그룹 목록이 없다 — 이 그룹 세션을 끝내고 인트로로 나간다 (sep19 goGlobalHome) */
   function leaveAsGuest() {
-    navigate(paths.login)
+    navigate(paths.welcome)
     void signOut()
   }
 

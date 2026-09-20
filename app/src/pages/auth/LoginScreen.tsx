@@ -1,27 +1,27 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
+import { useAuthFlowStore } from '../../store/authFlowStore'
 import styles from './auth.module.css'
 
-interface Props {
-  /** 회원가입으로 넘어갈 때 이메일을 이어 쓰도록 부모가 들고 있음 (01 액션 & 결과) */
-  email: string
-  onEmailChange: (email: string) => void
-  /** 화면 위에 보여줄 안내 (예: 비밀번호 재설정 링크를 보냈다는 안내) */
-  notice?: string | null
-  onBack: () => void
-}
-
-/** 01 로그인 */
-export default function LoginScreen({ email, onEmailChange, notice, onBack }: Props) {
+/**
+ * 01 로그인 (`/login`). 비밀번호 재설정(14)을 마치고 올 때는 `navigate(paths.login, { state: { notice } })`로
+ * 안내 문구를 실어 보내면 폼 위에 안내 박스로 보여준다. 뒤로가기는 인트로(`/welcome`).
+ */
+export default function LoginScreen() {
   const navigate = useNavigate()
+  const notice = (useLocation().state as { notice?: string } | null)?.notice
   const signIn = useAppStore((s) => s.signIn)
+  // 회원가입으로 넘어갈 때 이메일을 이어 쓰도록 화면 밖에서 들고 있음 (01 액션 & 결과)
+  const email = useAuthFlowStore((s) => s.loginEmail)
+  const setEmail = useAuthFlowStore((s) => s.setLoginEmail)
+  const resetAuthFlow = useAuthFlowStore((s) => s.reset)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -35,6 +35,7 @@ export default function LoginScreen({ email, onEmailChange, notice, onBack }: Pr
     setBusy(true)
     try {
       await signIn(email, password)
+      resetAuthFlow()
       navigate(paths.groups, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인하지 못했어요')
@@ -44,7 +45,7 @@ export default function LoginScreen({ email, onEmailChange, notice, onBack }: Pr
 
   return (
     <div>
-      <Topbar title="로그인" onBack={onBack} />
+      <Topbar title="로그인" onBack={() => navigate(paths.welcome)} />
       <form className={styles.body} onSubmit={submit}>
         {notice && <Callout>{notice}</Callout>}
         <label className={fields.label} htmlFor="login-email">
@@ -57,7 +58,7 @@ export default function LoginScreen({ email, onEmailChange, notice, onBack }: Pr
           autoComplete="email"
           value={email}
           onChange={(e) => {
-            onEmailChange(e.target.value)
+            setEmail(e.target.value)
             setError(null)
           }}
         />

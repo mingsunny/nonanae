@@ -16,6 +16,7 @@ import {
 import ToastHost from '../components/common/Toast'
 import { routes } from '../routes/router'
 import { useAppStore } from '../store/appStore'
+import { useAuthFlowStore } from '../store/authFlowStore'
 import { useToastStore } from '../store/toastStore'
 
 /** 목업을 시드로 되돌리고 스토어를 다시 불러옴. loggedIn=false면 로그아웃 상태로 시작. */
@@ -51,6 +52,7 @@ async function requestResetToken(email: string): Promise<string> {
 
 beforeEach(async () => {
   useToastStore.setState({ message: null })
+  useAuthFlowStore.getState().reset()
   await boot({ loggedIn: true })
 })
 
@@ -64,7 +66,7 @@ describe('01 인트로 / 로그인', () => {
     await boot({ loggedIn: false })
     const router = renderApp('/')
     expect(await screen.findByAltText('노나내')).toBeTruthy()
-    expect(pathOf(router)).toBe('/login')
+    expect(pathOf(router)).toBe('/welcome')
     for (const name of ['로그인', '회원가입', '초대코드로 가입하기']) {
       expect(screen.getByRole('button', { name })).toBeTruthy()
     }
@@ -75,14 +77,31 @@ describe('01 인트로 / 로그인', () => {
     for (const url of ['/groups', '/profile', '/groups/new']) {
       const router = renderApp(url)
       expect(await screen.findByAltText('노나내')).toBeTruthy()
-      expect(pathOf(router)).toBe('/login')
+      expect(pathOf(router)).toBe('/welcome')
       cleanup()
     }
   })
 
-  it('테스트 계정으로 로그인하면 그룹 목록으로 간다', async () => {
+  it('/login으로 바로 들어오면 인트로 없이 로그인 폼이 뜬다. 뒤로가기는 인트로로 간다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/login')
+    expect(await screen.findByLabelText('비밀번호')).toBeTruthy()
+    expect(screen.queryByAltText('노나내')).toBeNull()
+    await click('뒤로가기')
+    expect(await screen.findByAltText('노나내')).toBeTruthy()
+    expect(pathOf(router)).toBe('/welcome')
+  })
+
+  it('인트로의 "로그인"은 /login으로 이동한다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/welcome')
+    await click('로그인')
+    expect(pathOf(router)).toBe('/login')
+  })
+
+  it('테스트 계정으로 로그인하면 그룹 목록으로 간다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/welcome')
     await click('로그인')
     await fill('이메일', 'a@naver.com')
     await fill('비밀번호', 'aaaaaaaa')
@@ -93,7 +112,7 @@ describe('01 인트로 / 로그인', () => {
 
   it('이메일에 @가 없거나 비밀번호가 비어 있으면 로그인 버튼이 비활성이다', async () => {
     await boot({ loggedIn: false })
-    renderApp('/login')
+    renderApp('/welcome')
     await click('로그인')
     const submit = screen.getByRole('button', { name: '로그인' }) as HTMLButtonElement
     expect(submit.disabled).toBe(true)
@@ -106,7 +125,7 @@ describe('01 인트로 / 로그인', () => {
 
   it('비밀번호가 틀리면 에러를 보여주고 화면에 머문다', async () => {
     await boot({ loggedIn: false })
-    const router = renderApp('/login')
+    const router = renderApp('/welcome')
     await click('로그인')
     await fill('이메일', 'a@naver.com')
     await fill('비밀번호', 'wrong-password')
@@ -117,12 +136,12 @@ describe('01 인트로 / 로그인', () => {
 
   it('"초대코드로 가입하기"는 초대코드 입력 화면으로, "비밀번호를 잊으셨나요?"는 재설정 화면으로 간다', async () => {
     await boot({ loggedIn: false })
-    const router = renderApp('/login')
+    const router = renderApp('/welcome')
     await click('초대코드로 가입하기')
     expect(pathOf(router)).toBe('/join')
     cleanup()
 
-    const router2 = renderApp('/login')
+    const router2 = renderApp('/welcome')
     await click('로그인')
     await userEvent.click(screen.getByRole('link', { name: '비밀번호를 잊으셨나요?' }))
     expect(pathOf(router2)).toBe('/password-reset')
@@ -132,7 +151,7 @@ describe('01 인트로 / 로그인', () => {
 describe('01·02 회원가입 (2단계)', () => {
   async function goToSignup() {
     await boot({ loggedIn: false })
-    const router = renderApp('/login')
+    const router = renderApp('/welcome')
     await click('회원가입')
     return router
   }
@@ -145,8 +164,10 @@ describe('01·02 회원가입 (2단계)', () => {
 
   it('1단계 → 2단계를 마치면 계정이 만들어지고 로그인된 채로 그룹 목록에 들어간다. 첫 그룹 안내가 뜬다', async () => {
     const router = await goToSignup()
+    expect(pathOf(router)).toBe('/signup')
     await fillStep1()
     await click('다음')
+    expect(pathOf(router)).toBe('/signup/account')
 
     expect(await screen.findByText(/이름과 계좌 정보를 등록해주세요/)).toBeTruthy()
     await fill('이름', '신규')
@@ -158,6 +179,26 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(pathOf(router)).toBe('/groups')
     expect(screen.getByText('그룹을 만들고 정산을 시작해요')).toBeTruthy()
     expect(state().usersById[state().currentUserId!]).toMatchObject({ email: 'new@example.com', bank: '토스뱅크' })
+    // 가입을 마치면 1단계 입력값(비밀번호 포함)은 메모리에서 비워진다
+    expect(useAuthFlowStore.getState().draft).toEqual({ email: '', password: '', passwordConfirm: '' })
+  })
+
+  it('1단계 입력값 없이 /signup/account로 바로 들어오면 1단계로 되돌린다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/signup/account')
+    expect(await screen.findByLabelText('비밀번호 확인')).toBeTruthy()
+    expect(pathOf(router)).toBe('/signup')
+  })
+
+  it('1단계 뒤로가기는 인트로로, "이미 계정이 있으신가요? 로그인"은 로그인 화면으로 간다', async () => {
+    const router = await goToSignup()
+    await click('로그인')
+    expect(pathOf(router)).toBe('/login')
+    cleanup()
+
+    const router2 = await goToSignup()
+    await click('뒤로가기')
+    expect(pathOf(router2)).toBe('/welcome')
   })
 
   it('비밀번호 확인이 다르면 안내 문구가 뜨고 "다음"이 비활성이다', async () => {
@@ -183,11 +224,12 @@ describe('01·02 회원가입 (2단계)', () => {
   })
 
   it('2단계에서 뒤로 가면 1단계 입력값이 남아 있다', async () => {
-    await goToSignup()
+    const router = await goToSignup()
     await fillStep1()
     await click('다음')
     await screen.findByText(/이름과 계좌 정보를 등록해주세요/)
     await click('뒤로가기')
+    expect(pathOf(router)).toBe('/signup')
     expect((screen.getByLabelText('이메일') as HTMLInputElement).value).toBe('new@example.com')
     expect((screen.getByLabelText('비밀번호') as HTMLInputElement).value).toBe('pw-1234')
   })
@@ -207,7 +249,7 @@ describe('01·02 회원가입 (2단계)', () => {
 
   it('로그인 화면에 입력해 둔 이메일이 회원가입 1단계로 이어진다', async () => {
     await boot({ loggedIn: false })
-    renderApp('/login')
+    renderApp('/welcome')
     await click('로그인')
     await fill('이메일', 'keep@example.com')
     await click('뒤로가기')
@@ -445,7 +487,7 @@ describe('06·07 초대코드로 참여', () => {
     await click('뒤로가기')
     expect(await screen.findByLabelText('초대코드')).toBeTruthy()
     await click('뒤로가기')
-    expect(pathOf(router)).toBe('/login')
+    expect(pathOf(router)).toBe('/welcome')
     cleanup()
 
     await boot({ loggedIn: true })
@@ -460,7 +502,7 @@ describe('06·07 초대코드로 참여', () => {
     await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
     await userEvent.click(await screen.findByRole('button', { name: '나가기' }))
     expect(await screen.findByAltText('노나내')).toBeTruthy()
-    expect(pathOf(router)).toBe('/login')
+    expect(pathOf(router)).toBe('/welcome')
     await waitFor(() => expect(state().viewAsMemberId).toBeNull())
   })
 })
