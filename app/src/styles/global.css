@@ -1,0 +1,39 @@
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 모바일 웹 기준: 넓은 화면에서도 앱 폭을 고정하고 가운데 정렬 */
+#root {
+  max-width: var(--app-max-width);
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: var(--paper);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* 금액 등 숫자 정렬 (DESIGN.md: 항상 tabular-nums) */
+.num {
+  font-variant-numeric: tabular-nums;
+}

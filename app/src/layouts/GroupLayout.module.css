@@ -1,0 +1,140 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.header {
+  padding: var(--space-md) 20px var(--space-md);
+  background: var(--ink);
+  color: #fff;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 14px;
+}
+
+.back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.groupName {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caption {
+  margin-bottom: var(--space-xs);
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.total {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-xl);
+  letter-spacing: -0.01em;
+}
+
+.members {
+  display: flex;
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.chip {
+  display: inline-flex;
+  margin-left: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+}
+
+.chip:first-child {
+  margin-left: 0;
+}
+
+.pills {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: 12px;
+}
+
+.pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kakao {
+  background: #fee500;
+  color: #191600;
+}
+
+.content {
+  flex: 1;
+  padding: 18px 20px calc(var(--tabbar-height) + 90px);
+}
+
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  width: 100%;
+  max-width: var(--app-max-width);
+  height: var(--tabbar-height);
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #afaa9b;
+  text-decoration: none;
+}
+
+.tab span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.active {
+  color: var(--brand-deep);
+}

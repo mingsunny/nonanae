@@ -220,12 +220,20 @@ expense_participants (expense_id FK, user_id FK, share_amount NULLABLE, PRIMARY 
 
 ## 기술 스택 추천
 
-- **프론트엔드**: Next.js (React) — 반응형 웹앱, 카카오 SDK 연동 쉬움, Vercel 배포로 빠른 반복
-- **백엔드**: Next.js API Routes (or 별도 Node/Express) — 초기 규모에선 풀스택 프레임워크로 충분
+> ✅ **2026-09-20 팀 협의로 프론트엔드 스택 변경**: Next.js 대신 **React + Vite + TypeScript**로 구현하기로 확정. 스타일링은 **CSS Modules**, 백엔드는 **Supabase**(민선 담당). 화면 담당은 01~07·14번 민선, 08~13번 kady. 아래 목록에서 취소선은 이 결정으로 대체된 이전 추천.
+>
+> 같은 날 추가 확정: 상태관리는 **zustand**, 정산 계산(`schema.md` 계산 로직)은 **프론트에서 수행**(Supabase에는 계산용 서버가 없고, 그룹 규모가 2~15명이라 성능 문제 없음).
+>
+> 미정(백엔드 담당 민선이 정할 것): 이메일 인증/비밀번호 재설정 메일 발송 방식(Supabase Auth 사용 여부 포함), 게스트(계정 없음)의 Supabase 데이터 접근 방식(RLS 설계). 배포 대상(Vercel 등)도 미정.
+>
+> 화면 URL 경로는 [docs/spec/conventions.md](docs/spec/conventions.md#url-경로-라우팅) 참고.
+
+- ~~**프론트엔드**: Next.js (React) — 반응형 웹앱, 카카오 SDK 연동 쉬움, Vercel 배포로 빠른 반복~~ → **React + Vite + TypeScript, 라우팅은 React Router, 스타일은 CSS Modules** (2026-09-20)
+- ~~**백엔드**: Next.js API Routes (or 별도 Node/Express) — 초기 규모에선 풀스택 프레임워크로 충분~~ → **Supabase** (Vite는 SPA라 API Routes가 없음. 담당: 민선) (2026-09-20)
 - **DB**: PostgreSQL (Supabase 추천 — 인증 연동, 무료 티어로 시작 가능)
 - **파일 스토리지**: Supabase Storage — 영수증 사진 업로드용 (신규 요구사항)
-- **인증**: NextAuth.js — Credentials Provider(이메일+비밀번호)를 v1 기본으로 구성, Google/Kakao Provider를 추가 옵션으로 함께 구성. 비밀번호는 bcrypt로 해시. 이메일 발송(회원가입 인증 메일, 비밀번호 재설정 메일)이 v1부터 필요해짐 — Resend/AWS SES 등 트랜잭셔널 이메일 서비스 연동 필요 (이전엔 Phase 2로 미뤄뒀던 인프라, 이번 결정으로 v1 필수가 됨)
-- **배포**: Vercel (프론트+백엔드), Supabase (DB + Storage)
+- **인증**: ~~NextAuth.js~~ (Next.js 전용이라 사용 불가) — 이메일+비밀번호 v1 기본(구글·카카오 연동은 2026-09-12 스펙에서 제외). 구체 방식(Supabase Auth 등)은 미정. 비밀번호 재설정·인증 메일 발송이 v1부터 필요해진 점은 그대로 — Resend/AWS SES 등 트랜잭셔널 이메일 서비스 연동 필요 (이전엔 Phase 2로 미뤄뒀던 인프라, 이번 결정으로 v1 필수가 됨)
+- **배포**: ~~Vercel (프론트+백엔드)~~ 프론트 배포 대상 미정, Supabase (DB + Storage)
 
 이 스택은 개인 프로젝트 규모에서 인프라 관리 부담을 최소화하면서 몇 주 내 MVP 완성이 가능하다. 다만 로그인 방식이 이메일 기본으로 바뀌면서 비밀번호 재설정·이메일 인증 발송 인프라가 v1부터 필요해졌다(이전엔 카카오 단독이라 필요 없었음) — 영수증 업로드(파일 업로드 파이프라인)에 더해 이 부분도 신규로 커버해야 한다.
 
@@ -274,10 +282,10 @@ expense_participants (expense_id FK, user_id FK, share_amount NULLABLE, PRIMARY 
 
 ## 다음 단계 제안
 
-1. Next.js + Supabase 프로젝트 스캐폴딩 (Storage 버킷 설정 포함)
+1. ~~Next.js + Supabase 프로젝트 스캐폴딩 (Storage 버킷 설정 포함)~~ → **React(Vite) + TypeScript 앱 스캐폴딩 + Supabase 프로젝트 설정 (Storage 버킷 포함)** (2026-09-20)
 2. 정산 알고리즘 단위 테스트부터 작성 (엣지 케이스: 나머지 배분 확정 규칙, 1인 그룹, 이미 잔액 0인 멤버)
 3. 이메일+비밀번호 회원가입/로그인 구현 (비밀번호 해시, 이메일 인증 메일, 비밀번호 재설정 플로우 포함) → 구글/카카오 로그인 연동 추가 (카카오는 카카오톡 공유하기(Share) API도 함께 필요 — 카카오 디벨로퍼스 앱 등록 필요, 사용자가 직접 해야 하는 외부 계정 설정) + `/join?code=XXXX` 자동 참여 라우팅 구현 (위 "그룹 초대 흐름" 케이스 A/B 참고)
-4. 프로토타입(`prototypes/settlement-prototype.html`)의 화면/카피/인터랙션을 그대로 Next.js 컴포넌트로 이식
+4. 프로토타입(`prototypes/settlement-prototype.html`)의 화면/카피/인터랙션을 그대로 ~~Next.js~~ React(Vite) 컴포넌트로 이식 (2026-09-20)
 5. (향후) 사업자등록증 발급 후 카카오싱크 전환 검토 — 실명(`name`) 동의항목, 이메일 등 추가 개인정보 수집이 필요해지면 그때 재평가
 6. 게스트 참여(닉네임+PIN) 구현 — PIN 해시 저장, 재입장 시 브루트포스 방지(5회 실패 15분 잠금), 게스트→정식 회원 전환 시 지출 기록 이관 로직 (위 "그룹 초대 흐름" 케이스 D/E 참고)
 

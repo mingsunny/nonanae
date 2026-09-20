@@ -1,0 +1,259 @@
+.page {
+  min-height: 100dvh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-md) 20px var(--space-sm);
+}
+
+.back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.body {
+  padding: 0 20px var(--space-2xl);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.chip {
+  padding: 9px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chipOn {
+  color: #fff;
+}
+
+.upload {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  padding: 18px;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.preview {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  margin-bottom: var(--space-sm);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.toggle {
+  display: flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: #efe9d9;
+}
+
+.opt {
+  flex: 1;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.optOn {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.people {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.person:last-child {
+  border-bottom: 0;
+}
+
+.check {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  border: 1.6px solid #c7c2b3;
+  border-radius: 6px;
+}
+
+.boxOn {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.personName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.share {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.readonly {
+  padding: 6px 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.off {
+  color: #c7c2b3;
+  font-weight: 600;
+}
+
+.shareInput {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.shareField {
+  width: 96px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: right;
+  appearance: textfield;
+}
+
+.shareField::-webkit-inner-spin-button,
+.shareField::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.shareField:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+.shareField:disabled {
+  border-color: var(--line);
+  background: #f1efe9;
+  color: #c7c2b3;
+  cursor: not-allowed;
+}
+
+.unit {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.summary {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.ok {
+  color: var(--brand-deep);
+}
+
+.bad {
+  color: var(--brick);
+}
+
+.actions {
+  margin-top: 22px;
+}
+
+.remove {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.removeLink {
+  padding: 8px;
+  border: 0;
+  background: none;
+  color: var(--brick);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
