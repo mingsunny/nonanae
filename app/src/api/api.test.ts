@@ -78,7 +78,7 @@ describe('createExpense', () => {
     expect(notifications[0]).toMatchObject({
       type: 'expense',
       groupId: 'g_jeju',
-      title: '박서연님이 [제주도 여행]에 내역을 추가했어요',
+      title: '[제주도 여행]에 박서연님이 결제한 내역이 추가됐어요',
       read: false,
     })
   })

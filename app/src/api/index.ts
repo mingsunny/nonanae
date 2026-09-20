@@ -117,7 +117,9 @@ export async function createExpense(input: ExpenseInput): Promise<ExpenseWithPar
     groupId: group.id,
     memberId: payer.id,
     type: 'expense',
-    title: `${memberDisplayName(payer, usersById(d)) || '누군가'}님이 [${group.name}]에 내역을 추가했어요`,
+    // 등록한 사람이 아니라 결제자 이름을 쓴다 — 지출에 "등록한 사람" 필드가 없고 다른 사람 대신 등록할 수도 있어서,
+    // "OO님이 추가했어요"라고 쓰면 오해를 준다 (13 알림1)
+    title: `[${group.name}]에 ${memberDisplayName(payer, usersById(d)) || '누군가'}님이 결제한 내역이 추가됐어요`,
     createdAt: nowIso(),
     read: false,
   })
