@@ -15,8 +15,8 @@ import styles from './MemberInvitePage.module.css'
 
 /**
  * 12. 멤버 초대 — 멤버 목록 조회 + 앱 미가입 친구를 이름만으로 미리 추가(대기 중 멤버).
- * 그룹을 방금 만든 직후 05에서 이동해 올 때는 navigate(path, { state: { fromCreation: true } })로 넘기면
- * back 대신 하단 "그룹으로 가기" 버튼을 보여준다.
+ * 하단 "그룹으로 가기" 버튼은 항상 보이고, 그룹을 방금 만든 직후 05에서 이동해 올 때는
+ * navigate(path, { state: { fromCreation: true } })로 넘기면 상단 back 버튼만 숨긴다. (sep19 프로토타입 기준)
  */
 export default function MemberInvitePage() {
   const group = useCurrentGroup()
@@ -63,7 +63,7 @@ function MemberInvite({ group }: { group: GroupDetail }) {
         <h1 className={styles.title}>멤버 목록</h1>
       </div>
 
-      <div className={`${styles.body} ${fromCreation ? styles.withFooter : ''}`}>
+      <div className={styles.body}>
         <div className={styles.callout}>
           이 그룹에 참여 중인 멤버예요. 초대는 그룹 화면 상단의
           <br />
@@ -113,11 +113,9 @@ function MemberInvite({ group }: { group: GroupDetail }) {
         </form>
       </div>
 
-      {fromCreation && (
-        <div className={styles.footer}>
-          <Button onClick={() => navigate(paths.groupExpenses(group.id), { replace: true })}>그룹으로 가기</Button>
-        </div>
-      )}
+      <div className={styles.footer}>
+        <Button onClick={() => navigate(paths.groupExpenses(group.id), { replace: fromCreation })}>그룹으로 가기</Button>
+      </div>
     </div>
   )
 }

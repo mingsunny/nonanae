@@ -52,7 +52,7 @@
 | 10 그룹 요약 | `/groups/:groupId/summary` | |
 | 11 지출 추가 | `/groups/:groupId/expenses/new` | 신규 등록 모드 |
 | 11 지출 수정 | `/groups/:groupId/expenses/:expenseId` | 수정 모드 (기존 값 프리필) |
-| 12 멤버 초대 | `/groups/:groupId/members` | 05에서 그룹을 만든 직후 이동해 올 땐 `navigate(path, { state: { fromCreation: true } })`로 넘기면 back 대신 하단 "그룹으로 가기" 버튼이 나옴 |
+| 12 멤버 초대 | `/groups/:groupId/members` | 05에서 그룹을 만든 직후 이동해 올 땐 `navigate(path, { state: { fromCreation: true } })`로 넘기면 상단 back 버튼이 숨겨짐(하단 "그룹으로 가기"는 항상 표시) |
 | 13 알림 | (경로 없음) | 03 위에 뜨는 전역 오버레이라 별도 URL을 갖지 않음 |
 
 - 02 온보딩은 화면 존치 여부가 미정이라([handoff.md](handoff.md) 참고) 경로를 정하지 않음.

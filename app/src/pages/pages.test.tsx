@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetMockData } from '../api'
+import { todayIso } from '../lib/format'
 import ToastHost from '../components/common/Toast'
 import NotificationBell from '../components/notifications/NotificationBell'
 import GroupLayout from '../layouts/GroupLayout'
@@ -223,6 +224,11 @@ describe('11 지출 폼', () => {
     expect(text()).toContain('₩2,500')
   })
 
+  it('신규: 사용 날짜 기본값은 오늘', () => {
+    renderAt('/groups/g_jeju/expenses/new')
+    expect((screen.getByLabelText('사용 날짜') as HTMLInputElement).value).toBe(todayIso())
+  })
+
   it('신규 등록: 저장되고 08로 돌아가며 알림이 생긴다', async () => {
     renderAt('/groups/g_jeju/expenses/new')
     await fillBasics('10000', '택시')
@@ -345,7 +351,14 @@ describe('12 멤버 초대', () => {
     expect((screen.getByRole('button', { name: '추가' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('그룹 생성 직후(fromCreation)에는 back 대신 "그룹으로 가기" 버튼이 나온다', async () => {
+  it('하단 "그룹으로 가기"는 항상 보이고, 누르면 08로 간다', async () => {
+    renderAt('/groups/g_jeju/members')
+    expect(screen.getByRole('link', { name: '그룹으로' })).toBeTruthy() // 상단 back
+    await userEvent.click(screen.getByRole('button', { name: '그룹으로 가기' }))
+    expect(await screen.findByText('₩958,000')).toBeTruthy()
+  })
+
+  it('그룹 생성 직후(fromCreation)에는 상단 back만 숨기고 "그룹으로 가기"는 그대로 있다', async () => {
     render(
       <MemoryRouter initialEntries={[{ pathname: '/groups/g_jeju/members', state: { fromCreation: true } }]}>
         <Routes>

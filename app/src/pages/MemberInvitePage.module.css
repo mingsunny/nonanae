@@ -29,11 +29,8 @@
 }
 
 .body {
-  padding: var(--space-sm) 20px var(--space-xl);
-}
-
-.withFooter {
-  padding-bottom: 96px;
+  /* 하단 고정 버튼에 가리지 않도록 여백 */
+  padding: var(--space-sm) 20px 96px;
 }
 
 .callout {
