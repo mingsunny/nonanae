@@ -15,7 +15,7 @@
 >
 > ✅ 게스트 모델 확정 (2026-09-12): 게스트는 `User` row를 아예 만들지 않음 — PIN 등 별도 인증도 없음. 초대코드로 참여할 때 이름만 입력하면 `Member`(아래 참고)로만 존재함. 자세한 내용은 [06-join-group.md](06-join-group.md) 참고.
 
-로그인([01-login.md](01-login.md)) 후 최초 1회 온보딩([02-onboarding.md](02-onboarding.md))에서 생성됨. 게스트는 [06-join-group.md](06-join-group.md)의 초대코드 참여 시점에 생성됨.
+회원가입 2단계([02-onboarding.md](02-onboarding.md))를 마치는 시점에 생성됨(1단계 [01-login.md](01-login.md)에서는 만들지 않음). 게스트는 User를 만들지 않고 [06-join-group.md](06-join-group.md)의 초대코드 참여 시점에 Member만 생성됨.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
@@ -25,9 +25,9 @@
 | emailVerified | boolean | 이메일 인증 여부. 인증 필수화 여부는 미정([01-login.md](01-login.md) 참고) — 기본값 false |
 | passwordHash | string | bcrypt 해시 |
 | name | string | 이름. 회원가입 시 직접 입력, 온보딩/프로필에서 수정 가능 |
-| bank | string \| null | 은행명. [공통 은행 목록](conventions.md#은행-목록) 중 하나. 게스트는 null |
-| account | string \| null | 계좌번호. 형식 검증 없는 자유 텍스트 (현재 프로토타입 기준). 게스트는 null |
-| seenGroupCreateCoach | boolean | 첫 그룹 생성 코치마크([03-group-list.md](03-group-list.md))를 이미 봤는지 여부. 1회성 안내 노출 제어용. 게스트는 해당 화면에 진입하지 않으므로 미사용 |
+| bank | string | 은행명. [공통 은행 목록](conventions.md#은행-목록) 중 하나. 정식 회원은 가입 시 필수 입력 |
+| account | string | 계좌번호. 형식 검증 없는 자유 텍스트 (현재 프로토타입 기준). 정식 회원은 가입 시 필수 입력 |
+| seenGroupCreateCoach | boolean | 첫 그룹 생성 코치마크([03-group-list.md](03-group-list.md))를 이미 봤는지 여부. 1회성 안내 노출 제어용 |
 
 > `email`은 회원가입 시 중복 체크로만 쓰이는 UNIQUE 식별자. 소셜 로그인 연동이 없어 계정 자동 매칭/탈취 위험 시나리오는 해당 없음.
 
@@ -211,7 +211,7 @@ erDiagram
 | paid_by | uuid | NOT NULL, FK (paid_by, group_id) → members(id, group_id) | 결제자 멤버 (같은 그룹 멤버만 가능) |
 | title | text | NOT NULL, 공백 불가 | 항목명 |
 | amount | bigint | NOT NULL, > 0 | 금액(원) |
-| category | text | NOT NULL, `lodging`/`food`/`transport`/`activity`/`shopping`/`etc` | 숙소/식비/교통/액티비티/쇼핑/기타 |
+| category | text | NOT NULL, `숙소`/`식비`/`교통`/`액티비티`/`쇼핑`/`기타` | [마스터 데이터](#마스터-데이터)의 한글 라벨을 그대로 저장 (앱 `Category` 타입과 동일) |
 | receipt_image_url | text | | 영수증 (선택) |
 | split_type | text | NOT NULL, 기본 'equal', `equal`/`ratio`/`amount` | 나누기 방식 |
 | spent_at | date | NOT NULL, 기본 오늘 | 사용 날짜 (목록 정렬·그룹핑 기준) |
@@ -280,6 +280,7 @@ erDiagram
 - **게스트 참여**: `signInAnonymously()` → `join_group(code, null, 이름)` (새 참여) 또는 `join_group(code, memberId)` (기존 자리 선택·재입장)
 - **개인화 초대코드** `코드-멤버ID`: 앱이 `-`로 잘라 코드는 `join_group`의 첫 인자, 멤버ID는 두 번째 인자로 전달
 - **게스트 → 정식 전환 순서**: `updateUser({ email, password })` → `refreshSession()` → `upgrade_guest(...)`. 새 계정으로 처음부터 가입하면 uid가 달라져 기록을 이관할 수 없음
+- **앱 타입과의 매핑**: 앱의 `User`는 `email`/`emailVerified`를 갖지만 DB에서는 `auth.users` 소속이라 API 계층에서 `profiles`와 합쳐 만들어야 함. 앱의 `ExpenseParticipant`에는 `groupId`가 없지만 DB(`expense_participants.group_id`)는 필수라 저장 시 해당 지출의 `group_id`를 채워 넣어야 함
 - **앱에서 직접 처리하는 것**: 지출 등록 알림 생성(`notifications` insert), `share_amount` 규칙(균등이면 null, 비율/금액이면 확정값 — 다른 테이블 값에 의존해서 CHECK로 못 검), 은행 목록·계좌번호 형식 검증
 
 ### 알려진 제한 · 미결정
@@ -296,4 +297,5 @@ erDiagram
 - 2026-09-10: 08~13 화면(지출/정산/요약/폼/초대/알림) 스키마를 이 문서에 통합. Member에 `id` 추가(Expense.paidBy 등이 참조할 안정적인 키가 없어서), Expense 필드 채움, ExpenseParticipant·Notification 엔티티 추가, 마스터 데이터/계산 로직 섹션 추가. 은행계좌는 별도 엔티티로 분리하지 않고 User.bank/User.account 그대로 유지
 - 2026-09-12: sep10 프로토타입 기준으로 **구글·카카오 연동 로그인을 스펙에서 제외**. User에서 `googleId`/`kakaoId` 필드 삭제, 소셜 계정 자동 연동/탈취 위험 관련 서술 삭제 (민선)
 - 2026-09-12: **게스트 재입장 PIN 인증을 스펙에서 제외** 확정. 게스트는 `User` row 자체를 만들지 않는 것으로 모델 단순화 — User.authProvider에서 `'guest'` 제거(항상 `'email'`), Member에서 `nickname`/`pinHash`/`failedAttempts`/`lockedUntil` 필드 삭제(게스트는 placeholder와 동일하게 `userId: null` + `name`으로만 표현). "이름 표시 순서"를 2단계(`userId` 없음→Member.name, 있음→User.name)로 단순화 (민선)
+- 2026-09-20: User의 `bank`/`account`를 필수(NOT NULL)로 정정 — 게스트가 User에서 빠진 뒤에도 남아 있던 "게스트는 null" 서술 삭제. DB `expenses.category`를 영어 id가 아닌 한글 라벨로 저장하도록 맞춤(앱 `Category` 타입 기준) (민선)
 - 2026-09-20: Supabase DB 구현 정리 추가. 관계도(ER) 작성, 스펙→테이블 대응, 테이블 정의, RLS·RPC·삭제 동작, 앱 연동 규칙과 알려진 제한을 "DB 구현" 섹션에 기록. SQL 원본은 `supabase/migrations/` (민선)
