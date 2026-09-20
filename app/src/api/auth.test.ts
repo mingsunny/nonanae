@@ -113,12 +113,25 @@ describe('signOut / deleteAccount', () => {
     expect(snapshot.groups).toEqual([])
   })
 
-  it('탈퇴하면 그 계정으로 로그인할 수 없다. 그룹의 멤버 자리는 남고 이름만 빈 값이 된다 (04 예외처리)', async () => {
+  it('탈퇴하면 그 계정으로 로그인할 수 없다. 그룹의 멤버 자리는 이름이 남은 미가입 멤버가 된다 (schema.md "삭제 시 동작")', async () => {
     await deleteAccount()
     await expect(signIn('a@naver.com', 'aaaaaaaa')).rejects.toThrow()
     const resolution = await resolveInviteCode('JEJU26')
     if (resolution.kind !== 'pick') throw new Error('pick이어야 함')
-    expect(resolution.candidates.find((c) => c.id === 'm_me')).toEqual({ id: 'm_me', name: '', hasAccount: true })
+    expect(resolution.candidates.find((c) => c.id === 'm_me')).toEqual({ id: 'm_me', name: '테스트', hasAccount: false })
+  })
+
+  it('탈퇴해도 그 멤버가 결제한 지출과 참여 기록은 그대로 남는다', async () => {
+    const before = (await fetchSnapshot()).groups.find((g) => g.id === 'g_jeju')!
+    const paidByMe = before.expenses.filter((e) => e.paidBy === 'm_me').length
+    expect(paidByMe).toBeGreaterThan(0)
+
+    await deleteAccount()
+    // 탈퇴하면 세션이 비어 내 그룹이 안 보인다. 새 계정으로 그 자리를 다시 고르면 지출 기록이 그대로 이어진다
+    await signUp(newUser)
+    await joinAsExistingMember('g_jeju', 'm_me')
+    const g = (await fetchSnapshot()).groups.find((x) => x.id === 'g_jeju')!
+    expect(g.expenses.filter((e) => e.paidBy === 'm_me')).toHaveLength(paidByMe)
   })
 
   it('로그인하지 않은 상태로는 탈퇴할 수 없다', async () => {

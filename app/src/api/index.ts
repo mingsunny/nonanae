@@ -278,12 +278,17 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * 회원 탈퇴. User와 로그인 정보만 지우고, 그 사람의 Member와 지출은 그대로 둔다(04 예외처리 — 정책 미정).
- * 이름은 User에서 조회하므로 다른 멤버 화면에서 그 사람 이름이 빈 값으로 보인다.
+ * 회원 탈퇴. User와 로그인 정보를 지우고, 그 사람의 Member와 지출은 그대로 둔다.
+ * 이름은 Member.name으로 옮겨서 "이름 있는 미가입 멤버"로 남긴다 (schema.md "삭제 시 동작", DB의 preserve_member_name 트리거와 같은 규칙).
  */
 export async function deleteAccount(): Promise<void> {
   const d = getDb()
   const user = requireSessionUser(d)
+  for (const member of d.members) {
+    if (member.userId !== user.id) continue
+    member.name = user.name
+    member.userId = null
+  }
   d.users = d.users.filter((u) => u.id !== user.id)
   delete d.credentials[user.id]
   d.passwordResets = d.passwordResets.filter((r) => r.userId !== user.id)
