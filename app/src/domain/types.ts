@@ -94,3 +94,17 @@ export interface Transfer {
   to: string
   amount: number
 }
+
+/** 지출 등록/수정 폼(11)이 제출하는 값. participants의 shareAmount는 equal이면 null, ratio/amount면 확정된 원 단위 정수. */
+export interface ExpenseInput {
+  groupId: string
+  paidBy: string
+  title: string
+  amount: number
+  category: Category
+  receiptImageUrl: string | null
+  splitType: SplitType
+  /** 'YYYY-MM-DD' */
+  spentAt: string
+  participants: { memberId: string; shareAmount: number | null }[]
+}

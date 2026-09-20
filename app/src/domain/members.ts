@@ -8,3 +8,17 @@ export function memberDisplayName(member: Member, usersById: Record<string, User
   if (member.userId === null) return member.name ?? ''
   return usersById[member.userId]?.name ?? member.name ?? ''
 }
+
+/**
+ * 그룹 안에서 "나"에 해당하는 Member. 로그인했으면 userId로, 로그인 없이 초대코드로 참여한 게스트는
+ * viewAsMemberId(내가 고른/만든 자리)로 찾는다. 지출 폼의 기본 결제자, "(나)" 표기에 사용.
+ */
+export function findMyMember(
+  members: Member[],
+  currentUserId: string | null,
+  viewAsMemberId: string | null,
+): Member | undefined {
+  if (currentUserId !== null) return members.find((m) => m.userId === currentUserId)
+  if (viewAsMemberId !== null) return members.find((m) => m.id === viewAsMemberId)
+  return undefined
+}
