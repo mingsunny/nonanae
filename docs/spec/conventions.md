@@ -35,6 +35,29 @@
 
 **이 결정이 영향을 주는 화면**: [01-login.md](01-login.md), [02-onboarding.md](02-onboarding.md), [03-group-list.md](03-group-list.md), [04-profile.md](04-profile.md), [06-join-group.md](06-join-group.md), [07-join-match.md](07-join-match.md), [09-group-settle.md](09-group-settle.md), [12-group-invite.md](12-group-invite.md). 새 화면을 스펙 문서로 작성할 때 참가자가 관여하는 화면이라면 이 목록에 추가하고 위 표를 기준으로 게스트 분기를 검토할 것.
 
+## URL 경로 (라우팅)
+
+> 2026-09-20 확정. React(Vite) 구현 시 화면 간 이동의 기준이 되는 경로. 화면을 나눠 맡은 두 담당자(01~07·14 / 08~13)가 서로의 화면으로 넘어가는 지점에서 어긋나지 않도록 미리 고정함. 라우터는 React Router 사용.
+
+| 화면 | 경로 | 비고 |
+|---|---|---|
+| 01 로그인 / 회원가입 | `/login` | |
+| 03 그룹 목록 (홈 탭) | `/groups` | 13 알림 오버레이가 이 화면 위에서 열림 |
+| 04 프로필 (탭) | `/profile` | |
+| 05 새 그룹 만들기 | `/groups/new` | 생성 직후 08로 이동 |
+| 06 초대코드로 참여 / 07 멤버 매칭 | `/join` | 카카오톡 공유 링크는 `/join?code=ABCDEF`, 개인화 초대 링크는 `/join?code=ABCDEF-{memberId}` ([12](12-group-invite.md) 참고). 06→07은 같은 경로 안의 단계 전환 |
+| 14 비밀번호 재설정 | `/password-reset` | |
+| 08 그룹 지출 내역 | `/groups/:groupId/expenses` | 그룹 내부 기본 탭. `/groups/:groupId`로 들어오면 여기로 이동 |
+| 09 그룹 정산 | `/groups/:groupId/settle` | |
+| 10 그룹 요약 | `/groups/:groupId/summary` | |
+| 11 지출 추가 | `/groups/:groupId/expenses/new` | 신규 등록 모드 |
+| 11 지출 수정 | `/groups/:groupId/expenses/:expenseId` | 수정 모드 (기존 값 프리필) |
+| 12 멤버 초대 | `/groups/:groupId/members` | 05에서 그룹을 만든 직후 이동해 올 땐 `navigate(path, { state: { fromCreation: true } })`로 넘기면 상단 back 버튼이 숨겨짐(하단 "그룹으로 가기"는 항상 표시) |
+| 13 알림 | (경로 없음) | 03 위에 뜨는 전역 오버레이라 별도 URL을 갖지 않음 |
+
+- 02 온보딩은 화면 존치 여부가 미정이라([handoff.md](handoff.md) 참고) 경로를 정하지 않음.
+- 08/09/10은 하나의 그룹 레이아웃(공용 헤더 + 하단 탭바) 안에서 콘텐츠만 바뀌는 중첩 경로.
+
 ## 네이밍 규칙
 
 ## 디자인 토큰 (색상 / 타이포 / spacing)

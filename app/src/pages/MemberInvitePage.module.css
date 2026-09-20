@@ -1,0 +1,118 @@
+.page {
+  min-height: 100dvh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-md) 20px var(--space-sm);
+}
+
+.back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.body {
+  /* 하단 고정 버튼에 가리지 않도록 여백 */
+  padding: var(--space-sm) 20px 96px;
+}
+
+.callout {
+  margin-bottom: 22px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--brand-light);
+  color: var(--brand-deep);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.card {
+  padding: 4px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.person:last-child {
+  border-bottom: 0;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.badge {
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.send {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--brand);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addRow {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.addButton {
+  width: auto;
+  min-height: 0;
+  padding: 0 18px;
+  flex-shrink: 0;
+}
+
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--app-max-width);
+  padding: 14px 22px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}

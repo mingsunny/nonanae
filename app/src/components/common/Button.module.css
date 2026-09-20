@@ -1,0 +1,32 @@
+.button {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-md);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.primary:active:not(:disabled) {
+  background: var(--brand-deep);
+}
+
+.outline {
+  background: var(--card);
+  border-color: var(--brand);
+  color: var(--brand-deep);
+}
+
+.button:disabled {
+  background: #d9d5c6;
+  border-color: transparent;
+  color: #fff;
+  cursor: not-allowed;
+}

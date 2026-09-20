@@ -1,0 +1,25 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--brand-light);
+  color: var(--brand-deep);
+  font-size: var(--fs-caption);
+  font-weight: 800;
+}
+
+.sm {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
+.pending {
+  background: transparent;
+  border: 1.5px dashed var(--ink-soft);
+  color: var(--ink-soft);
+}
