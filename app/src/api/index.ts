@@ -12,10 +12,20 @@ import type {
   Notification,
   User,
 } from '../domain/types'
+import { USE_SUPABASE } from '../lib/supabase'
 import { paths } from '../routes/paths'
 import { clearStoredDb, loadDb, saveDb, uid } from './mockDb'
 import type { MockDb, MockSession } from './mockDb'
 import { createSeed } from './mockSeed'
+import * as remote from './supabaseApi'
+
+/**
+ * Supabase 연결 진행 상황: 지금은 1단계(로그인·가입·프로필)만 supabaseApi.ts로 넘어간다.
+ * VITE_USE_SUPABASE=true인데 아직 연결되지 않은 기능을 부르면, 목업 DB를 몰래 읽고 쓰지 않도록 여기서 멈춘다.
+ */
+function notYet(name: string): never {
+  throw new Error(`${name}은(는) 아직 Supabase에 연결되지 않았어요`)
+}
 
 let db: MockDb | null = null
 
@@ -40,6 +50,7 @@ export interface Snapshot {
 
 /** 내가 속한 그룹만, 그 그룹의 멤버·지출(+참여자)·알림과 멤버가 가리키는 User를 묶어서 반환 */
 export async function fetchSnapshot(): Promise<Snapshot> {
+  if (USE_SUPABASE) return remote.fetchSnapshot()
   const d = getDb()
   const { userId, viewAsMemberId } = d.session
 
@@ -100,6 +111,7 @@ function validateExpenseInput(d: MockDb, input: ExpenseInput): void {
 
 /** 지출 등록. 신규 등록일 때만 그룹에 "내역 추가" 알림을 남긴다(13 알림1, 문구는 생성 시점에 고정). */
 export async function createExpense(input: ExpenseInput): Promise<ExpenseWithParticipants> {
+  if (USE_SUPABASE) notYet('createExpense')
   const d = getDb()
   validateExpenseInput(d, input)
 
@@ -130,6 +142,7 @@ export async function createExpense(input: ExpenseInput): Promise<ExpenseWithPar
 
 /** 지출 수정. 수정은 알림을 만들지 않는다(13 알림1). 소속 그룹은 바꿀 수 없다. */
 export async function updateExpense(expenseId: string, input: ExpenseInput): Promise<ExpenseWithParticipants> {
+  if (USE_SUPABASE) notYet('updateExpense')
   const d = getDb()
   const existing = d.expenses.find((e) => e.id === expenseId)
   if (!existing) throw new Error('존재하지 않는 지출이에요')
@@ -148,6 +161,7 @@ export async function updateExpense(expenseId: string, input: ExpenseInput): Pro
 
 /** 지출 삭제. 이미 만들어진 알림은 그대로 둔다(13 §5: 알림은 생성 시점에 고정). */
 export async function deleteExpense(expenseId: string): Promise<void> {
+  if (USE_SUPABASE) notYet('deleteExpense')
   const d = getDb()
   if (!d.expenses.some((e) => e.id === expenseId)) throw new Error('존재하지 않는 지출이에요')
   d.expenses = d.expenses.filter((e) => e.id !== expenseId)
@@ -157,6 +171,7 @@ export async function deleteExpense(expenseId: string): Promise<void> {
 
 /** 앱 미가입 친구를 이름만으로 추가(12). userId는 null. 대기 중 유저 추가는 알림을 만들지 않는다(13 알림2). */
 export async function addPendingMember(groupId: string, name: string): Promise<Member> {
+  if (USE_SUPABASE) notYet('addPendingMember')
   const d = getDb()
   if (!d.groups.some((g) => g.id === groupId)) throw new Error('존재하지 않는 그룹이에요')
   const trimmed = name.trim()
@@ -189,6 +204,7 @@ function addMemberJoinedNotification(d: MockDb, group: Group, member: Member): v
 
 /** 신규 유저가 그룹에 실제로 참여했을 때의 알림(13 알림2). 참여 흐름(06/07)에서 호출. */
 export async function notifyMemberJoined(groupId: string, memberId: string): Promise<void> {
+  if (USE_SUPABASE) notYet('notifyMemberJoined')
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   const member = d.members.find((m) => m.id === memberId && m.groupId === groupId)
@@ -198,6 +214,7 @@ export async function notifyMemberJoined(groupId: string, memberId: string): Pro
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
+  if (USE_SUPABASE) notYet('markNotificationRead')
   const d = getDb()
   const n = d.notifications.find((x) => x.id === notificationId)
   if (!n) return
@@ -219,10 +236,13 @@ function requireSessionUser(d: MockDb): User {
 
 /** 회원가입 1단계에서 "다음" 누를 때 쓰는 이메일 중복 체크 (2단계 제출 때 signUp이 한 번 더 검사) */
 export async function isEmailTaken(email: string): Promise<boolean> {
+  // Supabase 모드: 이메일 중복은 2단계 제출(signUp) 때 확인한다 — 1단계에서 가입 여부를 조회하면 계정 존재 여부가 노출된다
+  if (USE_SUPABASE) return false
   return getDb().users.some((u) => u.email === normalizeEmail(email))
 }
 
 export async function signIn(email: string, password: string): Promise<User> {
+  if (USE_SUPABASE) return remote.signIn(email, password)
   const d = getDb()
   const user = d.users.find((u) => u.email === normalizeEmail(email))
   // 미가입 이메일과 비밀번호 불일치를 구분하지 않는다 (01 예외처리: 계정 존재 여부 노출 방지)
@@ -244,6 +264,7 @@ export interface SignUpInput {
 
 /** 회원가입 2단계 제출. 여기서 비로소 User가 만들어지고 바로 로그인 상태가 된다 (02 데이터). */
 export async function signUp(input: SignUpInput): Promise<User> {
+  if (USE_SUPABASE) return remote.signUp(input)
   const d = getDb()
   const email = normalizeEmail(input.email)
   const name = input.name.trim()
@@ -272,6 +293,7 @@ export async function signUp(input: SignUpInput): Promise<User> {
 
 /** 로그아웃. 로그인 없이 참여한 게스트가 그룹 화면에서 나갈 때도 똑같이 세션을 비운다. */
 export async function signOut(): Promise<void> {
+  if (USE_SUPABASE) return remote.signOut()
   const d = getDb()
   d.session = { userId: null, viewAsMemberId: null }
   commit()
@@ -282,6 +304,7 @@ export async function signOut(): Promise<void> {
  * 이름은 Member.name으로 옮겨서 "이름 있는 미가입 멤버"로 남긴다 (schema.md "삭제 시 동작", DB의 preserve_member_name 트리거와 같은 규칙).
  */
 export async function deleteAccount(): Promise<void> {
+  if (USE_SUPABASE) notYet('deleteAccount')
   const d = getDb()
   const user = requireSessionUser(d)
   for (const member of d.members) {
@@ -304,6 +327,7 @@ export interface ProfileInput {
 
 /** 프로필 저장(04). 멤버 화면의 이름/계좌는 매번 User에서 읽으므로 모든 그룹에 바로 반영된다. */
 export async function updateProfile(input: ProfileInput): Promise<User> {
+  if (USE_SUPABASE) return remote.updateProfile(input)
   const d = getDb()
   const user = requireSessionUser(d)
   const name = input.name.trim()
@@ -316,6 +340,7 @@ export async function updateProfile(input: ProfileInput): Promise<User> {
 
 /** 03의 "그룹을 만들고 정산을 시작해요" 안내를 본 것으로 처리(유저당 1회) */
 export async function markGroupCreateCoachSeen(): Promise<void> {
+  if (USE_SUPABASE) return remote.markGroupCreateCoachSeen()
   const d = getDb()
   const user = requireSessionUser(d)
   if (user.seenGroupCreateCoach) return
@@ -327,6 +352,7 @@ export async function markGroupCreateCoachSeen(): Promise<void> {
 
 /** 그룹 생성. 만든 사람은 owner 멤버로 자동 등록되고, 그룹은 빈 상태로 시작한다(05). 정식 회원만 가능. */
 export async function createGroup(name: string): Promise<Group> {
+  if (USE_SUPABASE) notYet('createGroup')
   const d = getDb()
   const user = requireSessionUser(d)
   const trimmed = name.trim()
@@ -376,6 +402,7 @@ function claimMember(d: MockDb, group: Group, member: Member, userId: string): v
 
 /** 06: 코드 확인. 존재 여부·재입장·개인 초대 링크 여부에 따라 바로 들어가거나 07로 넘긴다. */
 export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
+  if (USE_SUPABASE) notYet('resolveInviteCode')
   const d = getDb()
   const { code, targetMemberId } = parseInviteCode(raw)
   const group = d.groups.find((g) => g.inviteCode === code)
@@ -412,6 +439,7 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
 
 /** 07: 목록에서 "이게 나예요". 로그인 상태면 그 자리를 내 계정에 연결(+알림), 아니면 그 자리로 세션만 지정(데이터·알림 변화 없음). */
 export async function joinAsExistingMember(groupId: string, memberId: string): Promise<void> {
+  if (USE_SUPABASE) notYet('joinAsExistingMember')
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   const member = d.members.find((m) => m.id === memberId && m.groupId === groupId)
@@ -425,6 +453,7 @@ export async function joinAsExistingMember(groupId: string, memberId: string): P
 
 /** 07(로그인 안 함): 목록에 없으면 이름만으로 새로 참여. 계정 없는 멤버(게스트)가 만들어진다. */
 export async function joinAsNewGuest(groupId: string, name: string): Promise<Member> {
+  if (USE_SUPABASE) notYet('joinAsNewGuest')
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   if (!group) throw new Error('존재하지 않는 그룹이에요')
@@ -449,6 +478,7 @@ export async function joinAsNewGuest(groupId: string, name: string): Promise<Mem
 
 /** 07(로그인 함): 목록에 없으면 내 계정으로 새 멤버 추가 (이름은 계정 이름 그대로). */
 export async function joinAsNewAccountMember(groupId: string): Promise<Member> {
+  if (USE_SUPABASE) notYet('joinAsNewAccountMember')
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   if (!group) throw new Error('존재하지 않는 그룹이에요')
@@ -483,6 +513,7 @@ function findValidReset(d: MockDb, token: string) {
  * 메일 발송이 없는 목업이라, 개발 중엔 콘솔에 링크를 찍어 준다.
  */
 export async function requestPasswordReset(email: string): Promise<void> {
+  if (USE_SUPABASE) notYet('requestPasswordReset')
   const d = getDb()
   const user = d.users.find((u) => u.email === normalizeEmail(email))
   if (!user) return
@@ -502,11 +533,13 @@ export async function requestPasswordReset(email: string): Promise<void> {
 }
 
 export async function isPasswordResetTokenValid(token: string): Promise<boolean> {
+  if (USE_SUPABASE) notYet('isPasswordResetTokenValid')
   return findValidReset(getDb(), token) !== undefined
 }
 
 /** 새 비밀번호 저장. 토큰은 1회용이라 성공하면 그 유저의 모든 재설정 링크가 무효가 된다. */
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  if (USE_SUPABASE) notYet('resetPassword')
   const d = getDb()
   const reset = findValidReset(d, token)
   if (!reset) throw new Error('링크가 만료되었거나 이미 사용됐어요. 재설정 링크를 다시 받아주세요.')
