@@ -13,20 +13,12 @@ import type {
   Notification,
   User,
 } from '../domain/types'
-import { USE_SUPABASE } from '../lib/supabase'
+import { USE_SUPABASE, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
 import { clearStoredDb, loadDb, saveDb, uid } from './mockDb'
 import type { MockDb, MockSession } from './mockDb'
 import { createSeed } from './mockSeed'
 import * as remote from './supabaseApi'
-
-/**
- * Supabase 연결 진행 상황: 지금은 1~3단계(로그인·가입·프로필 / 그룹 생성·초대코드 참여 / 지출·멤버 추가·알림)가 supabaseApi.ts로 넘어간다. 남은 것은 탈퇴·비밀번호 재설정.
- * VITE_USE_SUPABASE=true인데 아직 연결되지 않은 기능을 부르면, 목업 DB를 몰래 읽고 쓰지 않도록 여기서 멈춘다.
- */
-function notYet(name: string): never {
-  throw new Error(`${name}은(는) 아직 Supabase에 연결되지 않았어요`)
-}
 
 let db: MockDb | null = null
 
@@ -304,7 +296,7 @@ export async function signOut(): Promise<void> {
  * 이름은 Member.name으로 옮겨서 "이름 있는 미가입 멤버"로 남긴다 (schema.md "삭제 시 동작", DB의 preserve_member_name 트리거와 같은 규칙).
  */
 export async function deleteAccount(): Promise<void> {
-  if (USE_SUPABASE) notYet('deleteAccount')
+  if (USE_SUPABASE) return remote.deleteAccount()
   const d = getDb()
   const user = requireSessionUser(d)
   for (const member of d.members) {
@@ -500,6 +492,15 @@ export async function joinAsNewAccountMember(groupId: string): Promise<Member> {
 
 // --- 14 비밀번호 재설정 ---
 
+/**
+ * Supabase 모드에서 재설정 메일 링크로 들어왔는지. 목업은 링크에 `?token=`을 붙여 구분하지만,
+ * Supabase는 주소의 `#...`로 돌아오므로 화면이 이 값으로 "새 비밀번호 설정" 단계를 보여준다.
+ */
+export const hasPasswordResetLink = (): boolean => USE_SUPABASE && openedFromRecoveryLink
+
+/** Supabase 링크에는 화면이 넘겨줄 토큰이 없어서 쓰는 자리 채움 값 (isPasswordResetTokenValid/resetPassword가 무시함) */
+export const RECOVERY_LINK_TOKEN = 'recovery-link'
+
 /** 재설정 링크 유효 시간. 스펙(14)에서 정책 미정이라 흔히 권장하는 30분을 임시로 씀. */
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000
 
@@ -513,7 +514,7 @@ function findValidReset(d: MockDb, token: string) {
  * 메일 발송이 없는 목업이라, 개발 중엔 콘솔에 링크를 찍어 준다.
  */
 export async function requestPasswordReset(email: string): Promise<void> {
-  if (USE_SUPABASE) notYet('requestPasswordReset')
+  if (USE_SUPABASE) return remote.requestPasswordReset(email)
   const d = getDb()
   const user = d.users.find((u) => u.email === normalizeEmail(email))
   if (!user) return
@@ -533,13 +534,13 @@ export async function requestPasswordReset(email: string): Promise<void> {
 }
 
 export async function isPasswordResetTokenValid(token: string): Promise<boolean> {
-  if (USE_SUPABASE) notYet('isPasswordResetTokenValid')
+  if (USE_SUPABASE) return remote.isPasswordResetTokenValid()
   return findValidReset(getDb(), token) !== undefined
 }
 
 /** 새 비밀번호 저장. 토큰은 1회용이라 성공하면 그 유저의 모든 재설정 링크가 무효가 된다. */
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
-  if (USE_SUPABASE) notYet('resetPassword')
+  if (USE_SUPABASE) return remote.resetPassword(newPassword)
   const d = getDb()
   const reset = findValidReset(d, token)
   if (!reset) throw new Error('링크가 만료되었거나 이미 사용됐어요. 재설정 링크를 다시 받아주세요.')
