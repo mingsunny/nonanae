@@ -21,17 +21,22 @@ vi.mock('../lib/supabase', () => ({
 }))
 
 import {
+  addPendingMember,
   authErrorMessage,
+  createExpense,
   createGroup,
+  deleteExpense,
   fetchSnapshot,
   joinAsExistingMember,
   joinAsNewAccountMember,
   joinAsNewGuest,
   markGroupCreateCoachSeen,
+  markNotificationRead,
   resolveInviteCode,
   signIn,
   signOut,
   signUp,
+  updateExpense,
   updateProfile,
 } from './supabaseApi'
 
@@ -69,21 +74,39 @@ function mockProfileUpdate(result: { error: unknown } = { error: null }) {
 
 type Fixture = { data: unknown; error: unknown }
 
-/** from(테이블).select().eq()... 어느 순서로 이어 불러도 같은 결과를 돌려주는 가짜 조회 */
-function fakeTable(result: Fixture) {
-  const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'in', 'or', 'order', 'limit']) builder[method] = vi.fn(() => builder)
+type Builder = Record<string, ReturnType<typeof vi.fn>>
+
+/** from(테이블).select().eq()... 어느 순서로 이어 불러도 같은 결과를 돌려주는 가짜 조회·쓰기 */
+function fakeTable(result: Fixture): Builder {
+  const builder: Builder = {}
+  for (const method of ['select', 'insert', 'update', 'upsert', 'delete', 'eq', 'in', 'or', 'not', 'order', 'limit']) {
+    builder[method] = vi.fn(() => builder)
+  }
   builder.single = vi.fn(async () => result)
   builder.maybeSingle = vi.fn(async () => result)
   // await로 기다릴 수 있게(PostgREST 조회처럼)
-  builder.then = (resolve: (v: Fixture) => unknown, reject: (e: unknown) => unknown) =>
-    Promise.resolve(result).then(resolve, reject)
+  builder.then = vi.fn((resolve: (v: Fixture) => unknown, reject: (e: unknown) => unknown) =>
+    Promise.resolve(result).then(resolve, reject),
+  )
   return builder
 }
 
-/** 테이블 이름별로 돌려줄 결과를 정한다. 안 정한 테이블은 빈 목록. */
-function mockTables(fixtures: Record<string, Fixture>) {
-  mocks.from.mockImplementation((table: string) => fakeTable(fixtures[table] ?? { data: [], error: null }))
+/**
+ * 테이블 이름별로 돌려줄 결과를 정한다. 안 정한 테이블은 빈 목록.
+ * 같은 테이블을 여러 번 부르면 배열로 준 결과를 순서대로 쓴다(마지막 것은 계속 반복).
+ * 돌려주는 값으로 "어느 테이블에 어떤 호출이 갔는지" 확인할 수 있다: made.expenses[0].insert.mock.calls
+ */
+function mockTables(fixtures: Record<string, Fixture | Fixture[]>): Record<string, Builder[]> {
+  const made: Record<string, Builder[]> = {}
+  mocks.from.mockImplementation((table: string) => {
+    const spec = fixtures[table] ?? { data: [], error: null }
+    const list = made[table] ?? (made[table] = [])
+    const result = Array.isArray(spec) ? spec[Math.min(list.length, spec.length - 1)] : spec
+    const builder = fakeTable(result)
+    list.push(builder)
+    return builder
+  })
+  return made
 }
 
 const ok = (data: unknown): Fixture => ({ data, error: null })
@@ -545,5 +568,224 @@ describe('markGroupCreateCoachSeen / signOut', () => {
     await signOut()
     expect(mocks.auth.signOut).toHaveBeenCalled()
     expect(localStorage.getItem('nonanae:guest-member')).toBeNull()
+  })
+})
+
+describe('지출 (08~11)', () => {
+  const groupId = 'g-1'
+  const input = {
+    groupId,
+    paidBy: 'm-a',
+    title: ' 점심 ',
+    amount: 30000,
+    category: '식비' as const,
+    receiptImageUrl: null,
+    splitType: 'equal' as const,
+    spentAt: '2026-09-21',
+    participants: [
+      { memberId: 'm-a', shareAmount: null },
+      { memberId: 'm-b', shareAmount: null },
+    ],
+  }
+  const members = ok([{ id: 'm-a' }, { id: 'm-b' }, { id: 'm-c' }])
+  const expenseRow = {
+    id: 'e-1',
+    group_id: groupId,
+    paid_by: 'm-a',
+    title: '점심',
+    amount: 30000,
+    category: '식비',
+    receipt_image_url: null,
+    split_type: 'equal',
+    spent_at: '2026-09-21',
+    created_at: '2026-09-21T03:00:00Z',
+  }
+
+  describe('createExpense', () => {
+    it('지출과 참여자를 저장하고, 결제자 이름으로 알림을 남긴다', async () => {
+      const made = mockTables({
+        members: [members, ok({ name: null, profiles: { name: '민선' } })],
+        expenses: ok(expenseRow),
+        groups: ok({ name: '제주도 여행' }),
+      })
+
+      const expense = await createExpense(input)
+
+      expect(made.expenses[0].insert.mock.calls[0][0]).toEqual({
+        group_id: groupId,
+        paid_by: 'm-a',
+        title: '점심',
+        amount: 30000,
+        category: '식비',
+        receipt_image_url: null,
+        split_type: 'equal',
+        spent_at: '2026-09-21',
+      })
+      expect(made.expense_participants[0].insert.mock.calls[0][0]).toEqual([
+        { expense_id: 'e-1', member_id: 'm-a', group_id: groupId, share_amount: null },
+        { expense_id: 'e-1', member_id: 'm-b', group_id: groupId, share_amount: null },
+      ])
+      expect(made.notifications[0].insert.mock.calls[0][0]).toEqual({
+        group_id: groupId,
+        member_id: 'm-a',
+        type: 'expense',
+        title: '[제주도 여행]에 민선님이 결제한 내역이 추가됐어요',
+      })
+      expect(expense).toMatchObject({ id: 'e-1', groupId, paidBy: 'm-a', amount: 30000, category: '식비' })
+      expect(expense.participants).toHaveLength(2)
+    })
+
+    it('결제자가 이름만 있는 멤버(게스트·대기 중)면 그 이름을 알림에 쓴다', async () => {
+      const made = mockTables({
+        members: [members, ok({ name: '김민지', profiles: null })],
+        expenses: ok(expenseRow),
+        groups: ok({ name: '제주도 여행' }),
+      })
+      await createExpense(input)
+      expect(made.notifications[0].insert.mock.calls[0][0].title).toBe('[제주도 여행]에 김민지님이 결제한 내역이 추가됐어요')
+    })
+
+    it('참여자를 저장하지 못하면 지출도 되돌리고 에러를 던진다', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const made = mockTables({
+        members,
+        expenses: [ok(expenseRow), ok(null)],
+        expense_participants: { data: null, error: { code: '23503', message: 'fk' } },
+      })
+
+      await expect(createExpense(input)).rejects.toThrow('그룹 멤버가 아닌 사람이 포함돼 있어요')
+
+      expect(made.expenses[1].delete).toHaveBeenCalled()
+      expect(made.expenses[1].eq).toHaveBeenCalledWith('id', 'e-1')
+      expect(made.notifications).toBeUndefined() // 알림도 만들지 않는다
+    })
+
+    it('알림을 못 만들어도 지출 등록은 성공한다', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockTables({
+        members: [members, { data: null, error: { message: 'boom' } }],
+        expenses: ok(expenseRow),
+        groups: ok({ name: '제주도 여행' }),
+      })
+      await expect(createExpense(input)).resolves.toMatchObject({ id: 'e-1' })
+      expect(spy).toHaveBeenCalled()
+    })
+
+    it('잘못된 입력은 서버에 쓰기 전에 막는다', async () => {
+      await expect(createExpense({ ...input, amount: 0 })).rejects.toThrow('금액은 0보다 큰 정수여야 해요')
+      await expect(createExpense({ ...input, amount: 1000.5 })).rejects.toThrow('금액은 0보다 큰 정수여야 해요')
+      await expect(createExpense({ ...input, title: '  ' })).rejects.toThrow('항목명을 입력해주세요')
+      await expect(createExpense({ ...input, participants: [] })).rejects.toThrow('참여자는 최소 1명이어야 해요')
+      await expect(
+        createExpense({ ...input, participants: [input.participants[0], input.participants[0]] }),
+      ).rejects.toThrow('같은 참여자가 두 번 들어갈 수 없어요')
+      expect(mocks.from).not.toHaveBeenCalled()
+    })
+
+    it('그룹 멤버가 아닌 사람이 결제자·참여자에 있으면 막는다', async () => {
+      const made = mockTables({ members })
+      await expect(createExpense({ ...input, paidBy: 'm-outsider' })).rejects.toThrow('그룹 멤버가 아닌 사람이 포함돼 있어요')
+      await expect(
+        createExpense({ ...input, participants: [{ memberId: 'm-outsider', shareAmount: null }] }),
+      ).rejects.toThrow('그룹 멤버가 아닌 사람이 포함돼 있어요')
+      expect(made.expenses).toBeUndefined() // 지출은 만들지도 않았다
+    })
+
+    it('내 그룹이 아니면(멤버가 하나도 안 보이면) 없는 그룹으로 본다', async () => {
+      mockTables({ members: ok([]) })
+      await expect(createExpense(input)).rejects.toThrow('존재하지 않는 그룹이에요')
+    })
+  })
+
+  describe('updateExpense', () => {
+    it('지출 본문을 고치고, 참여자는 upsert 후 빠진 사람만 지운다 (그룹은 바꾸지 않는다)', async () => {
+      const made = mockTables({
+        expenses: [ok({ id: 'e-1', group_id: groupId }), ok(expenseRow)],
+        members,
+      })
+
+      const expense = await updateExpense('e-1', input)
+
+      const update = made.expenses[1].update.mock.calls[0][0]
+      expect(update).toMatchObject({ title: '점심', amount: 30000, paid_by: 'm-a' })
+      expect(update).not.toHaveProperty('group_id')
+      expect(made.expense_participants[0].upsert.mock.calls[0]).toEqual([
+        [
+          { expense_id: 'e-1', member_id: 'm-a', group_id: groupId, share_amount: null },
+          { expense_id: 'e-1', member_id: 'm-b', group_id: groupId, share_amount: null },
+        ],
+        { onConflict: 'expense_id,member_id' },
+      ])
+      expect(made.expense_participants[1].delete).toHaveBeenCalled()
+      expect(made.expense_participants[1].eq).toHaveBeenCalledWith('expense_id', 'e-1')
+      expect(made.expense_participants[1].not).toHaveBeenCalledWith('member_id', 'in', '(m-a,m-b)')
+      expect(made.notifications).toBeUndefined() // 수정은 알림을 만들지 않는다
+      expect(expense.participants).toHaveLength(2)
+    })
+
+    it('없는 지출이면 던진다', async () => {
+      mockTables({ expenses: ok(null) })
+      await expect(updateExpense('e-missing', input)).rejects.toThrow('존재하지 않는 지출이에요')
+    })
+
+    it('다른 그룹으로 옮기려 하면 막는다', async () => {
+      mockTables({ expenses: ok({ id: 'e-1', group_id: 'g-other' }) })
+      await expect(updateExpense('e-1', input)).rejects.toThrow('지출의 그룹은 바꿀 수 없어요')
+    })
+
+    it('참여자에 문제가 있으면 아무것도 고치기 전에 막는다', async () => {
+      const made = mockTables({ expenses: ok({ id: 'e-1', group_id: groupId }), members })
+      await expect(
+        updateExpense('e-1', { ...input, participants: [{ memberId: 'm-outsider', shareAmount: null }] }),
+      ).rejects.toThrow('그룹 멤버가 아닌 사람이 포함돼 있어요')
+      expect(made.expenses).toHaveLength(1) // 존재 확인 조회뿐, update는 없었다
+      expect(made.expense_participants).toBeUndefined()
+    })
+  })
+
+  describe('deleteExpense', () => {
+    it('지출을 지운다', async () => {
+      const made = mockTables({ expenses: ok([{ id: 'e-1' }]) })
+      await deleteExpense('e-1')
+      expect(made.expenses[0].delete).toHaveBeenCalled()
+      expect(made.expenses[0].eq).toHaveBeenCalledWith('id', 'e-1')
+    })
+
+    it('지워진 행이 없으면(없거나 내 그룹이 아니면) 없는 지출로 본다', async () => {
+      mockTables({ expenses: ok([]) })
+      await expect(deleteExpense('e-x')).rejects.toThrow('존재하지 않는 지출이에요')
+    })
+  })
+})
+
+describe('멤버 추가·알림 읽음', () => {
+  it('앱 미가입 친구를 이름만으로 추가한다', async () => {
+    const made = mockTables({
+      members: ok({ id: 'm-new', group_id: 'g-1', user_id: null, guest_uid: null, role: 'member', name: '박서연', joined_at: '2026-09-21T04:00:00Z' }),
+    })
+
+    const member = await addPendingMember('g-1', ' 박서연 ')
+
+    expect(made.members[0].insert.mock.calls[0][0]).toEqual({ group_id: 'g-1', name: '박서연' })
+    expect(member).toEqual({ id: 'm-new', userId: null, groupId: 'g-1', role: 'member', name: '박서연', joinedAt: '2026-09-21T04:00:00Z' })
+  })
+
+  it('이름이 비어 있으면 서버를 부르지 않는다', async () => {
+    await expect(addPendingMember('g-1', '  ')).rejects.toThrow('이름을 입력해주세요')
+    expect(mocks.from).not.toHaveBeenCalled()
+  })
+
+  it('없는 그룹이면 그렇게 알려주고, 내 그룹이 아니면 권한이 없다고 알려준다', async () => {
+    mockTables({ members: { data: null, error: { code: '23503', message: 'fk' } } })
+    await expect(addPendingMember('g-x', '이름')).rejects.toThrow('존재하지 않는 그룹이에요')
+    mockTables({ members: { data: null, error: { code: '42501', message: 'rls' } } })
+    await expect(addPendingMember('g-x', '이름')).rejects.toThrow('이 작업을 할 권한이 없어요')
+  })
+
+  it('알림을 읽음으로 표시한다', async () => {
+    const made = mockTables({ notifications: { data: null, error: null } })
+    await markNotificationRead('n-1')
+    expect(made.notifications[0].update).toHaveBeenCalledWith({ read: true })
+    expect(made.notifications[0].eq).toHaveBeenCalledWith('id', 'n-1')
   })
 })
