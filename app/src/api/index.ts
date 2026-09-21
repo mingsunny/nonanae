@@ -20,7 +20,7 @@ import { createSeed } from './mockSeed'
 import * as remote from './supabaseApi'
 
 /**
- * Supabase 연결 진행 상황: 지금은 1단계(로그인·가입·프로필)만 supabaseApi.ts로 넘어간다.
+ * Supabase 연결 진행 상황: 지금은 1단계(로그인·가입·프로필)와 2단계(그룹 생성·초대코드 참여)가 supabaseApi.ts로 넘어간다.
  * VITE_USE_SUPABASE=true인데 아직 연결되지 않은 기능을 부르면, 목업 DB를 몰래 읽고 쓰지 않도록 여기서 멈춘다.
  */
 function notYet(name: string): never {
@@ -352,7 +352,7 @@ export async function markGroupCreateCoachSeen(): Promise<void> {
 
 /** 그룹 생성. 만든 사람은 owner 멤버로 자동 등록되고, 그룹은 빈 상태로 시작한다(05). 정식 회원만 가능. */
 export async function createGroup(name: string): Promise<Group> {
-  if (USE_SUPABASE) notYet('createGroup')
+  if (USE_SUPABASE) return remote.createGroup(name)
   const d = getDb()
   const user = requireSessionUser(d)
   const trimmed = name.trim()
@@ -402,7 +402,7 @@ function claimMember(d: MockDb, group: Group, member: Member, userId: string): v
 
 /** 06: 코드 확인. 존재 여부·재입장·개인 초대 링크 여부에 따라 바로 들어가거나 07로 넘긴다. */
 export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
-  if (USE_SUPABASE) notYet('resolveInviteCode')
+  if (USE_SUPABASE) return remote.resolveInviteCode(raw)
   const d = getDb()
   const { code, targetMemberId } = parseInviteCode(raw)
   const group = d.groups.find((g) => g.inviteCode === code)
@@ -439,7 +439,7 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
 
 /** 07: 목록에서 "이게 나예요". 로그인 상태면 그 자리를 내 계정에 연결(+알림), 아니면 그 자리로 세션만 지정(데이터·알림 변화 없음). */
 export async function joinAsExistingMember(groupId: string, memberId: string): Promise<void> {
-  if (USE_SUPABASE) notYet('joinAsExistingMember')
+  if (USE_SUPABASE) return remote.joinAsExistingMember(groupId, memberId)
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   const member = d.members.find((m) => m.id === memberId && m.groupId === groupId)
@@ -453,7 +453,7 @@ export async function joinAsExistingMember(groupId: string, memberId: string): P
 
 /** 07(로그인 안 함): 목록에 없으면 이름만으로 새로 참여. 계정 없는 멤버(게스트)가 만들어진다. */
 export async function joinAsNewGuest(groupId: string, name: string): Promise<Member> {
-  if (USE_SUPABASE) notYet('joinAsNewGuest')
+  if (USE_SUPABASE) return remote.joinAsNewGuest(groupId, name)
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   if (!group) throw new Error('존재하지 않는 그룹이에요')
@@ -478,7 +478,7 @@ export async function joinAsNewGuest(groupId: string, name: string): Promise<Mem
 
 /** 07(로그인 함): 목록에 없으면 내 계정으로 새 멤버 추가 (이름은 계정 이름 그대로). */
 export async function joinAsNewAccountMember(groupId: string): Promise<Member> {
-  if (USE_SUPABASE) notYet('joinAsNewAccountMember')
+  if (USE_SUPABASE) return remote.joinAsNewAccountMember(groupId)
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   if (!group) throw new Error('존재하지 않는 그룹이에요')
