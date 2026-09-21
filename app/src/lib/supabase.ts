@@ -20,3 +20,16 @@ export function getSupabase(): SupabaseClient {
   client = createClient(url, key)
   return client
 }
+
+/**
+ * 주소의 해시(#...)가 비밀번호 재설정 메일 링크를 타고 돌아온 것인지 본다.
+ * 성공하면 `#access_token=...&type=recovery`, 만료·이미 사용한 링크면 `#error=...&error_code=otp_expired` 가 붙는다.
+ */
+export function isRecoveryHash(hash: string): boolean {
+  return /[#&](type=recovery|error_code=)/.test(hash)
+}
+
+// Supabase는 링크의 토큰을 세션으로 바꾸면서 주소의 해시를 지운다. 그 전에(앱이 뜨자마자) 한 번 읽어 둔다.
+const initialHash = typeof window === 'undefined' ? '' : window.location.hash
+/** 이 페이지가 비밀번호 재설정 메일 링크로 열렸는지 (링크가 만료된 경우도 포함 — 그때는 세션이 없어 "만료" 안내가 뜬다) */
+export const openedFromRecoveryLink = isRecoveryHash(initialHash)

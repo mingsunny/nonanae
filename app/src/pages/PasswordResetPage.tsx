@@ -1,21 +1,27 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { isPasswordResetTokenValid, requestPasswordReset, resetPassword } from '../api'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { RECOVERY_LINK_TOKEN, hasPasswordResetLink, isPasswordResetTokenValid, requestPasswordReset, resetPassword } from '../api'
 import Button from '../components/common/Button'
 import Callout from '../components/common/Callout'
 import fields from '../components/common/Field.module.css'
 import Topbar from '../components/common/Topbar'
 import { paths } from '../routes/paths'
+import { useAppStore } from '../store/appStore'
 import styles from './PasswordResetPage.module.css'
 
 /**
- * 14. 비밀번호 재설정 — 이메일로 재설정 링크를 받고(1단계), 링크(`?token=`)로 들어와 새 비밀번호를 정한다(2단계).
+ * 14. 비밀번호 재설정 — 이메일로 재설정 링크를 받고(1단계), 링크로 들어와 새 비밀번호를 정한다(2단계).
+ * 목업은 링크에 `?token=`이 붙고, Supabase는 주소의 `#...`로 돌아오므로 그때는 자리 채움 토큰으로 2단계를 연다.
  * 프로토타입 UI가 없어 스펙의 표준 흐름 초안을 따랐다.
  */
 export default function PasswordResetPage() {
   const [params] = useSearchParams()
-  const token = params.get('token')
+  const location = useLocation()
+  // 링크로 열린 "첫 화면"일 때만 새 비밀번호 단계를 연다. 화면 안에서 다시 들어오면(예: 만료 안내의 "다시 받기") 일반 요청 화면이어야 한다.
+  // 최초 진입 주소의 key는 'default'이고, 이후 화면 이동마다 새 key가 붙는다.
+  const arrivedByLink = location.key === 'default' && hasPasswordResetLink()
+  const token = params.get('token') ?? (arrivedByLink ? RECOVERY_LINK_TOKEN : null)
   return token ? <NewPasswordStep token={token} /> : <RequestStep />
 }
 
@@ -107,6 +113,8 @@ function NewPasswordStep({ token }: { token: string }) {
     setBusy(true)
     try {
       await resetPassword(token, password)
+      // 재설정 링크로 열린 화면은 임시 로그인 상태였을 수 있어서, 정리된 로그인 상태를 다시 읽는다
+      await useAppStore.getState().refresh()
       navigate(paths.login, { replace: true, state: passwordChangedState })
     } catch (err) {
       setError(err instanceof Error ? err.message : '비밀번호를 바꾸지 못했어요')

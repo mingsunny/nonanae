@@ -18,7 +18,8 @@ import type {
   SplitType,
   User,
 } from '../domain/types'
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
+import { paths } from '../routes/paths'
 import type { JoinResolution, ProfileInput, SignUpInput, Snapshot } from './index'
 
 /** public.profiles 한 행 (DB는 snake_case) */
@@ -63,6 +64,8 @@ export function authErrorMessage(error: AuthError): string {
       return '이미 가입된 이메일이에요. 로그인해주세요.'
     case 'weak_password':
       return '비밀번호가 너무 짧거나 쉬워요. 더 길게 만들어주세요.'
+    case 'same_password':
+      return '이전과 다른 비밀번호를 입력해주세요.'
     case 'email_address_invalid':
     case 'validation_failed':
       return '이메일 형식이 올바르지 않아요'
@@ -377,6 +380,7 @@ function rpcErrorMessage(error: PostgrestError): string {
   if (message.includes('member not available')) return '이미 가입된 멤버예요'
   if (message.includes('name required for guests')) return '이름을 입력해주세요'
   if (message.includes('not authenticated')) return '로그인이 필요해요'
+  if (message.includes('guests cannot delete accounts')) return '로그인한 회원만 탈퇴할 수 있어요'
   console.error('[supabase rpc]', error)
   return '요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.'
 }
@@ -694,4 +698,55 @@ export async function addPendingMember(groupId: string, name: string): Promise<M
 export async function markNotificationRead(notificationId: string): Promise<void> {
   const { error } = await getSupabase().from('notifications').update({ read: true }).eq('id', notificationId)
   if (error) throw new Error(dbErrorMessage(error))
+}
+
+// --- 04 회원 탈퇴 · 14 비밀번호 재설정 ---
+
+/**
+ * 회원 탈퇴. 계정 삭제는 DB 함수(delete_my_account)가 한다 — 이름은 멤버 자리에 남고 지출 기록은 유지된다(schema.md "삭제 시 동작").
+ * 서버에서 계정이 사라졌으므로 로그아웃 요청 없이 이 기기의 로그인 정보만 지운다.
+ */
+export async function deleteAccount(): Promise<void> {
+  await requireAuthUserId()
+  const supabase = getSupabase()
+  const { error } = await supabase.rpc('delete_my_account')
+  if (error) throw new Error(rpcErrorMessage(error))
+  writeGuestHint(null)
+  await supabase.auth.signOut({ scope: 'local' })
+}
+
+const RESET_LINK_EXPIRED = '링크가 만료되었거나 이미 사용됐어요. 재설정 링크를 다시 받아주세요.'
+
+/**
+ * 재설정 링크 메일 요청. 가입된 이메일이든 아니든 똑같이 끝난다(14 예외처리: 계정 존재 여부 노출 방지) —
+ * 그래서 서버 에러도 삼키고 콘솔에만 남긴다. 요청이 너무 잦다는 안내만 보여준다(계정 존재 여부와 무관).
+ * 메일 속 링크는 이 앱의 `/password-reset`으로 돌아온다(Supabase 대시보드 URL Configuration에 등록되어 있어야 함).
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}${paths.passwordReset}`,
+  })
+  if (!error) return
+  if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
+    throw new Error(authErrorMessage(error))
+  }
+  console.error('[supabase] 비밀번호 재설정 메일 요청 실패', error)
+}
+
+/** 재설정 링크로 들어왔고, 그 링크가 로그인 가능한 세션으로 바뀌었는지(=만료·사용 전인지). token 값은 쓰지 않는다. */
+export async function isPasswordResetTokenValid(): Promise<boolean> {
+  if (!openedFromRecoveryLink) return false
+  const { data } = await getSupabase().auth.getSession()
+  const user = data.session?.user
+  return !!user && !user.is_anonymous
+}
+
+/** 새 비밀번호 저장. 끝나면 재설정용 세션을 정리해서, 새 비밀번호로 다시 로그인하게 한다. */
+export async function resetPassword(newPassword: string): Promise<void> {
+  if (!newPassword) throw new Error('새 비밀번호를 입력해주세요')
+  if (!(await isPasswordResetTokenValid())) throw new Error(RESET_LINK_EXPIRED)
+  const supabase = getSupabase()
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw new Error(authErrorMessage(error))
+  await supabase.auth.signOut()
 }

@@ -141,8 +141,9 @@ erDiagram
 > 이 섹션은 실제 DB가 위 스펙을 어떻게 구현하는지의 **요약**이다. 컬럼·제약·정책의 원본은 SQL 파일이며, 둘이 다르면 SQL이 기준이다.
 > - [`supabase/migrations/20260920000000_init_schema.sql`](../../supabase/migrations/20260920000000_init_schema.sql) — 테이블, RLS, 가입/탈퇴 트리거, 그룹 생성·참여 RPC
 > - [`supabase/migrations/20260920000100_guest_support.sql`](../../supabase/migrations/20260920000100_guest_support.sql) — 게스트(익명 로그인) 지원. **위 파일을 먼저 실행한 뒤** 실행
+> - [`supabase/migrations/20260921000000_delete_account.sql`](../../supabase/migrations/20260921000000_delete_account.sql) — 회원 탈퇴용 함수 `delete_my_account()`. 위 두 파일 다음에 실행
 >
-> 적용 상태(2026-09-21): 두 마이그레이션 모두 Supabase 프로젝트(`nonanae`)에 적용됨. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
+> 적용 상태(2026-09-21): 세 마이그레이션 모두 Supabase 프로젝트(`nonanae`)에 적용됨. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
 
 ### 스펙 → 테이블 대응
 
@@ -271,6 +272,7 @@ erDiagram
 | `create_group(p_name)` | [05](05-create-group.md) 그룹 + 그룹장 멤버를 한 번에 생성, group id 반환. **정식 회원만**(게스트 거부) |
 | `lookup_group_by_code(p_code)` | [06](06-join-group.md) 초대코드 확인 + [07](07-join-match.md) "나 고르기" 목록용 `{id, name, members[{id, name, claimed}]}` 반환. 잘못된 코드면 null |
 | `join_group(p_code, p_member_id, p_name)` | [06](06-join-group.md)/[07](07-join-match.md) 초대코드 참여. 정식 회원·게스트 공용 — `p_member_id`가 있으면 그 자리를 내 것으로, 없으면 새 멤버로 추가(게스트는 `p_name` 필수). 이미 멤버면 기존 멤버 id 반환. 새 멤버가 생기거나 정식 회원이 자리를 채울 때만 참여 알림 생성 |
+| `delete_my_account()` | [04](04-profile.md) 회원 탈퇴. 로그인한 정식 회원 본인의 `auth.users` 행을 삭제(게스트는 거부) → `profiles` cascade 삭제 → `before_profile_delete` 트리거가 이름 보존 |
 | `is_group_member`, `is_group_owner`, `shares_group_with`, `is_anonymous_user` | RLS용 헬퍼 |
 
 ### 앱 연동 규칙
@@ -288,6 +290,7 @@ erDiagram
 - **같은 그룹 멤버끼리 서로의 은행·계좌번호를 조회할 수 있음** — "보낼 사람에게만 보이기"는 화면에서만 제한됨. 데이터 수준 제한이 필요하면 뷰/함수 추가 필요
 - **영수증 사진이 지출 행에 그대로 저장됨** — `receipt_image_url`에 사진 데이터(data URL, 최대 2MB)를 넣고 있어서, 그룹 데이터를 읽을 때마다 사진이 함께 내려옴. 사진이 늘면 Supabase Storage에 올리고 주소만 저장하도록 바꿔야 함
 - **지출 등록·수정이 여러 테이블에 나눠 쓰임** — 지출 → 참여자 → 알림 순으로 저장하고, 참여자 저장이 실패하면 지출도 되돌림. 네트워크가 중간에 끊기면 일부만 저장될 수 있어, 엄격한 원자성이 필요해지면 DB 함수(RPC)로 옮겨야 함
+- **방장이 탈퇴하면 그룹을 관리할 사람이 없어짐** — 방장 멤버 행의 `user_id`가 null이 되어(이름은 남음) 그룹 수정·삭제 정책(`is_group_owner`)을 통과할 사람이 없음. 방장 위임/그룹 정리 정책이 필요해지면 스펙과 함께 정해야 함
 - **익명 계정 남용 방지** 미설정 — 실서비스 전 CAPTCHA/레이트리밋 필요
 - **게스트 사칭 가능** — 재입장 시 본인 확인이 없어 같은 그룹의 누군가가 이름을 골라 그 자리를 가져갈 수 있음 (스펙에서 수용한 트레이드오프)
 
@@ -301,3 +304,4 @@ erDiagram
 - 2026-09-20: User의 `bank`/`account`를 필수(NOT NULL)로 정정 — 게스트가 User에서 빠진 뒤에도 남아 있던 "게스트는 null" 서술 삭제. DB `expenses.category`를 영어 id가 아닌 한글 라벨로 저장하도록 맞춤(앱 `Category` 타입 기준) (민선)
 - 2026-09-20: **게스트 → 정식 회원 전환을 스펙에서 제외** — `upgrade_guest` 함수와 전환 순서 서술 삭제. 게스트는 일반 로그인/회원가입만 쓰고, 게스트 기록은 새 계정으로 이관하지 않음
 - 2026-09-20: Supabase DB 구현 정리 추가. 관계도(ER) 작성, 스펙→테이블 대응, 테이블 정의, RLS·RPC·삭제 동작, 앱 연동 규칙과 알려진 제한을 "DB 구현" 섹션에 기록. SQL 원본은 `supabase/migrations/` (민선)
+- 2026-09-21: 회원 탈퇴용 DB 함수 `delete_my_account()` 추가(`20260921000000_delete_account.sql`) — 본인 계정만 삭제, 게스트 거부. 삭제 시 이름은 멤버 자리에 남고 지출·알림 기록은 유지됨을 실제 DB에서 확인. 방장 탈퇴 시 그룹 관리자가 없어지는 한계를 "알려진 제한"에 기록 (민선)

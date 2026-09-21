@@ -10,14 +10,21 @@ const mocks = vi.hoisted(() => ({
     signOut: vi.fn(),
     signInAnonymously: vi.fn(),
     getSession: vi.fn(),
+    resetPasswordForEmail: vi.fn(),
+    updateUser: vi.fn(),
   },
   from: vi.fn(),
   rpc: vi.fn(),
+  recovery: { opened: false },
 }))
 
 vi.mock('../lib/supabase', () => ({
   USE_SUPABASE: true,
   getSupabase: () => ({ auth: mocks.auth, from: mocks.from, rpc: mocks.rpc }),
+  // 재설정 메일 링크로 열린 페이지인지 (테스트마다 mocks.recovery.opened로 바꾼다)
+  get openedFromRecoveryLink() {
+    return mocks.recovery.opened
+  },
 }))
 
 import {
@@ -25,13 +32,17 @@ import {
   authErrorMessage,
   createExpense,
   createGroup,
+  deleteAccount,
   deleteExpense,
   fetchSnapshot,
   joinAsExistingMember,
   joinAsNewAccountMember,
   joinAsNewGuest,
   markGroupCreateCoachSeen,
+  isPasswordResetTokenValid,
   markNotificationRead,
+  requestPasswordReset,
+  resetPassword,
   resolveInviteCode,
   signIn,
   signOut,
@@ -128,6 +139,7 @@ beforeEach(() => {
 
 beforeEach(() => {
   localStorage.clear()
+  mocks.recovery.opened = false
 })
 
 describe('authErrorMessage', () => {
@@ -787,5 +799,119 @@ describe('멤버 추가·알림 읽음', () => {
     await markNotificationRead('n-1')
     expect(made.notifications[0].update).toHaveBeenCalledWith({ read: true })
     expect(made.notifications[0].eq).toHaveBeenCalledWith('id', 'n-1')
+  })
+})
+
+describe('회원 탈퇴 (04)', () => {
+  it('DB 함수로 계정을 지우고, 이 기기의 로그인 정보와 게스트 기억을 정리한다', async () => {
+    localStorage.setItem('nonanae:guest-member', 'm-a')
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mocks.rpc.mockResolvedValue({ data: null, error: null })
+    mocks.auth.signOut.mockResolvedValue({ error: null })
+
+    await deleteAccount()
+
+    expect(mocks.rpc).toHaveBeenCalledWith('delete_my_account')
+    // 서버에서 계정이 사라졌으니 로그아웃 요청 없이 이 기기 로그인 정보만 지운다
+    expect(mocks.auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(localStorage.getItem('nonanae:guest-member')).toBeNull()
+  })
+
+  it('로그인하지 않았거나 게스트면 서버를 부르지 않는다', async () => {
+    mocks.auth.getSession.mockResolvedValue(guestSession)
+    await expect(deleteAccount()).rejects.toThrow('로그인이 필요해요')
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  it('서버가 거부하면 로그인 정보를 지우지 않고 에러를 던진다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'guests cannot delete accounts' } })
+    await expect(deleteAccount()).rejects.toThrow('로그인한 회원만 탈퇴할 수 있어요')
+    expect(mocks.auth.signOut).not.toHaveBeenCalled()
+  })
+})
+
+describe('비밀번호 재설정 (14)', () => {
+  describe('requestPasswordReset', () => {
+    it('메일 링크가 돌아올 주소(이 앱의 /password-reset)를 넘긴다', async () => {
+      mocks.auth.resetPasswordForEmail.mockResolvedValue({ error: null })
+      await requestPasswordReset(' me@example.com ')
+      expect(mocks.auth.resetPasswordForEmail).toHaveBeenCalledWith('me@example.com', {
+        redirectTo: `${window.location.origin}/password-reset`,
+      })
+    })
+
+    it('서버 에러는 삼킨다 — 가입 여부에 따라 결과가 달라 보이면 계정 존재 여부가 노출된다', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mocks.auth.resetPasswordForEmail.mockResolvedValue({ error: authError('unexpected_failure') })
+      await expect(requestPasswordReset('me@example.com')).resolves.toBeUndefined()
+      expect(spy).toHaveBeenCalled()
+    })
+
+    it('요청이 너무 잦다는 안내만은 보여준다 (계정 존재 여부와 무관)', async () => {
+      mocks.auth.resetPasswordForEmail.mockResolvedValue({ error: authError('over_email_send_rate_limit') })
+      await expect(requestPasswordReset('me@example.com')).rejects.toThrow('요청이 너무 많아요')
+    })
+  })
+
+  describe('isPasswordResetTokenValid', () => {
+    it('재설정 링크로 열렸고 링크가 세션으로 바뀌었으면 유효하다', async () => {
+      mocks.recovery.opened = true
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      expect(await isPasswordResetTokenValid()).toBe(true)
+    })
+
+    it('링크로 열렸지만 세션이 없으면(만료·이미 사용) 유효하지 않다', async () => {
+      mocks.recovery.opened = true
+      mocks.auth.getSession.mockResolvedValue(noSession)
+      expect(await isPasswordResetTokenValid()).toBe(false)
+    })
+
+    it('링크로 열리지 않았다면, 이미 로그인한 사람이라도 유효하지 않다', async () => {
+      mocks.recovery.opened = false
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      expect(await isPasswordResetTokenValid()).toBe(false)
+      expect(mocks.auth.getSession).not.toHaveBeenCalled()
+    })
+
+    it('게스트(익명) 세션은 유효하지 않다', async () => {
+      mocks.recovery.opened = true
+      mocks.auth.getSession.mockResolvedValue(guestSession)
+      expect(await isPasswordResetTokenValid()).toBe(false)
+    })
+  })
+
+  describe('resetPassword', () => {
+    it('새 비밀번호를 저장하고, 재설정용 세션을 정리한다', async () => {
+      mocks.recovery.opened = true
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      mocks.auth.updateUser.mockResolvedValue({ error: null })
+      mocks.auth.signOut.mockResolvedValue({ error: null })
+
+      await resetPassword('new-password-1')
+
+      expect(mocks.auth.updateUser).toHaveBeenCalledWith({ password: 'new-password-1' })
+      expect(mocks.auth.signOut).toHaveBeenCalled()
+    })
+
+    it('링크가 만료됐으면 비밀번호를 바꾸지 않는다', async () => {
+      mocks.recovery.opened = true
+      mocks.auth.getSession.mockResolvedValue(noSession)
+      await expect(resetPassword('new-password-1')).rejects.toThrow('링크가 만료되었거나 이미 사용됐어요')
+      expect(mocks.auth.updateUser).not.toHaveBeenCalled()
+    })
+
+    it('비어 있으면 서버를 부르지 않는다', async () => {
+      await expect(resetPassword('')).rejects.toThrow('새 비밀번호를 입력해주세요')
+      expect(mocks.auth.getSession).not.toHaveBeenCalled()
+    })
+
+    it('이전과 같은 비밀번호면 한국어로 안내하고 로그아웃하지 않는다', async () => {
+      mocks.recovery.opened = true
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      mocks.auth.updateUser.mockResolvedValue({ error: authError('same_password') })
+      await expect(resetPassword('same')).rejects.toThrow('이전과 다른 비밀번호를 입력해주세요.')
+      expect(mocks.auth.signOut).not.toHaveBeenCalled()
+    })
   })
 })
