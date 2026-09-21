@@ -10,6 +10,15 @@ export interface MockSession {
   viewAsMemberId: string | null
 }
 
+/** 비밀번호 재설정 요청 1건 (14). 토큰은 1회용이고 expiresAt 이후엔 못 쓴다. */
+export interface PasswordReset {
+  token: string
+  userId: string
+  /** ISO 8601 */
+  expiresAt: string
+  used: boolean
+}
+
 export interface MockDb {
   session: MockSession
   users: User[]
@@ -18,6 +27,9 @@ export interface MockDb {
   expenses: Expense[]
   expenseParticipants: ExpenseParticipant[]
   notifications: Notification[]
+  /** userId → 비밀번호. 목업 전용 — 실제로는 Supabase Auth가 해시로 관리하고 프론트는 다루지 않는다. */
+  credentials: Record<string, string>
+  passwordResets: PasswordReset[]
 }
 
 const STORAGE_KEY = 'nonanae:mock-db:v1'
@@ -36,7 +48,10 @@ function isMockDb(value: unknown): value is MockDb {
     Array.isArray(v.members) &&
     Array.isArray(v.expenses) &&
     Array.isArray(v.expenseParticipants) &&
-    Array.isArray(v.notifications)
+    Array.isArray(v.notifications) &&
+    typeof v.credentials === 'object' &&
+    v.credentials !== null &&
+    Array.isArray(v.passwordResets)
   )
 }
 
@@ -50,7 +65,8 @@ export function loadDb(): MockDb {
   } catch {
     // localStorage 접근 불가/파싱 실패 → 시드로 시작
   }
-  return createSeed()
+  // 앱을 처음 열면 로그인 전 상태 — 인트로(01)부터 보인다
+  return createSeed(Date.now(), { signedIn: false })
 }
 
 export function saveDb(db: MockDb): void {

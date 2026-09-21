@@ -1,0 +1,33 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.save {
+  margin-top: 22px;
+}
+
+/* 로그아웃/탈퇴는 눈에 띄면 안 되는 저강조 텍스트 링크 */
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 34px;
+}

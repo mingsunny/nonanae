@@ -6,8 +6,7 @@
 --     PIN 같은 재입장 인증도 없음
 --   * 재입장(기기 변경/브라우저 데이터 삭제): 새 익명 세션으로 06/07 화면에서 같은 이름을 다시 고르면 guest_uid가 새 세션으로 넘어옴
 --     (스푸핑 방지 장치 없음 — 스펙에서 수용한 트레이드오프)
---   * 게스트 -> 정식 회원 전환: supabase.auth.updateUser({ email, password })로 익명 계정을 그대로 승격한 뒤
---     upgrade_guest()를 호출하면, 같은 멤버 행(id 유지)에 user_id가 채워져서 지출 기록이 그대로 이어짐
+--   * 게스트 -> 정식 회원 전환(기록 이관)은 지원하지 않음: 게스트는 일반 로그인/회원가입만 쓰고, 게스트 기록은 옮기지 않음
 --
 -- 사전 설정: Supabase 대시보드 > Authentication > Sign In / Providers > "Allow anonymous sign-ins" 켜기
 --            (익명 계정은 무제한 생성될 수 있으니 실서비스 전에 CAPTCHA/레이트리밋 설정 권장)
@@ -181,38 +180,12 @@ begin
 end
 $$;
 
--- 01 게스트 -> 정식 회원 전환. 순서:
---   1) supabase.auth.updateUser({ email, password })  — 익명 계정을 같은 uid 그대로 정식 계정으로 승격
---   2) supabase.auth.refreshSession()                — JWT의 is_anonymous 값을 갱신
---   3) upgrade_guest(name, bank, account)            — 프로필을 만들고, 이 세션이 게스트로 참여했던 모든 그룹의 멤버 행을 내 계정에 연결
--- 멤버 id가 그대로라 기존 지출/정산 기록이 자동으로 이어짐. 완전히 새 계정으로 가입해버리면(uid가 달라짐) 이관할 수 없음
-create or replace function public.upgrade_guest(p_name text, p_bank text, p_account text) returns int
-language plpgsql security definer set search_path = ''
-as $$
-declare
-  moved int;
-begin
-  if auth.uid() is null then raise exception 'not authenticated'; end if;
-  if public.is_anonymous_user() then raise exception 'sign up with email first'; end if;
-  if exists (select 1 from public.profiles where id = auth.uid()) then raise exception 'profile already exists'; end if;
-
-  insert into public.profiles (id, name, bank, account) values (auth.uid(), p_name, p_bank, p_account);
-
-  update public.members set user_id = auth.uid(), guest_uid = null, name = null
-   where guest_uid = auth.uid();
-  get diagnostics moved = row_count;
-  return moved;
-end
-$$;
-
 -- ============================================================
 -- 5. 실행 권한
 -- ============================================================
 
 revoke all on function public.is_anonymous_user() from public, anon;
 revoke all on function public.join_group(text, uuid, text) from public, anon;
-revoke all on function public.upgrade_guest(text, text, text) from public, anon;
 
 grant execute on function public.is_anonymous_user() to authenticated;
 grant execute on function public.join_group(text, uuid, text) to authenticated;
-grant execute on function public.upgrade_guest(text, text, text) to authenticated;

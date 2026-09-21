@@ -6,6 +6,7 @@ import type { GroupDetail } from '../domain/types'
 import { copyText } from '../lib/clipboard'
 import { won } from '../lib/format'
 import { paths } from '../routes/paths'
+import { useAppStore } from '../store/appStore'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
 import { showToast } from '../store/toastStore'
 import styles from './GroupLayout.module.css'
@@ -23,12 +24,20 @@ export default function GroupLayout() {
 function GroupShell({ group }: { group: GroupDetail }) {
   const navigate = useNavigate()
   const { nameOf, isPending } = useGroupView(group)
+  const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
+  const signOut = useAppStore((s) => s.signOut)
 
   const tabs = [
     { to: paths.groupExpenses(group.id), label: '지출', icon: <ReceiptIcon /> },
     { to: paths.groupSettle(group.id), label: '정산', icon: <TransferIcon /> },
     { to: paths.groupSummary(group.id), label: '요약', icon: <BarsIcon /> },
   ]
+
+  /** 로그인 없이 참여한 게스트에겐 그룹 목록이 없다 — 이 그룹 세션을 끝내고 인트로로 나간다 (sep19 goGlobalHome) */
+  function leaveAsGuest() {
+    navigate(paths.welcome)
+    void signOut()
+  }
 
   async function copyInviteCode() {
     const ok = await copyText(group.inviteCode)
@@ -39,10 +48,16 @@ function GroupShell({ group }: { group: GroupDetail }) {
     <div className={styles.layout}>
       <header className={styles.header}>
         <div className={styles.topbar}>
-          {/* 그룹 내 어느 탭에서든 back은 항상 그룹 목록으로 (08 §4) */}
-          <Link to={paths.groups} className={styles.back} aria-label="그룹 목록으로">
-            <BackIcon size={14} />
-          </Link>
+          {/* 그룹 내 어느 탭에서든 back은 항상 그룹 목록으로 (08 §4). 게스트는 목록이 없어 인트로로 나감 */}
+          {isLoggedIn ? (
+            <Link to={paths.groups} className={styles.back} aria-label="그룹 목록으로">
+              <BackIcon size={14} />
+            </Link>
+          ) : (
+            <button type="button" className={styles.back} aria-label="나가기" onClick={leaveAsGuest}>
+              <BackIcon size={14} />
+            </button>
+          )}
           <h1 className={styles.groupName}>{group.name}</h1>
         </div>
 

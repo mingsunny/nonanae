@@ -37,6 +37,32 @@
   background-position: right 14px center;
 }
 
+/* 입력 아래 안내 문구: 에러는 brick, 통과는 brand */
+.error,
+.ok {
+  margin: var(--space-sm) 0 0;
+  font-size: 12.5px;
+}
+
+.error {
+  color: var(--brick);
+}
+
+.ok {
+  color: var(--brand-deep);
+}
+
+/* 입력 아래 작은 텍스트 링크 (예: 비밀번호를 잊으셨나요?) */
+.textLink {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-caption);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* 숫자 입력의 증감 화살표 제거 */
 .input[type='number'] {
   appearance: textfield;

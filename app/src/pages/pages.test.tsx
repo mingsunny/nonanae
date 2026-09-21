@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetMockData } from '../api'
-import { todayIso } from '../lib/format'
+import { seedDate } from '../api/mockSeed'
+import { dateLabel, todayIso } from '../lib/format'
 import ToastHost from '../components/common/Toast'
 import NotificationBell from '../components/notifications/NotificationBell'
 import GroupLayout from '../layouts/GroupLayout'
@@ -98,13 +99,48 @@ describe('그룹 헤더 (08/09/10 공용)', () => {
 })
 
 describe('08 지출 내역', () => {
+  it('같은 날짜 안에서는 최근에 등록한 지출이 위에 나온다 (수정해도 자리는 그대로)', () => {
+    // 시드의 이틀 전 지출 3건: e_1(가장 먼저 등록) → e_2 → e_3(가장 나중에 등록)
+    renderAt('/groups/g_jeju/expenses')
+    const t = text()
+    expect(t.indexOf('흑돼지 저녁식사')).toBeLessThan(t.indexOf('공항 렌터카 3일'))
+    expect(t.indexOf('공항 렌터카 3일')).toBeLessThan(t.indexOf('애월 게스트하우스 2박'))
+    cleanup()
+
+    // e_1을 수정해도(createdAt 유지) 맨 아래에 그대로 있다
+    patchGroup((g) => ({ expenses: g.expenses.map((e) => (e.id === 'e_1' ? { ...e, title: '애월 숙소(수정)' } : e)) }))
+    renderAt('/groups/g_jeju/expenses')
+    const edited = text()
+    expect(edited.indexOf('공항 렌터카 3일')).toBeLessThan(edited.indexOf('애월 숙소(수정)'))
+  })
+
   it('날짜는 최신순, 항목에 결제자·나눔 인원(일부 표시)', () => {
     renderAt('/groups/g_jeju/expenses')
     const t = text()
-    expect(t.indexOf('10월 14일')).toBeLessThan(t.indexOf('10월 13일'))
-    expect(t.indexOf('10월 13일')).toBeLessThan(t.indexOf('10월 12일'))
+    // 데모 지출은 오늘 / 어제 / 이틀 전 (mockSeed.seedDate)
+    const [today, yesterday, twoDaysAgo] = [0, 1, 2].map((daysAgo) => dateLabel(seedDate(daysAgo)))
+    expect(t.indexOf(today)).toBeLessThan(t.indexOf(yesterday))
+    expect(t.indexOf(yesterday)).toBeLessThan(t.indexOf(twoDaysAgo))
     expect(t).toContain('박서연 결제 · 4명 나눔')
     expect(screen.getByText('스노클링 체험').closest('a')!.textContent).toContain('박서연 결제 · 3명 나눔 (일부)')
+  })
+
+  it('새로 등록한 지출(기본 날짜=오늘)은 데모 지출과 같은 "오늘" 묶음의 맨 위에 나온다', async () => {
+    await useAppStore.getState().addExpense({
+      groupId: 'g_jeju',
+      paidBy: 'm_me',
+      title: '방금 산 간식',
+      amount: 5000,
+      category: '식비',
+      receiptImageUrl: null,
+      splitType: 'equal',
+      spentAt: todayIso(),
+      participants: [{ memberId: 'm_me', shareAmount: null }],
+    })
+    renderAt('/groups/g_jeju/expenses')
+    const t = text()
+    expect(t.indexOf('방금 산 간식')).toBeLessThan(t.indexOf('기념품 쇼핑')) // 오늘 데모 지출(e_6)보다 위
+    expect(t.split(dateLabel(todayIso())).length - 1).toBe(1) // 날짜 묶음이 갈라지지 않고 하나
   })
 
   it('항목을 누르면 수정 폼, FAB를 누르면 신규 폼으로 간다', async () => {
@@ -114,11 +150,11 @@ describe('08 지출 내역', () => {
     expect(await screen.findByText('지출 수정')).toBeTruthy()
   })
 
-  it('지출이 없을 때: 나 혼자면 초대 안내, 멤버가 있으면 첫 지출 안내 + FAB 강조', () => {
+  it('지출이 없을 때: 나 혼자면 초대 안내, 멤버가 있으면 첫 지출 안내. 어느 쪽이든 FAB는 강조 효과가 없다', () => {
     patchGroup(() => ({ expenses: [] }))
     renderAt('/groups/g_jeju/expenses')
     expect(text()).toContain('아직 등록된 지출이 없어요.')
-    expect(screen.getByRole('link', { name: '지출 추가' }).className).toContain('glow')
+    expect(screen.getByRole('link', { name: '지출 추가' }).className).not.toContain('glow')
     cleanup()
 
     patchGroup((g) => ({ expenses: [], members: g.members.slice(0, 1) }))
@@ -239,7 +275,7 @@ describe('11 지출 폼', () => {
     expect(groupState().expenses).toHaveLength(7)
     const added = groupState().expenses.at(-1)!
     expect(added).toMatchObject({ title: '택시', amount: 10000, paidBy: 'm_me', splitType: 'equal', category: '식비' })
-    expect(useAppStore.getState().notifications[0].title).toBe('테스트님이 [제주도 여행]에 내역을 추가했어요')
+    expect(useAppStore.getState().notifications[0].title).toBe('[제주도 여행]에 테스트님이 결제한 내역이 추가됐어요')
   })
 
   it('참여자를 해제하면 분담이 재계산되고, 마지막 1명은 해제할 수 없다', async () => {
@@ -297,7 +333,7 @@ describe('11 지출 폼', () => {
     expect(text()).toContain('지출 수정')
     expect((screen.getByLabelText('항목명') as HTMLInputElement).value).toBe('스노클링 체험')
     expect((screen.getByLabelText('사용 금액') as HTMLInputElement).value).toBe('180000')
-    expect((screen.getByLabelText('사용 날짜') as HTMLInputElement).value).toBe('2026-10-13')
+    expect((screen.getByLabelText('사용 날짜') as HTMLInputElement).value).toBe(seedDate(1)) // e_4는 어제
     expect(text()).toContain('₩60,000')
 
     const title = screen.getByLabelText('항목명')
@@ -403,14 +439,14 @@ describe('13 알림', () => {
     expect(screen.getByLabelText('읽지 않은 알림 있음')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: '알림 열기' }))
     const rows = within(screen.getByRole('dialog')).getAllByRole('button').filter((b) => b.textContent!.includes('님이'))
-    expect(rows[0].textContent).toContain('테스트님이 [제주도 여행]에 내역을 추가했어요')
+    expect(rows[0].textContent).toContain('[제주도 여행]에 테스트님이 결제한 내역이 추가됐어요')
     expect(rows[1].textContent).toContain('이하준님이 [제주도 여행] 그룹에 참여했어요')
   })
 
   it('알림을 누르면 읽음 처리 → 패널 닫힘 → 해당 그룹 지출 탭으로 이동', async () => {
     renderAt('/groups')
     await userEvent.click(screen.getByRole('button', { name: '알림 열기' }))
-    await userEvent.click(screen.getByText('테스트님이 [제주도 여행]에 내역을 추가했어요'))
+    await userEvent.click(screen.getByText('[제주도 여행]에 테스트님이 결제한 내역이 추가됐어요'))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(await screen.findByText('₩958,000')).toBeTruthy() // 그룹 헤더가 보임 = 08로 이동

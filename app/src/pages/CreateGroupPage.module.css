@@ -1,0 +1,14 @@
+.body {
+  padding: var(--space-sm) 20px var(--space-xl);
+}
+
+.guide {
+  margin: 0 0 var(--space-sm);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.submit {
+  margin-top: 22px;
+}

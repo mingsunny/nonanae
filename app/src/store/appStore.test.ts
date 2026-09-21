@@ -46,7 +46,7 @@ describe('useAppStore', () => {
     })
     const s = useAppStore.getState()
     expect(selectGroup('g_jeju')(s)!.expenses).toHaveLength(7)
-    expect(s.notifications[0].title).toBe('테스트님이 [제주도 여행]에 내역을 추가했어요')
+    expect(s.notifications[0].title).toBe('[제주도 여행]에 테스트님이 결제한 내역이 추가됐어요')
   })
 
   it('removeExpense / addPendingMember / markNotificationRead 도 스토어에 반영된다', async () => {
