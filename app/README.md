@@ -41,6 +41,29 @@ src/
 - 상태는 localStorage(`nonanae:mock-db:v1`)에 저장된다. 처음 상태(로그아웃, 인트로부터)로 되돌리려면 개발 서버의 브라우저 콘솔에서 `window.__resetMockData()`. (저장 구조가 바뀐 이전 데이터는 자동으로 버리고 시드로 시작한다)
 - 시드 정의: `src/api/mockSeed.ts` (프로토타입 sep19의 시드를 옮긴 것).
 
+## Supabase 연결 (진행 중)
+
+앱은 기본적으로 위 목업으로 동작하고, 환경변수로 켤 때만 Supabase에 연결된다. 연결 범위는 단계별로 넓히는 중이다.
+
+| 단계 | 범위 | 상태 |
+|---|---|---|
+| 1 | 로그인 · 회원가입 · 프로필(04) · 코치마크 표시 | 연결됨 (`src/api/supabaseApi.ts`) |
+| 2 | 그룹 생성 · 초대코드 참여(게스트 포함) | 아직 (Supabase 모드에서는 "아직 연결되지 않았어요" 에러) |
+| 3 | 지출 · 멤버 추가 · 알림 | 아직 |
+| 4 | 회원 탈퇴 · 비밀번호 재설정 | 아직 |
+
+켜는 법:
+
+```bash
+cp .env.example .env.local   # 그리고 값을 채운다 (VITE_USE_SUPABASE=true, URL, publishable 키)
+npm run dev
+```
+
+- 키는 Supabase 대시보드 → Project Settings → API Keys의 **publishable** 키만 쓴다. secret / service_role 키는 넣지 않는다.
+- `.env.local`은 git에 올라가지 않는다. 테스트(`npm test`)는 이 설정과 상관없이 항상 목업으로 돈다.
+- Vercel에 배포할 때는 프로젝트 환경변수에 같은 세 값을 넣는다. `VITE_USE_SUPABASE`를 넣지 않으면 배포본은 목업으로 동작한다.
+- 코드는 `src/api/index.ts`가 각 함수 맨 앞에서 `USE_SUPABASE`이면 `supabaseApi.ts`로 넘기는 구조다. 화면·스토어는 바뀌지 않는다.
+
 ## 화면 구현 현황
 
 | 화면 | 상태 |
