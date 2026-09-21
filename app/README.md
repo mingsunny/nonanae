@@ -64,6 +64,12 @@ npm run dev
 - Vercel에 배포할 때는 프로젝트 환경변수에 같은 세 값을 넣는다. `VITE_USE_SUPABASE`를 넣지 않으면 배포본은 목업으로 동작한다.
 - 코드는 `src/api/index.ts`가 각 함수 맨 앞에서 `USE_SUPABASE`이면 `supabaseApi.ts`로 넘기는 구조다. 화면·스토어는 바뀌지 않는다.
 
+## 배포 (Vercel)
+
+- Vercel 프로젝트의 **Root Directory는 `app`**, Framework Preset은 Vite다.
+- `vercel.json`의 rewrite는 모든 경로를 `index.html`로 돌려준다. 라우터가 브라우저 경로(`/login`, `/join?code=…`)를 쓰기 때문에, 이게 없으면 주소로 바로 들어가거나 새로고침할 때 404가 난다. 초대 링크와 비밀번호 재설정 메일 링크도 이 방식으로 열린다. (실제 파일이 있는 경로 — 빌드된 JS/CSS, 이미지 — 는 rewrite보다 먼저 그대로 서빙된다)
+- Supabase에 연결하려면 Vercel 환경변수에 `VITE_USE_SUPABASE=true`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`를 넣고 다시 배포한다(Vite는 빌드할 때 값을 코드에 넣는다).
+
 ## 화면 구현 현황
 
 | 화면 | 상태 |
