@@ -3,8 +3,12 @@
 // 게스트는 Supabase 익명 로그인 세션으로 표현한다 — User(프로필)는 없고, members.guest_uid로 자기 자리를 가리킨다.
 import type { AuthError, PostgrestError, User as AuthUser } from '@supabase/supabase-js'
 import { parseInviteCode } from '../domain/inviteCode'
+import { expenseAddedTitle } from '../domain/notifications'
 import type {
   Category,
+  Expense,
+  ExpenseInput,
+  ExpenseParticipant,
   ExpenseWithParticipants,
   Group,
   GroupDetail,
@@ -160,6 +164,28 @@ const toNotification = (r: NotificationRow): Notification => ({
   read: r.read,
 })
 
+const EXPENSE_COLUMNS =
+  'id, group_id, paid_by, title, amount, category, receipt_image_url, split_type, spent_at, created_at'
+const MEMBER_COLUMNS = 'id, group_id, user_id, guest_uid, role, name, joined_at'
+
+const toExpense = (r: ExpenseRow): Expense => ({
+  id: r.id,
+  groupId: r.group_id,
+  paidBy: r.paid_by,
+  title: r.title,
+  amount: r.amount,
+  category: r.category,
+  receiptImageUrl: r.receipt_image_url,
+  splitType: r.split_type,
+  spentAt: r.spent_at,
+  createdAt: r.created_at,
+})
+const toParticipant = (p: ParticipantRow): ExpenseParticipant => ({
+  expenseId: p.expense_id,
+  memberId: p.member_id,
+  shareAmount: p.share_amount,
+})
+
 /** 조회 결과의 error를 던지고, 행 배열로 돌려준다 */
 function rowsOrThrow<T>(result: { data: unknown; error: PostgrestError | null }, what: string): T[] {
   if (result.error) throw new Error(`${what}을(를) 불러오지 못했어요: ${result.error.message}`)
@@ -202,11 +228,8 @@ export async function fetchSnapshot(): Promise<Snapshot> {
 
   const [groupsRes, membersRes, expensesRes, participantsRes, notificationsRes] = await Promise.all([
     supabase.from('groups').select('id, name, invite_code'),
-    supabase.from('members').select('id, group_id, user_id, guest_uid, role, name, joined_at').order('joined_at'),
-    supabase
-      .from('expenses')
-      .select('id, group_id, paid_by, title, amount, category, receipt_image_url, split_type, spent_at, created_at')
-      .order('created_at'),
+    supabase.from('members').select(MEMBER_COLUMNS).order('joined_at'),
+    supabase.from('expenses').select(EXPENSE_COLUMNS).order('created_at'),
     supabase.from('expense_participants').select('expense_id, member_id, share_amount'),
     supabase
       .from('notifications')
@@ -261,19 +284,8 @@ export async function fetchSnapshot(): Promise<Snapshot> {
         .filter((e) => e.group_id === g.id)
         .map(
           (e): ExpenseWithParticipants => ({
-            id: e.id,
-            groupId: e.group_id,
-            paidBy: e.paid_by,
-            title: e.title,
-            amount: e.amount,
-            category: e.category,
-            receiptImageUrl: e.receipt_image_url,
-            splitType: e.split_type,
-            spentAt: e.spent_at,
-            createdAt: e.created_at,
-            participants: allParticipants
-              .filter((p) => p.expense_id === e.id)
-              .map((p) => ({ expenseId: p.expense_id, memberId: p.member_id, shareAmount: p.share_amount })),
+            ...toExpense(e),
+            participants: allParticipants.filter((p) => p.expense_id === e.id).map(toParticipant),
           }),
         ),
     }))
@@ -510,4 +522,176 @@ export async function joinAsNewAccountMember(groupId: string): Promise<Member> {
   const userId = await requireAuthUserId()
   const memberId = await joinGroup(requireInviteCode(groupId), null, null)
   return { id: memberId, userId, groupId, role: 'member', name: null, joinedAt: new Date().toISOString() }
+}
+
+// --- 08~11 지출 · 12 멤버 추가 · 13 알림 ---
+
+/** 조회·쓰기 실패(PostgREST 에러)를 화면 문구로 바꾼다. 모르는 에러는 콘솔에만 남긴다. */
+function dbErrorMessage(error: PostgrestError, foreignKeyMessage = '그룹 멤버가 아닌 사람이 포함돼 있어요'): string {
+  if (error.code === '23503') return foreignKeyMessage // 존재하지 않는 그룹/멤버를 가리킴
+  if (error.code === '42501') return '이 작업을 할 권한이 없어요' // RLS: 내 그룹이 아님
+  console.error('[supabase db]', error)
+  return '요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.'
+}
+
+/**
+ * 지출 입력 검증(목업과 같은 규칙) + 결제자·참여자가 모두 이 그룹의 멤버인지 확인.
+ * 여러 테이블에 나눠 쓰기 전에 미리 걸러서, 쓰다가 중간에 실패하는 경우를 줄인다.
+ */
+async function validateExpenseInput(input: ExpenseInput): Promise<void> {
+  if (!Number.isInteger(input.amount) || input.amount <= 0) throw new Error('금액은 0보다 큰 정수여야 해요')
+  if (!input.title.trim()) throw new Error('항목명을 입력해주세요')
+  if (input.participants.length === 0) throw new Error('참여자는 최소 1명이어야 해요')
+  const seen = new Set<string>()
+  for (const p of input.participants) {
+    if (seen.has(p.memberId)) throw new Error('같은 참여자가 두 번 들어갈 수 없어요')
+    seen.add(p.memberId)
+  }
+
+  const { data, error } = await getSupabase().from('members').select('id').eq('group_id', input.groupId)
+  if (error) throw new Error(dbErrorMessage(error))
+  const memberIds = new Set(((data ?? []) as { id: string }[]).map((m) => m.id))
+  // RLS 때문에 내가 속하지 않은(또는 없는) 그룹은 멤버가 하나도 안 보인다
+  if (memberIds.size === 0) throw new Error('존재하지 않는 그룹이에요')
+  for (const id of [input.paidBy, ...seen]) {
+    if (!memberIds.has(id)) throw new Error('그룹 멤버가 아닌 사람이 포함돼 있어요')
+  }
+}
+
+const expenseFields = (input: ExpenseInput) => ({
+  paid_by: input.paidBy,
+  title: input.title.trim(),
+  amount: input.amount,
+  category: input.category,
+  receipt_image_url: input.receiptImageUrl,
+  split_type: input.splitType,
+  spent_at: input.spentAt,
+})
+
+/** expense_participants 행. group_id는 DB가 "같은 그룹의 멤버만" 가리키는지 검사하려고 요구한다(schema.md). */
+const participantRows = (expenseId: string, input: ExpenseInput) =>
+  input.participants.map((p) => ({
+    expense_id: expenseId,
+    member_id: p.memberId,
+    group_id: input.groupId,
+    share_amount: p.shareAmount,
+  }))
+
+const withParticipants = (row: ExpenseRow, input: ExpenseInput): ExpenseWithParticipants => ({
+  ...toExpense(row),
+  participants: input.participants.map((p) => ({ expenseId: row.id, memberId: p.memberId, shareAmount: p.shareAmount })),
+})
+
+/** 지출 등록 알림. 앱이 직접 만든다(schema.md). 알림 하나 못 만들었다고 지출 등록을 실패시키지는 않는다. */
+async function addExpenseNotification(groupId: string, payerMemberId: string): Promise<void> {
+  try {
+    const supabase = getSupabase()
+    const [groupRes, payerRes] = await Promise.all([
+      supabase.from('groups').select('name').eq('id', groupId).single<{ name: string }>(),
+      supabase.from('members').select('name, profiles(name)').eq('id', payerMemberId).single(),
+    ])
+    if (groupRes.error) throw groupRes.error
+    if (payerRes.error) throw payerRes.error
+    const payer = payerRes.data as unknown as { name: string | null; profiles: { name: string } | { name: string }[] | null }
+    const profile = Array.isArray(payer.profiles) ? payer.profiles[0] : payer.profiles
+    const { error } = await supabase.from('notifications').insert({
+      group_id: groupId,
+      member_id: payerMemberId,
+      type: 'expense',
+      title: expenseAddedTitle(groupRes.data.name, profile?.name ?? payer.name ?? ''),
+    })
+    if (error) throw error
+  } catch (err) {
+    console.error('[supabase] 지출 등록 알림을 만들지 못했어요', err)
+  }
+}
+
+/** 지출 등록. 지출 → 참여자 → 알림 순으로 쓰고, 참여자를 못 넣으면 지출도 되돌려 "참여자 없는 지출"이 남지 않게 한다. */
+export async function createExpense(input: ExpenseInput): Promise<ExpenseWithParticipants> {
+  await validateExpenseInput(input)
+  const supabase = getSupabase()
+
+  const { data: row, error } = await supabase
+    .from('expenses')
+    .insert({ group_id: input.groupId, ...expenseFields(input) })
+    .select(EXPENSE_COLUMNS)
+    .single<ExpenseRow>()
+  if (error) throw new Error(dbErrorMessage(error))
+
+  const { error: participantsError } = await supabase.from('expense_participants').insert(participantRows(row.id, input))
+  if (participantsError) {
+    await supabase.from('expenses').delete().eq('id', row.id)
+    throw new Error(dbErrorMessage(participantsError))
+  }
+
+  await addExpenseNotification(input.groupId, input.paidBy)
+  return withParticipants(row, input)
+}
+
+/**
+ * 지출 수정. 수정은 알림을 만들지 않는다(13 알림1). 소속 그룹은 바꿀 수 없다.
+ * 순서: 검증 → 지출 본문 → 참여자 추가·수정(upsert) → 빠진 참여자 삭제.
+ * 중간에 실패하면 에러로 끝나 화면의 폼이 그대로 남으므로 다시 저장하면 이어서 맞춰진다.
+ */
+export async function updateExpense(expenseId: string, input: ExpenseInput): Promise<ExpenseWithParticipants> {
+  const supabase = getSupabase()
+  const { data: existing, error: findError } = await supabase
+    .from('expenses')
+    .select('id, group_id')
+    .eq('id', expenseId)
+    .maybeSingle<{ id: string; group_id: string }>()
+  if (findError) throw new Error(dbErrorMessage(findError))
+  if (!existing) throw new Error('존재하지 않는 지출이에요')
+  if (existing.group_id !== input.groupId) throw new Error('지출의 그룹은 바꿀 수 없어요')
+  await validateExpenseInput(input)
+
+  const { data: row, error } = await supabase
+    .from('expenses')
+    .update(expenseFields(input))
+    .eq('id', expenseId)
+    .select(EXPENSE_COLUMNS)
+    .single<ExpenseRow>()
+  if (error) throw new Error(dbErrorMessage(error))
+
+  const { error: upsertError } = await supabase
+    .from('expense_participants')
+    .upsert(participantRows(expenseId, input), { onConflict: 'expense_id,member_id' })
+  if (upsertError) throw new Error(dbErrorMessage(upsertError))
+
+  // 위 검증을 통과한 id는 DB에서 읽은 멤버 uuid뿐이라 필터 문자열에 그대로 넣어도 안전하다
+  const kept = input.participants.map((p) => p.memberId).join(',')
+  const { error: deleteError } = await supabase
+    .from('expense_participants')
+    .delete()
+    .eq('expense_id', expenseId)
+    .not('member_id', 'in', `(${kept})`)
+  if (deleteError) throw new Error(dbErrorMessage(deleteError))
+
+  return withParticipants(row, input)
+}
+
+/** 지출 삭제. 참여자 행은 DB가 함께 지우고, 이미 만들어진 알림은 그대로 둔다(13 §5). */
+export async function deleteExpense(expenseId: string): Promise<void> {
+  const { data, error } = await getSupabase().from('expenses').delete().eq('id', expenseId).select('id')
+  if (error) throw new Error(dbErrorMessage(error))
+  // RLS 때문에 내 그룹의 지출이 아니면 "0건 삭제"로 끝나므로 없는 지출로 본다
+  if (!data || data.length === 0) throw new Error('존재하지 않는 지출이에요')
+}
+
+/** 앱 미가입 친구를 이름만으로 추가(12). userId는 null이고 알림은 만들지 않는다(13 알림2). */
+export async function addPendingMember(groupId: string, name: string): Promise<Member> {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('이름을 입력해주세요')
+  const { data, error } = await getSupabase()
+    .from('members')
+    .insert({ group_id: groupId, name: trimmed })
+    .select(MEMBER_COLUMNS)
+    .single<MemberRow>()
+  if (error) throw new Error(dbErrorMessage(error, '존재하지 않는 그룹이에요'))
+  return toMember(data)
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const { error } = await getSupabase().from('notifications').update({ read: true }).eq('id', notificationId)
+  if (error) throw new Error(dbErrorMessage(error))
 }

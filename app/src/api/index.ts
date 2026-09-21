@@ -3,6 +3,7 @@
 // Supabase가 붙으면 함수 안쪽만 supabase-js 호출로 바꾸면 되고 호출하는 쪽은 그대로다.
 import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
+import { expenseAddedTitle } from '../domain/notifications'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -20,7 +21,7 @@ import { createSeed } from './mockSeed'
 import * as remote from './supabaseApi'
 
 /**
- * Supabase 연결 진행 상황: 지금은 1단계(로그인·가입·프로필)와 2단계(그룹 생성·초대코드 참여)가 supabaseApi.ts로 넘어간다.
+ * Supabase 연결 진행 상황: 지금은 1~3단계(로그인·가입·프로필 / 그룹 생성·초대코드 참여 / 지출·멤버 추가·알림)가 supabaseApi.ts로 넘어간다. 남은 것은 탈퇴·비밀번호 재설정.
  * VITE_USE_SUPABASE=true인데 아직 연결되지 않은 기능을 부르면, 목업 DB를 몰래 읽고 쓰지 않도록 여기서 멈춘다.
  */
 function notYet(name: string): never {
@@ -111,7 +112,7 @@ function validateExpenseInput(d: MockDb, input: ExpenseInput): void {
 
 /** 지출 등록. 신규 등록일 때만 그룹에 "내역 추가" 알림을 남긴다(13 알림1, 문구는 생성 시점에 고정). */
 export async function createExpense(input: ExpenseInput): Promise<ExpenseWithParticipants> {
-  if (USE_SUPABASE) notYet('createExpense')
+  if (USE_SUPABASE) return remote.createExpense(input)
   const d = getDb()
   validateExpenseInput(d, input)
 
@@ -129,9 +130,7 @@ export async function createExpense(input: ExpenseInput): Promise<ExpenseWithPar
     groupId: group.id,
     memberId: payer.id,
     type: 'expense',
-    // 등록한 사람이 아니라 결제자 이름을 쓴다 — 지출에 "등록한 사람" 필드가 없고 다른 사람 대신 등록할 수도 있어서,
-    // "OO님이 추가했어요"라고 쓰면 오해를 준다 (13 알림1)
-    title: `[${group.name}]에 ${memberDisplayName(payer, usersById(d)) || '누군가'}님이 결제한 내역이 추가됐어요`,
+    title: expenseAddedTitle(group.name, memberDisplayName(payer, usersById(d))),
     createdAt: nowIso(),
     read: false,
   })
@@ -142,7 +141,7 @@ export async function createExpense(input: ExpenseInput): Promise<ExpenseWithPar
 
 /** 지출 수정. 수정은 알림을 만들지 않는다(13 알림1). 소속 그룹은 바꿀 수 없다. */
 export async function updateExpense(expenseId: string, input: ExpenseInput): Promise<ExpenseWithParticipants> {
-  if (USE_SUPABASE) notYet('updateExpense')
+  if (USE_SUPABASE) return remote.updateExpense(expenseId, input)
   const d = getDb()
   const existing = d.expenses.find((e) => e.id === expenseId)
   if (!existing) throw new Error('존재하지 않는 지출이에요')
@@ -161,7 +160,7 @@ export async function updateExpense(expenseId: string, input: ExpenseInput): Pro
 
 /** 지출 삭제. 이미 만들어진 알림은 그대로 둔다(13 §5: 알림은 생성 시점에 고정). */
 export async function deleteExpense(expenseId: string): Promise<void> {
-  if (USE_SUPABASE) notYet('deleteExpense')
+  if (USE_SUPABASE) return remote.deleteExpense(expenseId)
   const d = getDb()
   if (!d.expenses.some((e) => e.id === expenseId)) throw new Error('존재하지 않는 지출이에요')
   d.expenses = d.expenses.filter((e) => e.id !== expenseId)
@@ -171,7 +170,7 @@ export async function deleteExpense(expenseId: string): Promise<void> {
 
 /** 앱 미가입 친구를 이름만으로 추가(12). userId는 null. 대기 중 유저 추가는 알림을 만들지 않는다(13 알림2). */
 export async function addPendingMember(groupId: string, name: string): Promise<Member> {
-  if (USE_SUPABASE) notYet('addPendingMember')
+  if (USE_SUPABASE) return remote.addPendingMember(groupId, name)
   const d = getDb()
   if (!d.groups.some((g) => g.id === groupId)) throw new Error('존재하지 않는 그룹이에요')
   const trimmed = name.trim()
@@ -204,7 +203,8 @@ function addMemberJoinedNotification(d: MockDb, group: Group, member: Member): v
 
 /** 신규 유저가 그룹에 실제로 참여했을 때의 알림(13 알림2). 참여 흐름(06/07)에서 호출. */
 export async function notifyMemberJoined(groupId: string, memberId: string): Promise<void> {
-  if (USE_SUPABASE) notYet('notifyMemberJoined')
+  // Supabase 모드: 참여 알림은 join_group(DB 함수)이 참여할 때 이미 만든다
+  if (USE_SUPABASE) return
   const d = getDb()
   const group = d.groups.find((g) => g.id === groupId)
   const member = d.members.find((m) => m.id === memberId && m.groupId === groupId)
@@ -214,7 +214,7 @@ export async function notifyMemberJoined(groupId: string, memberId: string): Pro
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
-  if (USE_SUPABASE) notYet('markNotificationRead')
+  if (USE_SUPABASE) return remote.markNotificationRead(notificationId)
   const d = getDb()
   const n = d.notifications.find((x) => x.id === notificationId)
   if (!n) return
