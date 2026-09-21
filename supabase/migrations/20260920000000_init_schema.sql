@@ -58,7 +58,7 @@ create table public.expenses (
   paid_by uuid not null,
   title text not null check (length(btrim(title)) > 0),
   amount bigint not null check (amount > 0),
-  category text not null check (category in ('lodging', 'food', 'transport', 'activity', 'shopping', 'etc')),
+  category text not null check (category in ('숙소', '식비', '교통', '액티비티', '쇼핑', '기타')),
   receipt_image_url text,
   split_type text not null default 'equal' check (split_type in ('equal', 'ratio', 'amount')),
   spent_at date not null default current_date,

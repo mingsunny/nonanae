@@ -47,7 +47,7 @@
 | 02 계좌 등록 (회원가입 2단계) | `/signup/account` | 1단계 입력값을 넘겨받아야 하므로, 직접 URL로 들어오면 `/signup`으로 되돌림 |
 | 03 그룹 목록 (홈 탭) | `/groups` | 13 알림 오버레이가 이 화면 위에서 열림 |
 | 04 프로필 (탭) | `/profile` | |
-| 05 새 그룹 만들기 | `/groups/new` | 생성 직후 08로 이동 |
+| 05 새 그룹 만들기 | `/groups/new` | 생성 직후 12(멤버 초대)로 이동 — 이후 12의 "그룹으로 가기"로 08 진입 |
 | 06 초대코드로 참여 / 07 멤버 매칭 | `/join` | 카카오톡 공유 링크는 `/join?code=ABCDEF`, 개인화 초대 링크는 `/join?code=ABCDEF-{memberId}` ([12](12-group-invite.md) 참고). 06→07은 같은 경로 안의 단계 전환 |
 | 14 비밀번호 재설정 | `/password-reset` | |
 | 08 그룹 지출 내역 | `/groups/:groupId/expenses` | 그룹 내부 기본 탭. `/groups/:groupId`로 들어오면 여기로 이동 |
