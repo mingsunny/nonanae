@@ -14,6 +14,12 @@ interface AppState {
   status: 'idle' | 'loading' | 'ready'
   /** 로그인한 정식 회원. 로그인 안 했으면 null */
   currentUserId: string | null
+  /**
+   * 로그아웃/탈퇴로 currentUserId가 null이 되는 것과 같은 타이밍에 함께 켜진다.
+   * RequireUser가 "로그인 안 됨"으로 리다이렉트할 때 인트로 대신 로그인 화면으로 보내게 하는 신호 —
+   * 처음부터 로그인 안 된 상태(새로고침, 직접 URL 진입)와 구분하기 위함. signIn/signUp에서 새 세션을 시작할 때 끈다.
+   */
+  leavingToLogin: boolean
   /** 로그인 없이 초대코드로 참여한 게스트가 지금 보고 있는 Member.id */
   viewAsMemberId: string | null
   usersById: Record<string, User>
@@ -57,6 +63,7 @@ interface AppState {
 export const useAppStore = create<AppState>()((set, get) => ({
   status: 'idle',
   currentUserId: null,
+  leavingToLogin: false,
   viewAsMemberId: null,
   usersById: {},
   groups: [],
@@ -115,20 +122,26 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   signIn: async (email, password) => {
     await api.signIn(email, password)
+    set({ leavingToLogin: false })
     await get().refresh()
   },
 
   signUp: async (input) => {
     await api.signUp(input)
+    set({ leavingToLogin: false })
     await get().refresh()
   },
 
   signOut: async () => {
+    // 게스트가 그룹에서 나갈 때도 이 액션을 쓰는데, 그때는 RequireUser를 거치지 않고 이미 인트로로
+    // 직접 이동하므로 이 플래그가 필요 없다 — 로그인했던 정식 회원이 나갈 때만 켠다.
+    if (get().currentUserId !== null) set({ leavingToLogin: true })
     await api.signOut()
     await get().refresh()
   },
 
   deleteAccount: async () => {
+    set({ leavingToLogin: true })
     await api.deleteAccount()
     await get().refresh()
   },
