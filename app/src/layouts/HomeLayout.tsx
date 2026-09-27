@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { HomeIcon, UserIcon } from '../components/common/icons'
 import NotificationBell from '../components/notifications/NotificationBell'
+import { useElementHeight } from '../lib/useElementHeight'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import styles from './HomeLayout.module.css'
@@ -11,6 +12,8 @@ import styles from './HomeLayout.module.css'
  */
 export default function HomeLayout() {
   const user = useAppStore((s) => (s.currentUserId ? s.usersById[s.currentUserId] : undefined))
+  // 상단바가 고정(position: fixed)이라 실제 높이만큼 콘텐츠 위쪽을 띄워야 가려지지 않는다.
+  const [topbarRef, topbarHeight] = useElementHeight<HTMLElement>()
 
   const tabs = [
     { to: paths.groups, label: '홈', icon: <HomeIcon /> },
@@ -19,12 +22,12 @@ export default function HomeLayout() {
 
   return (
     <div className={styles.layout}>
-      <header className={styles.topbar}>
+      <header className={styles.topbar} ref={topbarRef}>
         <h1 className={styles.title}>{user ? `${user.name}님의 그룹` : '내 그룹'}</h1>
         <NotificationBell />
       </header>
 
-      <main className={styles.content}>
+      <main className={styles.content} style={{ paddingTop: topbarHeight + 8 /* --space-sm, 상단바 아래 여백 */ }}>
         <Outlet />
       </main>
 
