@@ -31,6 +31,8 @@ interface AppState {
   editExpense: (expenseId: string, input: ExpenseInput) => Promise<ExpenseWithParticipants>
   removeExpense: (expenseId: string) => Promise<void>
   addPendingMember: (groupId: string, name: string) => Promise<Member>
+  /** 12: 게스트가 참여할 때 입력한 이름을 나중에 고침(본인 자리만) */
+  renameGuestMember: (memberId: string, name: string) => Promise<void>
   markNotificationRead: (notificationId: string) => Promise<void>
 
   // 01/02/04: 로그인·가입·프로필
@@ -99,6 +101,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const member = await api.addPendingMember(groupId, name)
     await get().refresh()
     return member
+  },
+
+  renameGuestMember: async (memberId, name) => {
+    await api.renameGuestMember(memberId, name)
+    await get().refresh()
   },
 
   markNotificationRead: async (notificationId) => {

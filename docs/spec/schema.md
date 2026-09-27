@@ -142,8 +142,9 @@ erDiagram
 > - [`supabase/migrations/20260920000000_init_schema.sql`](../../supabase/migrations/20260920000000_init_schema.sql) — 테이블, RLS, 가입/탈퇴 트리거, 그룹 생성·참여 RPC
 > - [`supabase/migrations/20260920000100_guest_support.sql`](../../supabase/migrations/20260920000100_guest_support.sql) — 게스트(익명 로그인) 지원. **위 파일을 먼저 실행한 뒤** 실행
 > - [`supabase/migrations/20260921000000_delete_account.sql`](../../supabase/migrations/20260921000000_delete_account.sql) — 회원 탈퇴용 함수 `delete_my_account()`. 위 두 파일 다음에 실행
+> - [`supabase/migrations/20260927000000_rename_guest_member.sql`](../../supabase/migrations/20260927000000_rename_guest_member.sql) — 게스트 본인 이름 수정용 함수 `rename_guest_member()`. 위 세 파일 다음에 실행
 >
-> 적용 상태(2026-09-21): 세 마이그레이션 모두 Supabase 프로젝트(`nonanae`)에 적용됨. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
+> 적용 상태(2026-09-21): 처음 세 마이그레이션은 Supabase 프로젝트(`nonanae`)에 적용됨. `rename_guest_member`(2026-09-27 추가)는 **적용 전에는 게스트 이름 수정이 동작하지 않음**. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
 
 ### 스펙 → 테이블 대응
 
@@ -272,6 +273,7 @@ erDiagram
 | `create_group(p_name)` | [05](05-create-group.md) 그룹 + 그룹장 멤버를 한 번에 생성, group id 반환. **정식 회원만**(게스트 거부) |
 | `lookup_group_by_code(p_code)` | [06](06-join-group.md) 초대코드 확인 + [07](07-join-match.md) "나 고르기" 목록용 `{id, name, members[{id, name, claimed}]}` 반환. 잘못된 코드면 null |
 | `join_group(p_code, p_member_id, p_name)` | [06](06-join-group.md)/[07](07-join-match.md) 초대코드 참여. 정식 회원·게스트 공용 — `p_member_id`가 있으면 그 자리를 내 것으로, 없으면 새 멤버로 추가(게스트는 `p_name` 필수). 이미 멤버면 기존 멤버 id 반환. 새 멤버가 생기거나 정식 회원이 자리를 채울 때만 참여 알림 생성 |
+| `rename_guest_member(p_member_id, p_name)` | [12](12-group-invite.md) 게스트 본인 이름 수정. "지금 이 익명 세션이 차지한 자리"(`guest_uid = auth.uid()`)만 허용 — `name` 컬럼만 바꾼다(다른 컬럼은 함수가 손대지 않으므로, 일반 UPDATE 정책과 달리 role/user_id를 함께 바꿔 권한을 상승시킬 수 없음) |
 | `delete_my_account()` | [04](04-profile.md) 회원 탈퇴. 로그인한 정식 회원 본인의 `auth.users` 행을 삭제(게스트는 거부) → `profiles` cascade 삭제 → `before_profile_delete` 트리거가 이름 보존 |
 | `is_group_member`, `is_group_owner`, `shares_group_with`, `is_anonymous_user` | RLS용 헬퍼 |
 
@@ -305,3 +307,4 @@ erDiagram
 - 2026-09-20: **게스트 → 정식 회원 전환을 스펙에서 제외** — `upgrade_guest` 함수와 전환 순서 서술 삭제. 게스트는 일반 로그인/회원가입만 쓰고, 게스트 기록은 새 계정으로 이관하지 않음
 - 2026-09-20: Supabase DB 구현 정리 추가. 관계도(ER) 작성, 스펙→테이블 대응, 테이블 정의, RLS·RPC·삭제 동작, 앱 연동 규칙과 알려진 제한을 "DB 구현" 섹션에 기록. SQL 원본은 `supabase/migrations/` (민선)
 - 2026-09-21: 회원 탈퇴용 DB 함수 `delete_my_account()` 추가(`20260921000000_delete_account.sql`) — 본인 계정만 삭제, 게스트 거부. 삭제 시 이름은 멤버 자리에 남고 지출·알림 기록은 유지됨을 실제 DB에서 확인. 방장 탈퇴 시 그룹 관리자가 없어지는 한계를 "알려진 제한"에 기록 (민선)
+- 2026-09-27: 게스트 본인 이름 수정용 DB 함수 `rename_guest_member()` 추가(`20260927000000_rename_guest_member.sql`) — "지금 이 익명 세션이 차지한 자리"만 name 컬럼을 바꿀 수 있게 해, 일반 UPDATE 정책을 열었을 때 생기는 권한 상승(role 변경 등) 위험을 피함. 목업 DB에도 같은 제약(viewAsMemberId 일치)으로 반영 (민선)

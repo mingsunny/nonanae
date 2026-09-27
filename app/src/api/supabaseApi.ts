@@ -378,7 +378,9 @@ function rpcErrorMessage(error: PostgrestError): string {
   if (message.includes('guests cannot create groups')) return '로그인한 회원만 그룹을 만들 수 있어요'
   if (message.includes('invalid invite code')) return '존재하지 않는 그룹이에요'
   if (message.includes('member not available')) return '이미 가입된 멤버예요'
-  if (message.includes('name required for guests')) return '이름을 입력해주세요'
+  if (message.includes('name required')) return '이름을 입력해주세요'
+  if (message.includes('only guests can rename')) return '게스트만 이름을 수정할 수 있어요'
+  if (message.includes('rename target not available')) return '본인 자리만 이름을 수정할 수 있어요'
   if (message.includes('not authenticated')) return '로그인이 필요해요'
   if (message.includes('guests cannot delete accounts')) return '로그인한 회원만 탈퇴할 수 있어요'
   console.error('[supabase rpc]', error)
@@ -526,6 +528,23 @@ export async function joinAsNewAccountMember(groupId: string): Promise<Member> {
   const userId = await requireAuthUserId()
   const memberId = await joinGroup(requireInviteCode(groupId), null, null)
   return { id: memberId, userId, groupId, role: 'member', name: null, joinedAt: new Date().toISOString() }
+}
+
+/**
+ * 12: 게스트가 참여할 때 입력한 이름을 나중에 고침. DB 함수가 "지금 이 익명 세션이 차지한 자리"인지 확인하므로,
+ * 다른 사람의 멤버 행은 memberId를 안다고 해도 바꿀 수 없다.
+ */
+export async function renameGuestMember(memberId: string, name: string): Promise<Member> {
+  const { error } = await getSupabase().rpc('rename_guest_member', { p_member_id: memberId, p_name: name })
+  if (error) throw new Error(rpcErrorMessage(error))
+
+  const { data: row, error: readError } = await getSupabase()
+    .from('members')
+    .select(MEMBER_COLUMNS)
+    .eq('id', memberId)
+    .single<MemberRow>()
+  if (readError) throw new Error(`멤버를 불러오지 못했어요: ${readError.message}`)
+  return toMember(row)
 }
 
 // --- 08~11 지출 · 12 멤버 추가 · 13 알림 ---

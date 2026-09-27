@@ -181,6 +181,23 @@ export async function addPendingMember(groupId: string, name: string): Promise<M
   return structuredClone(member)
 }
 
+/**
+ * 12: 게스트가 참여할 때 입력한 이름을 나중에 고침. 지금 이 브라우저가 차지하고 있는 자리(viewAsMemberId)만 바꿀 수 있다.
+ * 이미 만들어진 알림 문구는 그대로 둔다(생성 시점 이름으로 고정 저장 — schema.md). 재입장은 member.id로 매칭하므로 영향 없다.
+ */
+export async function renameGuestMember(memberId: string, name: string): Promise<Member> {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('이름을 입력해주세요')
+  if (USE_SUPABASE) return remote.renameGuestMember(memberId, trimmed)
+  const d = getDb()
+  if (d.session.viewAsMemberId !== memberId) throw new Error('본인의 이름만 수정할 수 있어요')
+  const member = d.members.find((m) => m.id === memberId)
+  if (!member) throw new Error('존재하지 않는 멤버예요')
+  member.name = trimmed
+  commit()
+  return structuredClone(member)
+}
+
 function addMemberJoinedNotification(d: MockDb, group: Group, member: Member): void {
   d.notifications.push({
     id: uid('n'),

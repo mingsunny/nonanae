@@ -29,9 +29,14 @@ function MemberInvite({ group }: { group: GroupDetail }) {
   const location = useLocation()
   const fromCreation = (location.state as { fromCreation?: boolean } | null)?.fromCreation === true
   const addPendingMember = useAppStore((s) => s.addPendingMember)
+  const renameGuestMember = useAppStore((s) => s.renameGuestMember)
   const { nameOf, isMe, isPending } = useGroupView(group)
   const [name, setName] = useState('')
   const trimmed = name.trim()
+  // 게스트 본인 이름 수정. 한 번에 한 명만 편집 상태로 둔다(본인 자리 외에는 이 폼이 뜨지 않음).
+  const [editingName, setEditingName] = useState('')
+  const [editing, setEditing] = useState(false)
+  const editingTrimmed = editingName.trim()
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -42,6 +47,17 @@ function MemberInvite({ group }: { group: GroupDetail }) {
       setName('')
     } catch (error) {
       showToast(error instanceof Error ? error.message : '추가하지 못했어요')
+    }
+  }
+
+  /** 게스트 본인이 참여할 때 입력한 이름을 고침 (내 자리만) */
+  async function saveRename(memberId: string) {
+    if (!editingTrimmed) return
+    try {
+      await renameGuestMember(memberId, editingTrimmed)
+      setEditing(false)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '이름을 바꾸지 못했어요')
     }
   }
 
@@ -73,6 +89,32 @@ function MemberInvite({ group }: { group: GroupDetail }) {
         <div className={styles.card}>
           {group.members.map((m) => {
             const pending = isPending(m)
+            // 게스트로 참여한 본인 자리만 이름을 고칠 수 있다. userId가 있으면 정식 회원이라 04 프로필에서 고친다.
+            const canRenameSelf = isMe(m.id) && m.userId === null
+            if (canRenameSelf && editing) {
+              return (
+                <div key={m.id} className={`${styles.person} ${styles.editingPerson}`}>
+                  <Avatar name={nameOf(m.id)} />
+                  <input
+                    className={`${fields.input} ${styles.editInput}`}
+                    type="text"
+                    autoFocus
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void saveRename(m.id)
+                      if (e.key === 'Escape') setEditing(false)
+                    }}
+                  />
+                  <button type="button" className={styles.send} disabled={!editingTrimmed} onClick={() => saveRename(m.id)}>
+                    저장
+                  </button>
+                  <button type="button" className={styles.cancelEdit} onClick={() => setEditing(false)}>
+                    취소
+                  </button>
+                </div>
+              )
+            }
             return (
               <div key={m.id} className={styles.person}>
                 <Avatar name={nameOf(m.id)} pending={pending} />
@@ -86,6 +128,18 @@ function MemberInvite({ group }: { group: GroupDetail }) {
                 {pending && (
                   <button type="button" className={styles.send} onClick={() => sendInvite(m.id)}>
                     초대 보내기
+                  </button>
+                )}
+                {canRenameSelf && (
+                  <button
+                    type="button"
+                    className={styles.editName}
+                    onClick={() => {
+                      setEditingName(nameOf(m.id))
+                      setEditing(true)
+                    }}
+                  >
+                    이름 수정
                   </button>
                 )}
               </div>
