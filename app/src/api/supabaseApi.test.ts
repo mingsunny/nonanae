@@ -30,6 +30,7 @@ vi.mock('../lib/supabase', () => ({
 import {
   addPendingMember,
   authErrorMessage,
+  renameGuestMember,
   createExpense,
   createGroup,
   deleteAccount,
@@ -799,6 +800,39 @@ describe('멤버 추가·알림 읽음', () => {
     await markNotificationRead('n-1')
     expect(made.notifications[0].update).toHaveBeenCalledWith({ read: true })
     expect(made.notifications[0].eq).toHaveBeenCalledWith('id', 'n-1')
+  })
+})
+
+describe('renameGuestMember (12)', () => {
+  const memberRowAfter = {
+    id: 'm-a',
+    group_id: 'g-1',
+    user_id: null,
+    guest_uid: 'anon-1',
+    role: 'member',
+    name: '고친이름',
+    joined_at: '2026-09-21T01:00:00Z',
+  }
+
+  it('DB 함수로 이름을 바꾸고, 바뀐 멤버 행을 읽어서 돌려준다', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: null })
+    const made = mockTables({ members: ok(memberRowAfter) })
+
+    const member = await renameGuestMember('m-a', ' 고친이름 ')
+
+    expect(mocks.rpc).toHaveBeenCalledWith('rename_guest_member', { p_member_id: 'm-a', p_name: ' 고친이름 ' })
+    expect(made.members[0].eq).toHaveBeenCalledWith('id', 'm-a')
+    expect(member).toEqual({ id: 'm-a', userId: null, groupId: 'g-1', role: 'member', name: '고친이름', joinedAt: '2026-09-21T01:00:00Z' })
+  })
+
+  it('본인 자리가 아니면(다른 사람의 memberId) 서버가 거부한다', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'rename target not available' } })
+    await expect(renameGuestMember('m-other', '이름')).rejects.toThrow('본인 자리만 이름을 수정할 수 있어요')
+  })
+
+  it('게스트가 아니면(정식 회원 세션) 서버가 거부한다', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'only guests can rename via this function' } })
+    await expect(renameGuestMember('m-a', '이름')).rejects.toThrow('게스트만 이름을 수정할 수 있어요')
   })
 })
 

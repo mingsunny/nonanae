@@ -3,6 +3,9 @@ import {
   addPendingMember,
   createExpense,
   deleteExpense,
+  joinAsNewGuest,
+  renameGuestMember,
+  signOut,
   fetchSnapshot,
   markNotificationRead,
   notifyMemberJoined,
@@ -163,6 +166,35 @@ describe('addPendingMember', () => {
 
   it('이름이 비어 있으면 거절', async () => {
     await expect(addPendingMember('g_jeju', '   ')).rejects.toThrow()
+  })
+})
+
+describe('renameGuestMember', () => {
+  it('게스트가 참여할 때 입력한 이름을 나중에 고칠 수 있다', async () => {
+    await signOut()
+    const guest = await joinAsNewGuest('g_jeju', '오타난이름')
+    const renamed = await renameGuestMember(guest.id, ' 고친이름 ')
+    expect(renamed).toMatchObject({ id: guest.id, name: '고친이름', userId: null })
+    const { groups } = await fetchSnapshot()
+    expect(groups[0].members.find((m) => m.id === guest.id)?.name).toBe('고친이름')
+  })
+
+  it('본인이 아닌 다른 멤버의 이름은 고칠 수 없다', async () => {
+    await signOut()
+    await joinAsNewGuest('g_jeju', '게스트1')
+    // g_jeju의 방장(m_me)은 내 자리가 아니다
+    await expect(renameGuestMember('m_me', '해킹시도')).rejects.toThrow('본인의 이름만 수정할 수 있어요')
+  })
+
+  it('이름이 비어 있으면 서버를 부르지 않는다', async () => {
+    await signOut()
+    const guest = await joinAsNewGuest('g_jeju', '게스트1')
+    await expect(renameGuestMember(guest.id, '   ')).rejects.toThrow('이름을 입력해주세요')
+  })
+
+  it('로그인한 정식 회원은 자기 멤버 자리를 이 함수로 고칠 수 없다(프로필에서 고쳐야 함)', async () => {
+    // 기본 시드는 u_test로 로그인된 상태 — 로그인 중엔 viewAsMemberId를 보지 않는다
+    await expect(renameGuestMember('m_me', '새이름')).rejects.toThrow('본인의 이름만 수정할 수 있어요')
   })
 })
 
