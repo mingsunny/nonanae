@@ -5,6 +5,7 @@ import { groupTotal } from '../domain/settlement'
 import type { GroupDetail } from '../domain/types'
 import { copyText } from '../lib/clipboard'
 import { won } from '../lib/format'
+import { useElementHeight } from '../lib/useElementHeight'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
@@ -26,6 +27,9 @@ function GroupShell({ group }: { group: GroupDetail }) {
   const { nameOf, isPending } = useGroupView(group)
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   const signOut = useAppStore((s) => s.signOut)
+  // 헤더가 고정(position: fixed)이라 실제 높이만큼 콘텐츠 위쪽을 띄워야 헤더에 안 가려진다.
+  // 헤더 높이는 그룹 이름 줄바꿈·멤버 수에 따라 달라지므로 고정값 대신 실측한다.
+  const [headerRef, headerHeight] = useElementHeight<HTMLElement>()
 
   const tabs = [
     { to: paths.groupExpenses(group.id), label: '지출', icon: <ReceiptIcon /> },
@@ -46,7 +50,7 @@ function GroupShell({ group }: { group: GroupDetail }) {
 
   return (
     <div className={styles.layout}>
-      <header className={styles.header}>
+      <header className={styles.header} ref={headerRef}>
         <div className={styles.topbar}>
           {/* 그룹 내 어느 탭에서든 back은 항상 그룹 목록으로 (08 §4). 게스트는 목록이 없어 인트로로 나감 */}
           {isLoggedIn ? (
@@ -88,7 +92,7 @@ function GroupShell({ group }: { group: GroupDetail }) {
         </div>
       </header>
 
-      <main className={styles.content}>
+      <main className={styles.content} style={{ paddingTop: headerHeight + 18 }}>
         <Outlet />
       </main>
 

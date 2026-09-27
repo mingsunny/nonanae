@@ -5,10 +5,18 @@
 }
 
 .topbar {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 20;
   display: flex;
   align-items: center;
+  width: 100%;
+  max-width: var(--app-max-width);
   gap: 10px;
   padding: var(--space-lg) 20px var(--space-sm);
+  background: var(--paper);
+  transform: translateX(-50%);
 }
 
 .title {
@@ -20,6 +28,7 @@
 
 .content {
   flex: 1;
+  /* 위쪽은 상단바가 고정이라 실제 높이만큼 HomeLayout.tsx가 인라인 스타일로 덮어씀(--space-sm은 상단바 아래 여백) */
   padding: var(--space-sm) 20px calc(var(--tabbar-height) + var(--space-xl));
 }
 
