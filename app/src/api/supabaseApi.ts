@@ -17,6 +17,7 @@ import type {
   SplitType,
   User,
 } from '../domain/types'
+import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
 import type { JoinResolution, ProfileInput, SignUpInput, Snapshot } from './index'
@@ -94,6 +95,8 @@ export function authErrorMessage(error: AuthError): string {
       return '이메일 형식이 올바르지 않아요'
     case 'anonymous_provider_disabled':
       return '지금은 로그인 없이 참여할 수 없어요. 로그인하거나 가입해주세요.'
+    case 'captcha_failed':
+      return CAPTCHA_FAILED_MESSAGE
     case 'over_request_rate_limit':
     case 'over_email_send_rate_limit':
       return '요청이 너무 많아요. 잠시 후 다시 시도해주세요.'
@@ -332,7 +335,12 @@ export async function fetchSnapshot(): Promise<Snapshot> {
 
 export async function signIn(email: string, password: string): Promise<User> {
   const supabase = getSupabase()
-  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+  const captchaToken = await getCaptchaToken()
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+    options: captchaOptions(captchaToken),
+  })
   if (error) throw new Error(authErrorMessage(error))
   const user = await loadSessionUser()
   if (!user) throw new Error('프로필을 찾지 못했어요')
@@ -349,10 +357,11 @@ export async function signUp(input: SignUpInput): Promise<User> {
   if (!name || !input.bank || !account) throw new Error('이름, 은행, 계좌번호를 모두 입력해주세요')
 
   const supabase = getSupabase()
+  const captchaToken = await getCaptchaToken()
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
     password: input.password,
-    options: { data: { name, bank: input.bank, account } },
+    options: { data: { name, bank: input.bank, account }, ...captchaOptions(captchaToken) },
   })
   if (error) throw new Error(authErrorMessage(error))
   // 이메일 확인이 켜져 있으면 이미 가입된 이메일도 에러 없이 돌아오는데, 그땐 identities가 비어 있다
@@ -493,7 +502,8 @@ async function ensureSession(): Promise<AuthUser> {
   const supabase = getSupabase()
   const { data } = await supabase.auth.getSession()
   if (data.session) return data.session.user
-  const { data: created, error } = await supabase.auth.signInAnonymously()
+  const captchaToken = await getCaptchaToken()
+  const { data: created, error } = await supabase.auth.signInAnonymously({ options: captchaOptions(captchaToken) })
   if (error || !created.user) throw new Error(error ? authErrorMessage(error) : '참여를 시작하지 못했어요')
   return created.user
 }
@@ -780,15 +790,17 @@ const RESET_LINK_EXPIRED = '링크가 만료되었거나 이미 사용됐어요.
 
 /**
  * 재설정 링크 메일 요청. 가입된 이메일이든 아니든 똑같이 끝난다(14 예외처리: 계정 존재 여부 노출 방지) —
- * 그래서 서버 에러도 삼키고 콘솔에만 남긴다. 요청이 너무 잦다는 안내만 보여준다(계정 존재 여부와 무관).
+ * 그래서 서버 에러도 삼키고 콘솔에만 남긴다. 요청이 너무 잦다는 안내와 봇 확인 실패 안내만 보여준다(계정 존재 여부와 무관).
  * 메일 속 링크는 이 앱의 `/password-reset`으로 돌아온다(Supabase 대시보드 URL Configuration에 등록되어 있어야 함).
  */
 export async function requestPasswordReset(email: string): Promise<void> {
+  const captchaToken = await getCaptchaToken()
   const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim(), {
     redirectTo: `${window.location.origin}${paths.passwordReset}`,
+    ...captchaOptions(captchaToken),
   })
   if (!error) return
-  if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
+  if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit' || error.code === 'captcha_failed') {
     throw new Error(authErrorMessage(error))
   }
   console.error('[supabase] 비밀번호 재설정 메일 요청 실패', error)
