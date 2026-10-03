@@ -148,7 +148,7 @@ erDiagram
 > - [`supabase/migrations/20261004000000_expense_notification_trigger.sql`](../../supabase/migrations/20261004000000_expense_notification_trigger.sql) — 지출 등록 알림을 서버 트리거가 만들게 함 + 지출이 있는 그룹을 못 지우던 FK 검사 시점 수정. **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261004000100_lock_notification_writes.sql`](../../supabase/migrations/20261004000100_lock_notification_writes.sql) — 클라이언트의 알림 직접 추가를 막고 수정은 `read`만 허용. **바로 위 파일을 적용하고, 앱이 알림을 직접 만들지 않는 새 버전으로 배포된 뒤에만 적용**
 >
-> 적용 상태(2026-10-04): `init_schema` ~ `restrict_profile_columns`는 Supabase 프로젝트(`nonanae`)에 모두 적용됨. `20261004...` 두 파일은 위 순서대로 적용하는 중(적용 전에는 같은 그룹 멤버가 알림에 임의 문구를 넣을 수 있고, 지출이 있는 그룹은 삭제되지 않음). 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
+> 적용 상태(2026-10-04): `init_schema` ~ `restrict_profile_columns`는 Supabase 프로젝트(`nonanae`)에 모두 적용됨. `20261004...` 두 파일도 적용됨(2026-10-04, 실제 서버에서 확인: 알림 직접 추가·문구 수정은 거부되고 읽음 표시는 정상, 지출이 있는 그룹도 삭제됨). 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
 
 ### 스펙 → 테이블 대응
 
