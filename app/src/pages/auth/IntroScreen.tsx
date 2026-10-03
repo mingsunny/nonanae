@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
+import PrivacyLink from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import logoUrl from '../../assets/logo.png'
 import { paths } from '../../routes/paths'
@@ -40,6 +41,9 @@ export default function IntroScreen() {
           <button type="button" className={fields.textLink} onClick={() => navigate(paths.join)}>
             초대코드로 가입하기
           </button>
+        </div>
+        <div className={styles.policyFooter}>
+          <PrivacyLink />
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Avatar from '../components/common/Avatar'
 import Button from '../components/common/Button'
 import fields from '../components/common/Field.module.css'
+import PrivacyLink from '../components/common/PrivacyLink'
 import { BANKS } from '../domain/constants'
 import type { User } from '../domain/types'
 import { paths } from '../routes/paths'
@@ -111,6 +112,9 @@ function Profile({ user }: { user: User }) {
           회원 탈퇴
         </button>
       </div>
+      <p className={styles.policy}>
+        <PrivacyLink />
+      </p>
     </form>
   )
 }

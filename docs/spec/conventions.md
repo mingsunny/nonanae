@@ -50,6 +50,7 @@
 | 05 새 그룹 만들기 | `/groups/new` | 생성 직후 12(멤버 초대)로 이동 — 이후 12의 "그룹으로 가기"로 08 진입 |
 | 06 초대코드로 참여 / 07 멤버 매칭 | `/join` | 카카오톡 공유 링크는 `/join?code=ABCDEF`, 개인화 초대 링크는 `/join?code=ABCDEF-{memberId}` ([12](12-group-invite.md) 참고). 06→07은 같은 경로 안의 단계 전환 |
 | 14 비밀번호 재설정 | `/password-reset` | |
+| 개인정보 처리방침 | `/privacy` | 로그인 없이 열람. 인트로·프로필·가입 2단계·게스트 참여 화면의 링크가 새 탭으로 연다. 문구는 `app/src/domain/privacyPolicy.ts` |
 | 08 그룹 지출 내역 | `/groups/:groupId/expenses` | 그룹 내부 기본 탭. `/groups/:groupId`로 들어오면 여기로 이동 |
 | 09 그룹 정산 | `/groups/:groupId/settle` | |
 | 10 그룹 요약 | `/groups/:groupId/summary` | |
