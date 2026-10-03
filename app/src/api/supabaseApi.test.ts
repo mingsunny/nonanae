@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
   recovery: { opened: false },
+  getCaptchaToken: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -26,6 +27,12 @@ vi.mock('../lib/supabase', () => ({
   get openedFromRecoveryLink() {
     return mocks.recovery.opened
   },
+}))
+
+// 봇 확인(Turnstile)은 실제 위젯을 띄우지 않고 토큰만 돌려주게 바꾼다. 기본은 토큰 없음(CAPTCHA 미사용 환경).
+vi.mock('../lib/captcha', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/captcha')>()),
+  getCaptchaToken: mocks.getCaptchaToken,
 }))
 
 import {
@@ -197,7 +204,7 @@ describe('signIn', () => {
 
     const user = await signIn(' me@example.com ', 'pw-12345')
 
-    expect(mocks.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'me@example.com', password: 'pw-12345' })
+    expect(mocks.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'me@example.com', password: 'pw-12345', options: {} })
     expect(user).toEqual({
       id: 'user-1',
       authProvider: 'email',
@@ -210,6 +217,23 @@ describe('signIn', () => {
     })
   })
 
+  it('봇 확인 토큰이 있으면 captchaToken으로 함께 보낸다', async () => {
+    mocks.getCaptchaToken.mockResolvedValue('tok-1')
+    mocks.auth.signInWithPassword.mockResolvedValue({ error: authError('invalid_credentials') })
+    await expect(signIn('me@example.com', 'pw-12345')).rejects.toThrow()
+    expect(mocks.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'me@example.com',
+      password: 'pw-12345',
+      options: { captchaToken: 'tok-1' },
+    })
+  })
+
+  it('서버가 봇 확인을 거절하면 그 안내를 보여준다', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.auth.signInWithPassword.mockResolvedValue({ error: authError('captcha_failed') })
+    await expect(signIn('me@example.com', 'pw-12345')).rejects.toThrow('보안 확인을 하지 못했어요')
+  })
+
   it('잘못된 비밀번호면 한국어 에러로 던진다', async () => {
     mocks.auth.signInWithPassword.mockResolvedValue({ error: authError('invalid_credentials') })
     await expect(signIn('me@example.com', 'wrong')).rejects.toThrow('이메일 또는 비밀번호가 일치하지 않아요.')
@@ -218,6 +242,18 @@ describe('signIn', () => {
 
 describe('signUp', () => {
   const input = { email: 'new@example.com', password: 'pw-12345', name: ' 신규 ', bank: '토스뱅크', account: ' 1000-1 ' }
+
+  it('봇 확인 토큰이 있으면 메타데이터와 함께 captchaToken을 보낸다', async () => {
+    mocks.getCaptchaToken.mockResolvedValue('tok-2')
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockMyProfile(profileRow)
+    await signUp(input)
+    expect(mocks.auth.signUp.mock.calls[0][0].options).toEqual({
+      data: { name: '신규', bank: '토스뱅크', account: '1000-1' },
+      captchaToken: 'tok-2',
+    })
+  })
 
   it('이름·은행·계좌를 auth 메타데이터로 보내고, 가입 후 User를 돌려준다', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
@@ -532,6 +568,15 @@ describe('resolveInviteCode', () => {
 
     expect(mocks.auth.signInAnonymously).toHaveBeenCalled()
     expect(mocks.rpc).toHaveBeenCalledWith('lookup_group_by_code', { p_code: 'NOPE99' })
+  })
+
+  it('익명 로그인에도 봇 확인 토큰을 실어 보낸다', async () => {
+    mocks.getCaptchaToken.mockResolvedValue('tok-3')
+    mocks.auth.getSession.mockResolvedValue(noSession)
+    mocks.auth.signInAnonymously.mockResolvedValue({ data: { user: { id: 'anon-1', is_anonymous: true } }, error: null })
+    mockRpc({ lookup_group_by_code: () => ok(null) })
+    await resolveInviteCode('nope99')
+    expect(mocks.auth.signInAnonymously).toHaveBeenCalledWith({ options: { captchaToken: 'tok-3' } })
   })
 
   it('이미 세션이 있으면 익명 로그인을 새로 만들지 않는다', async () => {
@@ -964,6 +1009,22 @@ describe('비밀번호 재설정 (14)', () => {
       expect(mocks.auth.resetPasswordForEmail).toHaveBeenCalledWith('me@example.com', {
         redirectTo: `${window.location.origin}/password-reset`,
       })
+    })
+
+    it('봇 확인 토큰이 있으면 captchaToken을 함께 보낸다', async () => {
+      mocks.getCaptchaToken.mockResolvedValue('tok-4')
+      mocks.auth.resetPasswordForEmail.mockResolvedValue({ error: null })
+      await requestPasswordReset('me@example.com')
+      expect(mocks.auth.resetPasswordForEmail).toHaveBeenCalledWith('me@example.com', {
+        redirectTo: `${window.location.origin}/password-reset`,
+        captchaToken: 'tok-4',
+      })
+    })
+
+    it('봇 확인 실패는 삼키지 않는다 — 메일이 안 갔는데 간 것처럼 보이면 안 된다', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mocks.auth.resetPasswordForEmail.mockResolvedValue({ error: authError('captcha_failed') })
+      await expect(requestPasswordReset('me@example.com')).rejects.toThrow('보안 확인을 하지 못했어요')
     })
 
     it('서버 에러는 삼킨다 — 가입 여부에 따라 결과가 달라 보이면 계정 존재 여부가 노출된다', async () => {
