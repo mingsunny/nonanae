@@ -361,9 +361,30 @@ export async function signUp(input: SignUpInput): Promise<User> {
   // 세션이 없다 = Supabase에서 "이메일 확인"이 켜져 있어 확인 메일을 눌러야 로그인됨
   if (!data.session) throw new Error('가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해주세요.')
 
+  await dropAccountFromLoginInfo()
+
   const user = await loadSessionUser()
   if (!user) throw new Error('프로필을 만들지 못했어요')
   return user
+}
+
+/**
+ * 가입 요청에 실어 보낸 은행·계좌번호의 사본을 로그인 정보(메타데이터)와 토큰에서 지운다.
+ * 계좌번호는 profiles에만 두면 되는데, 사본이 남으면 프로필에서 계좌를 고쳐도 옛 번호가 계속 남고 토큰에도 실려 다닌다.
+ * DB 가입 트리거도 지우지만 로그인 서버가 가입 직후 사용자 정보를 다시 저장하면서 되돌려 버리므로(실제 서버에서 확인),
+ * 가입이 끝난 뒤 여기서 한 번 더 지운다. 값을 null로 보내면 그 키가 지워진다.
+ * 못 지워도 가입 자체는 성공이므로 에러로 던지지 않는다(콘솔에만 남김 — 값은 찍지 않음).
+ */
+async function dropAccountFromLoginInfo(): Promise<void> {
+  const supabase = getSupabase()
+  const { error } = await supabase.auth.updateUser({ data: { bank: null, account: null } })
+  if (error) {
+    console.error('[supabase] 로그인 정보에서 계좌 사본을 지우지 못했어요', error.code ?? error.message)
+    return
+  }
+  // 이미 발급된 토큰에는 옛 메타데이터가 실려 있으니 새로 받는다
+  const refreshed = await supabase.auth.refreshSession()
+  if (refreshed.error) console.error('[supabase] 세션을 새로 받지 못했어요', refreshed.error.code ?? refreshed.error.message)
 }
 
 export async function signOut(): Promise<void> {

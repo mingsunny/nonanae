@@ -8,5 +8,11 @@
 --
 -- 되돌리려면: grant select on public.profiles to authenticated;
 
+-- 먼저 한 번 더 정리: 1/2 적용 이후에 가입한 계정의 로그인 정보에 남아 있는 계좌번호 사본을 지운다.
+-- (1/2의 가입 트리거가 지워도 로그인 서버가 가입 직후 되돌려서, 앱이 가입 뒤에 직접 지우도록 고치기 전 가입자에게 남아 있다. 여러 번 실행해도 안전)
+update auth.users
+   set raw_user_meta_data = raw_user_meta_data - 'bank' - 'account'
+ where raw_user_meta_data ?| array['bank', 'account'];
+
 revoke select on public.profiles from authenticated;
 grant select (id, name, seen_group_create_coach, created_at) on public.profiles to authenticated;
