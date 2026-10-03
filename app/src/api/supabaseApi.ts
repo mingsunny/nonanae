@@ -22,27 +22,51 @@ import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
 import type { JoinResolution, ProfileInput, SignUpInput, Snapshot } from './index'
 
-/** public.profiles 한 행 (DB는 snake_case) */
-interface ProfileRow {
+/**
+ * 다른 회원도 읽을 수 있는 프로필 컬럼 (DB는 snake_case). 은행·계좌번호는 일부러 뺐다 —
+ * profiles 테이블에서 직접 읽지 못하게 막아 두었고(20261003000100_restrict_profile_columns.sql),
+ * 내 것은 get_my_profile(), 돈을 받을 사람의 것은 get_payee_accounts() 함수로만 읽는다.
+ */
+interface PublicProfileRow {
   id: string
   name: string
-  bank: string
-  account: string
   seen_group_create_coach: boolean
 }
 
-const PROFILE_COLUMNS = 'id, name, bank, account, seen_group_create_coach'
+/** get_my_profile()이 돌려주는 내 프로필 (계좌 포함) */
+interface MyProfileRow extends PublicProfileRow {
+  bank: string
+  account: string
+}
 
-/** 프로필(이름·계좌)에 로그인 계정 정보(이메일·인증 여부)를 합쳐 앱의 User로 만든다. */
-function toUser(profile: ProfileRow, account: { email: string; emailVerified: boolean }): User {
+/** get_payee_accounts()가 돌려주는 한 줄: 돈을 받을 수 있는(지출을 결제한) 회원의 계좌 */
+interface PayeeAccountRow {
+  user_id: string
+  bank: string
+  account: string
+}
+
+const PUBLIC_PROFILE_COLUMNS = 'id, name, seen_group_create_coach'
+
+interface BankAccount {
+  bank: string
+  account: string
+}
+
+/** 프로필(이름)에 로그인 계정 정보(이메일·인증 여부)와, 볼 수 있는 경우의 계좌를 합쳐 앱의 User로 만든다. */
+function toUser(
+  profile: PublicProfileRow,
+  account: { email: string; emailVerified: boolean },
+  bankAccount: BankAccount | null,
+): User {
   return {
     id: profile.id,
     authProvider: 'email',
     email: account.email,
     emailVerified: account.emailVerified,
     name: profile.name,
-    bank: profile.bank,
-    account: profile.account,
+    bank: bankAccount?.bank ?? null,
+    account: bankAccount?.account ?? null,
     seenGroupCreateCoach: profile.seen_group_create_coach,
   }
 }
@@ -95,14 +119,11 @@ async function loadSessionUser(): Promise<User | null> {
   const authUser = data.session?.user
   if (!authUser || authUser.is_anonymous) return null
 
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select(PROFILE_COLUMNS)
-    .eq('id', authUser.id)
-    .maybeSingle<ProfileRow>()
+  // 내 계좌는 테이블에서 직접 읽을 수 없고 함수로만 읽는다
+  const { data: profile, error } = await supabase.rpc('get_my_profile').maybeSingle<MyProfileRow>()
   if (error) throw new Error(`프로필을 불러오지 못했어요: ${error.message}`)
   // 세션은 남아 있는데 프로필이 없는 경우(탈퇴 직후 등)는 로그아웃 상태로 본다
-  return profile ? toUser(profile, accountOf(authUser)) : null
+  return profile ? toUser(profile, accountOf(authUser), { bank: profile.bank, account: profile.account }) : null
 }
 
 // --- 서버 행 → 앱 타입 (DB는 snake_case) ---
@@ -260,22 +281,31 @@ export async function fetchSnapshot(): Promise<Snapshot> {
     userId = authUser.id
   }
 
-  // 멤버가 가리키는 정식 회원들의 프로필(이름·계좌). 내 프로필이 없으면(탈퇴 직후 등) 로그아웃 상태로 본다.
+  // 멤버가 가리키는 정식 회원들의 프로필. 내 프로필이 없으면(탈퇴 직후 등) 로그아웃 상태로 본다.
+  // 이름은 같은 그룹 멤버끼리 읽을 수 있지만, 계좌번호는 내 것(get_my_profile)과
+  // "돈을 받을 수 있는 사람"의 것(get_payee_accounts)만 받는다 — 나머지 회원의 계좌는 서버가 내려주지 않는다.
   const members = allMembers.filter((m) => visibleGroupIds.has(m.group_id))
   const profileIds = new Set(members.flatMap((m) => (m.user_id ? [m.user_id] : [])))
   if (userId) profileIds.add(userId)
-  const profiles =
+  const [profilesRes, myProfileRes, payeesRes] = await Promise.all([
     profileIds.size === 0
-      ? []
-      : rowsOrThrow<ProfileRow>(
-          await supabase.from('profiles').select(PROFILE_COLUMNS).in('id', [...profileIds]),
-          '프로필',
-        )
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).in('id', [...profileIds]),
+    userId ? supabase.rpc('get_my_profile').maybeSingle<MyProfileRow>() : Promise.resolve({ data: null, error: null }),
+    supabase.rpc('get_payee_accounts'),
+  ])
+  const profiles = rowsOrThrow<PublicProfileRow>(profilesRes, '프로필')
+  if (myProfileRes.error) throw new Error(`프로필을 불러오지 못했어요: ${myProfileRes.error.message}`)
+  const payees = rowsOrThrow<PayeeAccountRow>(payeesRes, '받을 사람 계좌')
   if (userId && !profiles.some((p) => p.id === userId)) return empty
 
+  const payeeAccounts = new Map(payees.map((r) => [r.user_id, { bank: r.bank, account: r.account }]))
+  const myProfile = myProfileRes.data
   // 다른 사람의 이메일은 화면에서 쓰지 않고 읽을 수도 없으므로 비워 둔다
   const users = profiles.map((p) =>
-    toUser(p, p.id === userId ? accountOf(authUser) : { email: '', emailVerified: false }),
+    p.id === userId
+      ? toUser(p, accountOf(authUser), myProfile ? { bank: myProfile.bank, account: myProfile.account } : null)
+      : toUser(p, { email: '', emailVerified: false }, payeeAccounts.get(p.id) ?? null),
   )
 
   const groups: GroupDetail[] = allGroups
@@ -381,6 +411,8 @@ function rpcErrorMessage(error: PostgrestError): string {
   if (message.includes('name required')) return '이름을 입력해주세요'
   if (message.includes('only guests can rename')) return '게스트만 이름을 수정할 수 있어요'
   if (message.includes('rename target not available')) return '본인 자리만 이름을 수정할 수 있어요'
+  if (message.includes('guests cannot rotate invite codes')) return '로그인한 회원만 초대코드를 새로 만들 수 있어요'
+  if (message.includes('only the owner can rotate')) return '방장만 초대코드를 새로 만들 수 있어요'
   if (message.includes('not authenticated')) return '로그인이 필요해요'
   if (message.includes('guests cannot delete accounts')) return '로그인한 회원만 탈퇴할 수 있어요'
   console.error('[supabase rpc]', error)
@@ -404,6 +436,18 @@ export async function createGroup(name: string): Promise<Group> {
     .single<GroupRow>()
   if (readError) throw new Error(`그룹을 불러오지 못했어요: ${readError.message}`)
   return toGroup(row)
+}
+
+/**
+ * 초대코드 재발급(12). 새 코드가 만들어지면 이전 코드와 그 코드로 만든 개인 초대 링크는 즉시 못 쓴다 —
+ * 코드가 새어 나갔을 때 방장이 끊는 용도. 이미 참여한 멤버에게는 영향이 없다. 방장만 가능(서버가 확인).
+ */
+export async function rotateInviteCode(groupId: string): Promise<string> {
+  await requireAuthUserId()
+  const { data, error } = await getSupabase().rpc('rotate_invite_code', { p_group_id: groupId })
+  if (error) throw new Error(rpcErrorMessage(error))
+  inviteCodeByGroupId.delete(groupId)
+  return data as string
 }
 
 // --- 06/07 초대코드로 참여 ---

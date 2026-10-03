@@ -30,7 +30,8 @@ function MemberInvite({ group }: { group: GroupDetail }) {
   const fromCreation = (location.state as { fromCreation?: boolean } | null)?.fromCreation === true
   const addPendingMember = useAppStore((s) => s.addPendingMember)
   const renameGuestMember = useAppStore((s) => s.renameGuestMember)
-  const { nameOf, isMe, isPending } = useGroupView(group)
+  const rotateInviteCode = useAppStore((s) => s.rotateInviteCode)
+  const { me, nameOf, isMe, isPending } = useGroupView(group)
   const [name, setName] = useState('')
   const trimmed = name.trim()
   // 게스트 본인 이름 수정. 한 번에 한 명만 편집 상태로 둔다(본인 자리 외에는 이 폼이 뜨지 않음).
@@ -58,6 +59,17 @@ function MemberInvite({ group }: { group: GroupDetail }) {
       setEditing(false)
     } catch (error) {
       showToast(error instanceof Error ? error.message : '이름을 바꾸지 못했어요')
+    }
+  }
+
+  /** 방장이 초대코드를 새로 만든다 — 이전 코드와 그 코드로 만든 초대 링크는 즉시 못 쓰고, 이미 참여한 멤버는 그대로다. */
+  async function rotateCode() {
+    if (!window.confirm('초대코드를 새로 만들까요?\n이전 코드와 초대 링크는 더 이상 쓸 수 없어요.')) return
+    try {
+      await rotateInviteCode(group.id)
+      showToast('초대코드를 새로 만들었어요')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '새로 만들지 못했어요')
     }
   }
 
@@ -165,6 +177,19 @@ function MemberInvite({ group }: { group: GroupDetail }) {
             </Button>
           </div>
         </form>
+
+        {/* 방장(정식 회원)만: 초대코드가 다른 사람에게 알려졌을 때 끊는 용도 */}
+        {me?.role === 'owner' && (
+          <div className={styles.rotate}>
+            <button type="button" className={styles.rotateButton} onClick={rotateCode}>
+              초대코드 새로 만들기
+            </button>
+            <p className={styles.rotateHint}>
+              초대코드가 원치 않는 사람에게 알려졌다면 새로 만드세요. 이전 코드와 초대 링크는 더 이상 쓸 수 없고,
+              이미 참여한 멤버는 그대로예요.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className={styles.footer}>

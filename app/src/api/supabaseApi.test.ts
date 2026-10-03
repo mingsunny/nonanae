@@ -45,6 +45,7 @@ import {
   requestPasswordReset,
   resetPassword,
   resolveInviteCode,
+  rotateInviteCode,
   signIn,
   signOut,
   signUp,
@@ -65,15 +66,6 @@ const noSession = { data: { session: null } }
 
 function authError(code: string): AuthError {
   return { code, message: `raw ${code}`, name: 'AuthApiError', status: 400 } as unknown as AuthError
-}
-
-/** from('profiles').select().eq().maybeSingle() 가 result를 돌려주게 한다 */
-function mockProfileRead(result: { data: unknown; error: unknown }) {
-  const maybeSingle = vi.fn().mockResolvedValue(result)
-  const eq = vi.fn(() => ({ maybeSingle }))
-  const select = vi.fn(() => ({ eq }))
-  mocks.from.mockReturnValueOnce({ select })
-  return { select, eq }
 }
 
 /** from('profiles').update(values).eq('id', ...) 가 result를 돌려주게 한다 */
@@ -123,19 +115,52 @@ function mockTables(fixtures: Record<string, Fixture | Fixture[]>): Record<strin
 
 const ok = (data: unknown): Fixture => ({ data, error: null })
 
-/** DB 함수(RPC)별 결과 */
-function mockRpc(handlers: Record<string, (args: Record<string, unknown>) => Fixture>) {
-  mocks.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
-    const handler = handlers[fn]
+/** DB 함수(RPC)별 결과. 테스트마다 비우고, 계좌를 읽는 함수 2개는 기본으로 "없음"을 돌려준다. */
+type RpcHandler = (args: Record<string, unknown>) => Fixture
+const rpcHandlers: Record<string, RpcHandler> = {}
+
+/** supabase-js의 rpc() 결과처럼 그냥 await해도 되고 .maybeSingle()/.single()도 부를 수 있게 만든다 */
+function rpcResult(result: Fixture) {
+  const rows = Array.isArray(result.data) ? result.data : result.data == null ? [] : [result.data]
+  const one = async () => (result.error ? { data: null, error: result.error } : { data: rows[0] ?? null, error: null })
+  return {
+    then: (resolve: (v: Fixture) => unknown, reject: (e: unknown) => unknown) =>
+      Promise.resolve(result).then(resolve, reject),
+    maybeSingle: one,
+    single: one,
+  }
+}
+
+function installRpc() {
+  for (const key of Object.keys(rpcHandlers)) delete rpcHandlers[key]
+  rpcHandlers.get_my_profile = () => ok([])
+  rpcHandlers.get_payee_accounts = () => ok([])
+  mocks.rpc.mockImplementation((fn: string, args: Record<string, unknown> = {}) => {
+    const handler = rpcHandlers[fn]
     if (!handler) throw new Error(`unexpected rpc ${fn}`)
-    return handler(args)
+    return rpcResult(handler(args))
   })
+}
+
+function mockRpc(handlers: Record<string, RpcHandler>) {
+  Object.assign(rpcHandlers, handlers)
+}
+
+/** get_my_profile()이 내 프로필(계좌 포함)을 돌려주게 한다. null이면 프로필 없음 */
+function mockMyProfile(row: Record<string, unknown> | null) {
+  mockRpc({ get_my_profile: () => ok(row ? [row] : []) })
+}
+
+/** get_payee_accounts()가 "돈을 받을 수 있는 사람"의 계좌들을 돌려주게 한다 */
+function mockPayeeAccounts(rows: { user_id: string; bank: string; account: string }[]) {
+  mockRpc({ get_payee_accounts: () => ok(rows) })
 }
 
 const guestSession = { data: { session: { user: { id: 'anon-1', is_anonymous: true } } } }
 
 beforeEach(() => {
   vi.resetAllMocks()
+  installRpc()
 })
 
 beforeEach(() => {
@@ -165,7 +190,7 @@ describe('signIn', () => {
   it('로그인하고 auth 계정 + 프로필을 합친 User를 돌려준다', async () => {
     mocks.auth.signInWithPassword.mockResolvedValue({ error: null })
     mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockProfileRead({ data: profileRow, error: null })
+    mockMyProfile(profileRow)
 
     const user = await signIn(' me@example.com ', 'pw-12345')
 
@@ -194,7 +219,7 @@ describe('signUp', () => {
   it('이름·은행·계좌를 auth 메타데이터로 보내고, 가입 후 User를 돌려준다', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
     mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockProfileRead({ data: { ...profileRow, name: '신규' }, error: null })
+    mockMyProfile({ ...profileRow, name: '신규' })
 
     const user = await signUp(input)
 
@@ -298,19 +323,80 @@ describe('fetchSnapshot', () => {
     ])
   })
 
-  it('다른 회원의 프로필은 이름·계좌만 채우고 이메일은 비운다', async () => {
-    mocks.auth.getSession.mockResolvedValue(signedInSession)
+  describe('계좌번호는 볼 수 있어야 하는 사람 것만 받는다', () => {
+    const twoMembers = () =>
+      mockTables({
+        groups: ok([groupRow('g-1')]),
+        members: ok([
+          memberRow({ id: 'm-owner', user_id: 'user-1', role: 'owner' }),
+          memberRow({ id: 'm-friend', user_id: 'user-2' }),
+          memberRow({ id: 'm-payer', user_id: 'user-3' }),
+        ]),
+        profiles: ok([
+          { id: 'user-1', name: '민선', seen_group_create_coach: false },
+          { id: 'user-2', name: '친구', seen_group_create_coach: false },
+          { id: 'user-3', name: '결제한친구', seen_group_create_coach: false },
+        ]),
+      })
+
+    it('내 계좌는 get_my_profile()로 채운다', async () => {
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      twoMembers()
+      mockMyProfile(profileRow)
+
+      const { users } = await fetchSnapshot()
+      expect(users.find((u) => u.id === 'user-1')).toMatchObject({ bank: '카카오뱅크', account: '3333-01-1', email: 'me@example.com' })
+    })
+
+    it('다른 회원은 "돈을 받을 수 있는 사람"(get_payee_accounts)일 때만 계좌를 채우고, 나머지는 비운다', async () => {
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      twoMembers()
+      mockMyProfile(profileRow)
+      mockPayeeAccounts([{ user_id: 'user-3', bank: '토스뱅크', account: '1000-9' }])
+
+      const { users } = await fetchSnapshot()
+      expect(users.find((u) => u.id === 'user-3')).toMatchObject({ name: '결제한친구', bank: '토스뱅크', account: '1000-9', email: '' })
+      // 결제한 적 없는 회원의 계좌는 서버가 내려주지 않으므로 화면에도 없다
+      expect(users.find((u) => u.id === 'user-2')).toMatchObject({ name: '친구', bank: null, account: null, email: '' })
+    })
+
+    it('은행·계좌 컬럼을 profiles 테이블에서 직접 읽지 않는다 (서버가 그 컬럼 조회를 막아 두었다)', async () => {
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      const made = twoMembers()
+      mockMyProfile(profileRow)
+
+      await fetchSnapshot()
+      for (const builder of made.profiles) {
+        const columns = String(builder.select.mock.calls[0][0])
+        expect(columns).not.toMatch(/bank|account/)
+      }
+    })
+
+    it('받을 사람 계좌를 못 불러오면 "계좌 없음"으로 속이지 않고 에러로 던진다', async () => {
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      twoMembers()
+      mockMyProfile(profileRow)
+      mockRpc({ get_payee_accounts: () => ({ data: null, error: { message: 'boom' } }) })
+
+      await expect(fetchSnapshot()).rejects.toThrow('받을 사람 계좌을(를) 불러오지 못했어요: boom')
+    })
+  })
+
+  it('게스트도 정산에 필요한 "받을 사람" 계좌는 받지만, 내 프로필(get_my_profile)은 부르지 않는다', async () => {
+    mocks.auth.getSession.mockResolvedValue(guestSession)
     mockTables({
       groups: ok([groupRow('g-1')]),
       members: ok([
-        memberRow({ id: 'm-owner', user_id: 'user-1', role: 'owner' }),
-        memberRow({ id: 'm-friend', user_id: 'user-2' }),
+        memberRow({ id: 'm-guest', guest_uid: 'anon-1', name: '게스트' }),
+        memberRow({ id: 'm-payer', user_id: 'user-3' }),
       ]),
-      profiles: ok([profileRow, { ...profileRow, id: 'user-2', name: '친구' }]),
+      profiles: ok([{ id: 'user-3', name: '결제한친구', seen_group_create_coach: false }]),
     })
+    mockPayeeAccounts([{ user_id: 'user-3', bank: '토스뱅크', account: '1000-9' }])
 
     const { users } = await fetchSnapshot()
-    expect(users.find((u) => u.id === 'user-2')).toMatchObject({ name: '친구', email: '', emailVerified: false })
+    expect(users.map((u) => u.account)).toEqual(['1000-9'])
+    expect(mocks.rpc).not.toHaveBeenCalledWith('get_my_profile', expect.anything())
   })
 
   it('게스트(익명) 세션은 정식 회원이 아니고, 자기 자리의 그룹 하나만 본다', async () => {
@@ -550,7 +636,7 @@ describe('updateProfile', () => {
   it('공백을 다듬어서 내 프로필 행만 수정한다', async () => {
     mocks.auth.getSession.mockResolvedValue(signedInSession)
     const { update, eq } = mockProfileUpdate()
-    mockProfileRead({ data: { ...profileRow, name: '새이름' }, error: null })
+    mockMyProfile({ ...profileRow, name: '새이름' })
 
     const user = await updateProfile({ name: ' 새이름 ', bank: '국민은행', account: ' 123-456 ' })
 
@@ -947,5 +1033,38 @@ describe('비밀번호 재설정 (14)', () => {
       await expect(resetPassword('same')).rejects.toThrow('이전과 다른 비밀번호를 입력해주세요.')
       expect(mocks.auth.signOut).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('rotateInviteCode (12)', () => {
+  it('방장이 새 코드를 만든다 — DB 함수를 부르고 새 코드를 돌려준다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ rotate_invite_code: () => ok('NEW234') })
+    expect(await rotateInviteCode('g-1')).toBe('NEW234')
+    expect(mocks.rpc).toHaveBeenCalledWith('rotate_invite_code', { p_group_id: 'g-1' })
+  })
+
+  it('이전 코드로 기억해 둔 참여 절차는 버린다 (옛 코드로 07에서 참여 시도하는 걸 막음)', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockTables({ members: ok([]) })
+    mockRpc({
+      lookup_group_by_code: () => ok({ id: 'g-1', name: '제주', members: [] }),
+      rotate_invite_code: () => ok('NEW234'),
+    })
+    await resolveInviteCode('OLD234') // 06에서 확인한 코드를 기억해 둠
+    await rotateInviteCode('g-1')
+    await expect(joinAsNewAccountMember('g-1')).rejects.toThrow('초대코드를 다시 입력해주세요')
+  })
+
+  it('게스트는 서버를 부르기 전에 막는다', async () => {
+    mocks.auth.getSession.mockResolvedValue(guestSession)
+    await expect(rotateInviteCode('g-1')).rejects.toThrow('로그인이 필요해요')
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  it('방장이 아니면 서버가 거부하고, 한국어 문구로 알려준다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ rotate_invite_code: () => ({ data: null, error: { message: 'only the owner can rotate the invite code' } }) })
+    await expect(rotateInviteCode('g-1')).rejects.toThrow('방장만 초대코드를 새로 만들 수 있어요')
   })
 })
