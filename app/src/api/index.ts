@@ -384,6 +384,26 @@ export async function createGroup(name: string): Promise<Group> {
   return structuredClone(group)
 }
 
+/**
+ * 초대코드 재발급(12). 새 코드가 만들어지면 이전 코드와 그 코드로 만든 개인 초대 링크는 즉시 못 쓴다 —
+ * 코드가 새어 나갔을 때 방장이 끊는 용도. 이미 참여한 멤버에게는 영향이 없다. 방장(정식 회원)만 가능.
+ */
+export async function rotateInviteCode(groupId: string): Promise<string> {
+  if (USE_SUPABASE) return remote.rotateInviteCode(groupId)
+  const d = getDb()
+  const user = requireSessionUser(d)
+  const group = d.groups.find((g) => g.id === groupId)
+  if (!group) throw new Error('존재하지 않는 그룹이에요')
+  const isOwner = d.members.some((m) => m.groupId === groupId && m.userId === user.id && m.role === 'owner')
+  if (!isOwner) throw new Error('방장만 초대코드를 새로 만들 수 있어요')
+
+  let inviteCode = generateInviteCode()
+  while (d.groups.some((g) => g.inviteCode === inviteCode)) inviteCode = generateInviteCode()
+  group.inviteCode = inviteCode
+  commit()
+  return inviteCode
+}
+
 // --- 06/07 초대코드로 참여 ---
 // fetchSnapshot은 "내가 속한 그룹"만 돌려주므로, 아직 멤버가 아닌 그룹은 이 함수들로만 다룬다.
 

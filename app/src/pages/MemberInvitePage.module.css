@@ -157,3 +157,27 @@
   border-top: 1px solid var(--line);
   background: var(--paper);
 }
+
+.rotate {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--line);
+}
+
+.rotateButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rotateHint {
+  margin: var(--space-xs) 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}

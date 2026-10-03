@@ -3,8 +3,11 @@ import {
   addPendingMember,
   createExpense,
   deleteExpense,
+  joinAsNewAccountMember,
   joinAsNewGuest,
   renameGuestMember,
+  resolveInviteCode,
+  rotateInviteCode,
   signOut,
   fetchSnapshot,
   markNotificationRead,
@@ -195,6 +198,38 @@ describe('renameGuestMember', () => {
   it('로그인한 정식 회원은 자기 멤버 자리를 이 함수로 고칠 수 없다(프로필에서 고쳐야 함)', async () => {
     // 기본 시드는 u_test로 로그인된 상태 — 로그인 중엔 viewAsMemberId를 보지 않는다
     await expect(renameGuestMember('m_me', '새이름')).rejects.toThrow('본인의 이름만 수정할 수 있어요')
+  })
+})
+
+describe('rotateInviteCode', () => {
+  it('방장이 새 코드를 만들면 이전 코드는 더 이상 쓸 수 없다', async () => {
+    const before = (await fetchSnapshot()).groups[0].inviteCode
+    const next = await rotateInviteCode('g_jeju')
+    expect(next).toMatch(/^[A-Z2-9]{6}$/)
+    expect(next).not.toBe(before)
+    expect((await fetchSnapshot()).groups[0].inviteCode).toBe(next)
+    expect(await resolveInviteCode(before)).toEqual({ kind: 'not-found' })
+    expect((await resolveInviteCode(next)).kind).toBe('joined') // 이미 멤버니 바로 들어감
+  })
+
+  it('이미 참여한 멤버는 코드가 바뀌어도 그대로 멤버다', async () => {
+    await rotateInviteCode('g_jeju')
+    const { groups } = await fetchSnapshot()
+    expect(groups[0].members).toHaveLength(4)
+  })
+
+  it('방장이 아닌 멤버는 만들 수 없다', async () => {
+    await joinAsNewAccountMember('g_test42') // 테스트 계정이 방장이 아닌 일반 멤버로 참여
+    await expect(rotateInviteCode('g_test42')).rejects.toThrow('방장만 초대코드를 새로 만들 수 있어요')
+  })
+
+  it('로그인하지 않은 게스트는 만들 수 없다', async () => {
+    await signOut()
+    await expect(rotateInviteCode('g_jeju')).rejects.toThrow('로그인이 필요해요')
+  })
+
+  it('없는 그룹이면 던진다', async () => {
+    await expect(rotateInviteCode('g_none')).rejects.toThrow('존재하지 않는 그룹이에요')
   })
 })
 

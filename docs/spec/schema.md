@@ -143,8 +143,10 @@ erDiagram
 > - [`supabase/migrations/20260920000100_guest_support.sql`](../../supabase/migrations/20260920000100_guest_support.sql) — 게스트(익명 로그인) 지원. **위 파일을 먼저 실행한 뒤** 실행
 > - [`supabase/migrations/20260921000000_delete_account.sql`](../../supabase/migrations/20260921000000_delete_account.sql) — 회원 탈퇴용 함수 `delete_my_account()`. 위 두 파일 다음에 실행
 > - [`supabase/migrations/20260927000000_rename_guest_member.sql`](../../supabase/migrations/20260927000000_rename_guest_member.sql) — 게스트 본인 이름 수정용 함수 `rename_guest_member()`. 위 세 파일 다음에 실행
+> - [`supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql`](../../supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql) — 계좌 조회 함수(`get_my_profile`, `get_payee_accounts`), 가입 때 계좌가 로그인 정보에 복사되던 것 정리, 초대코드 재발급(`rotate_invite_code`). **추가만 하는 안전한 단계**
+> - [`supabase/migrations/20261003000100_restrict_profile_columns.sql`](../../supabase/migrations/20261003000100_restrict_profile_columns.sql) — `profiles`의 은행·계좌 컬럼을 API로 직접 못 읽게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (먼저 적용하면 옛 앱이 프로필을 못 읽음)
 >
-> 적용 상태(2026-09-21): 처음 세 마이그레이션은 Supabase 프로젝트(`nonanae`)에 적용됨. `rename_guest_member`(2026-09-27 추가)는 **적용 전에는 게스트 이름 수정이 동작하지 않음**. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
+> 적용 상태(2026-10-03): 앞의 네 마이그레이션(`init_schema` ~ `rename_guest_member`)은 Supabase 프로젝트(`nonanae`)에 적용됨. 2026-10-03에 추가한 마지막 두 파일은 **아직 미적용** — 위 순서(추가 → 앱 배포 → 컬럼 차단)대로 적용. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
 
 ### 스펙 → 테이블 대응
 
@@ -258,7 +260,7 @@ erDiagram
 
 | 테이블 | 조회 | 쓰기 |
 |---|---|---|
-| profiles | 내 프로필 + 같은 그룹 멤버의 프로필(정산 화면에서 송금 계좌를 보여줘야 해서 게스트도 포함) | 내 프로필만 수정. 생성은 가입 트리거만 |
+| profiles | 내 프로필 + 같은 그룹 멤버의 프로필 중 **이름 등 일부 컬럼만**. 은행·계좌번호 컬럼은 테이블에서 직접 읽을 수 없고 `get_my_profile()`(내 것) / `get_payee_accounts()`(돈을 받을 사람 것)로만 읽는다 | 내 프로필만 수정. 생성은 가입 트리거만 |
 | groups | 멤버 | 그룹장만 수정·삭제. 생성은 `create_group()`만 |
 | members | 같은 그룹 멤버 | 멤버 누구나 이름만 있는 미가입 멤버(placeholder) 추가 가능. 참여·그룹장 지정은 RPC만 |
 | expenses, expense_participants | 같은 그룹 멤버 | 같은 그룹 멤버 누구나 등록·수정·삭제 |
@@ -273,6 +275,9 @@ erDiagram
 | `create_group(p_name)` | [05](05-create-group.md) 그룹 + 그룹장 멤버를 한 번에 생성, group id 반환. **정식 회원만**(게스트 거부) |
 | `lookup_group_by_code(p_code)` | [06](06-join-group.md) 초대코드 확인 + [07](07-join-match.md) "나 고르기" 목록용 `{id, name, members[{id, name, claimed}]}` 반환. 잘못된 코드면 null |
 | `join_group(p_code, p_member_id, p_name)` | [06](06-join-group.md)/[07](07-join-match.md) 초대코드 참여. 정식 회원·게스트 공용 — `p_member_id`가 있으면 그 자리를 내 것으로, 없으면 새 멤버로 추가(게스트는 `p_name` 필수). 이미 멤버면 기존 멤버 id 반환. 새 멤버가 생기거나 정식 회원이 자리를 채울 때만 참여 알림 생성 |
+| `get_my_profile()` | [04](04-profile.md) 내 이름·은행·계좌·안내 확인 여부. 본인 것만(게스트는 프로필이 없어 빈 결과) |
+| `get_payee_accounts()` | [09](09-group-settle.md) 정산 화면의 "받을 사람 계좌". **내가 속한 그룹에서 지출을 결제한 적 있는 정식 회원**의 은행·계좌만 돌려준다 — 정산에서 돈을 받는 쪽은 반드시 결제한 사람이라 이것만으로 충분하고, 결제한 적 없는 회원의 계좌는 같은 그룹이어도 내려주지 않는다. 게스트도 호출 가능(송금하려면 필요) |
+| `rotate_invite_code(p_group_id)` | [12](12-group-invite.md) 초대코드 재발급. **방장(정식 회원)만**. 새 코드를 돌려주고, 이전 코드와 그 코드로 만든 개인 초대 링크는 즉시 못 쓴다. 이미 참여한 멤버는 영향 없음 |
 | `rename_guest_member(p_member_id, p_name)` | [12](12-group-invite.md) 게스트 본인 이름 수정. "지금 이 익명 세션이 차지한 자리"(`guest_uid = auth.uid()`)만 허용 — `name` 컬럼만 바꾼다(다른 컬럼은 함수가 손대지 않으므로, 일반 UPDATE 정책과 달리 role/user_id를 함께 바꿔 권한을 상승시킬 수 없음) |
 | `delete_my_account()` | [04](04-profile.md) 회원 탈퇴. 로그인한 정식 회원 본인의 `auth.users` 행을 삭제(게스트는 거부) → `profiles` cascade 삭제 → `before_profile_delete` 트리거가 이름 보존 |
 | `is_group_member`, `is_group_owner`, `shares_group_with`, `is_anonymous_user` | RLS용 헬퍼 |
@@ -289,7 +294,8 @@ erDiagram
 ### 알려진 제한 · 미결정
 
 - **알림 읽음이 알림 1건당 하나** — 그룹원이 여러 명이면 한 명이 읽으면 다른 사람에게도 읽음으로 보임. 사용자별 읽음이 필요하면 스펙과 테이블을 함께 바꿔야 함
-- **같은 그룹 멤버끼리 서로의 은행·계좌번호를 조회할 수 있음** — "보낼 사람에게만 보이기"는 화면에서만 제한됨. 데이터 수준 제한이 필요하면 뷰/함수 추가 필요
+- **돈을 받을 사람(지출을 결제한 정식 회원)의 계좌번호는 같은 그룹 멤버라면 — 초대코드로 들어온 게스트 포함 — 서버에서 읽을 수 있음** — 송금하려면 필요한 정보라 완전히 막을 수는 없고, 결제한 적 없는 회원의 계좌는 내려주지 않는 것으로 범위를 줄였다. 초대코드가 새어 나가면 이 범위가 낯선 사람에게 열리므로 방장이 `rotate_invite_code()`로 코드를 바꿀 수 있게 했다. 더 줄이려면 게스트 참여에 방장 승인을 두는 등의 제품 결정이 필요하다
+- **같은 그룹 멤버면 게스트도 알림에 임의 문구를 넣거나 남이 등록한 지출을 수정·삭제할 수 있음** — 협업 기능이라 멤버 누구나 쓰기를 열어 둔 결과. 가짜 알림(예: "계좌가 바뀌었어요")이 문제가 될 만큼 사용자가 늘면 알림 생성을 DB 트리거로 옮겨 서버가 문구를 만들게 해야 함
 - **영수증 사진이 지출 행에 그대로 저장됨** — `receipt_image_url`에 사진 데이터(data URL, 최대 2MB)를 넣고 있어서, 그룹 데이터를 읽을 때마다 사진이 함께 내려옴. 사진이 늘면 Supabase Storage에 올리고 주소만 저장하도록 바꿔야 함
 - **지출 등록·수정이 여러 테이블에 나눠 쓰임** — 지출 → 참여자 → 알림 순으로 저장하고, 참여자 저장이 실패하면 지출도 되돌림. 네트워크가 중간에 끊기면 일부만 저장될 수 있어, 엄격한 원자성이 필요해지면 DB 함수(RPC)로 옮겨야 함
 - **방장이 탈퇴하면 그룹을 관리할 사람이 없어짐** — 방장 멤버 행의 `user_id`가 null이 되어(이름은 남음) 그룹 수정·삭제 정책(`is_group_owner`)을 통과할 사람이 없음. 방장 위임/그룹 정리 정책이 필요해지면 스펙과 함께 정해야 함
@@ -308,3 +314,4 @@ erDiagram
 - 2026-09-20: Supabase DB 구현 정리 추가. 관계도(ER) 작성, 스펙→테이블 대응, 테이블 정의, RLS·RPC·삭제 동작, 앱 연동 규칙과 알려진 제한을 "DB 구현" 섹션에 기록. SQL 원본은 `supabase/migrations/` (민선)
 - 2026-09-21: 회원 탈퇴용 DB 함수 `delete_my_account()` 추가(`20260921000000_delete_account.sql`) — 본인 계정만 삭제, 게스트 거부. 삭제 시 이름은 멤버 자리에 남고 지출·알림 기록은 유지됨을 실제 DB에서 확인. 방장 탈퇴 시 그룹 관리자가 없어지는 한계를 "알려진 제한"에 기록 (민선)
 - 2026-09-27: 게스트 본인 이름 수정용 DB 함수 `rename_guest_member()` 추가(`20260927000000_rename_guest_member.sql`) — "지금 이 익명 세션이 차지한 자리"만 name 컬럼을 바꿀 수 있게 해, 일반 UPDATE 정책을 열었을 때 생기는 권한 상승(role 변경 등) 위험을 피함. 목업 DB에도 같은 제약(viewAsMemberId 일치)으로 반영 (민선)
+- 2026-10-03: 보안 점검 결과 반영 — (1) `profiles`의 은행·계좌 컬럼을 API로 직접 읽을 수 없게 하고(`restrict_profile_columns`) 내 것은 `get_my_profile()`, 받을 사람 것은 `get_payee_accounts()`로만 읽게 함. 초대코드만 아는 게스트가 같은 그룹 모든 회원의 계좌번호 전체를 읽던 문제를 "결제한 회원"으로 범위 축소 (2) 가입 때 `options.data`로 넘긴 계좌번호가 `auth.users` 메타데이터와 로그인 토큰에 복사돼 프로필 수정 후에도 옛 번호로 남던 문제 — 가입 트리거가 복사 직후 지우고 기존 회원 것도 한 번 정리 (3) 초대코드 재발급 `rotate_invite_code()` 추가 (민선)
