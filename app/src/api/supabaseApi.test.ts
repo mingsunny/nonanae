@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     getSession: vi.fn(),
     resetPasswordForEmail: vi.fn(),
     updateUser: vi.fn(),
+    refreshSession: vi.fn(),
   },
   from: vi.fn(),
   rpc: vi.fn(),
@@ -161,6 +162,8 @@ const guestSession = { data: { session: { user: { id: 'anon-1', is_anonymous: tr
 beforeEach(() => {
   vi.resetAllMocks()
   installRpc()
+  mocks.auth.updateUser.mockResolvedValue({ error: null })
+  mocks.auth.refreshSession.mockResolvedValue({ error: null })
 })
 
 beforeEach(() => {
@@ -229,6 +232,34 @@ describe('signUp', () => {
       options: { data: { name: '신규', bank: '토스뱅크', account: '1000-1' } },
     })
     expect(user.name).toBe('신규')
+  })
+
+  it('가입이 끝나면 로그인 정보(메타데이터)에 남은 은행·계좌번호 사본을 지우고 토큰을 새로 받는다', async () => {
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockMyProfile({ ...profileRow, name: '신규' })
+
+    await signUp(input)
+
+    expect(mocks.auth.updateUser).toHaveBeenCalledWith({ data: { bank: null, account: null } })
+    expect(mocks.auth.refreshSession).toHaveBeenCalled()
+    // 사본을 지운 "뒤"에 프로필을 읽는다 (순서가 바뀌면 옛 토큰으로 읽게 됨)
+    expect(mocks.auth.updateUser.mock.invocationCallOrder[0]).toBeLessThan(mocks.auth.refreshSession.mock.invocationCallOrder[0])
+  })
+
+  it('사본을 못 지워도 가입은 성공한다 (콘솔에는 값 없이 코드만 남김)', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mocks.auth.updateUser.mockResolvedValue({ error: { code: 'unexpected_failure', message: 'boom' } })
+    mockMyProfile({ ...profileRow, name: '신규' })
+
+    await expect(signUp(input)).resolves.toMatchObject({ name: '신규' })
+
+    expect(mocks.auth.refreshSession).not.toHaveBeenCalled()
+    const logged = JSON.stringify(spy.mock.calls)
+    expect(logged).not.toContain(input.account.trim())
+    spy.mockRestore()
   })
 
   it('이메일 확인이 켜져 있을 때 이미 가입된 이메일은 identities가 비어서 온다', async () => {

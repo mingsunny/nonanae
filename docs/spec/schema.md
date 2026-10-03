@@ -146,7 +146,7 @@ erDiagram
 > - [`supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql`](../../supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql) — 계좌 조회 함수(`get_my_profile`, `get_payee_accounts`), 가입 때 계좌가 로그인 정보에 복사되던 것 정리, 초대코드 재발급(`rotate_invite_code`). **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261003000100_restrict_profile_columns.sql`](../../supabase/migrations/20261003000100_restrict_profile_columns.sql) — `profiles`의 은행·계좌 컬럼을 API로 직접 못 읽게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (먼저 적용하면 옛 앱이 프로필을 못 읽음)
 >
-> 적용 상태(2026-10-03): 앞의 네 마이그레이션(`init_schema` ~ `rename_guest_member`)은 Supabase 프로젝트(`nonanae`)에 적용됨. 2026-10-03에 추가한 마지막 두 파일은 **아직 미적용** — 위 순서(추가 → 앱 배포 → 컬럼 차단)대로 적용. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
+> 적용 상태(2026-10-03): 앞의 네 마이그레이션(`init_schema` ~ `rename_guest_member`)은 Supabase 프로젝트(`nonanae`)에 적용됨. `account_rpc_and_invite_rotation`(2026-10-03)도 적용됨(앱 배포까지 완료). 마지막 `restrict_profile_columns`만 **미적용** — 새 앱이 로그인·프로필·정산에서 정상 동작하는 것을 확인한 뒤 적용하며, 그 전까지는 같은 그룹 멤버가 `profiles`의 계좌를 API로 직접 읽을 수 있다. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
 
 ### 스펙 → 테이블 대응
 
@@ -315,3 +315,4 @@ erDiagram
 - 2026-09-21: 회원 탈퇴용 DB 함수 `delete_my_account()` 추가(`20260921000000_delete_account.sql`) — 본인 계정만 삭제, 게스트 거부. 삭제 시 이름은 멤버 자리에 남고 지출·알림 기록은 유지됨을 실제 DB에서 확인. 방장 탈퇴 시 그룹 관리자가 없어지는 한계를 "알려진 제한"에 기록 (민선)
 - 2026-09-27: 게스트 본인 이름 수정용 DB 함수 `rename_guest_member()` 추가(`20260927000000_rename_guest_member.sql`) — "지금 이 익명 세션이 차지한 자리"만 name 컬럼을 바꿀 수 있게 해, 일반 UPDATE 정책을 열었을 때 생기는 권한 상승(role 변경 등) 위험을 피함. 목업 DB에도 같은 제약(viewAsMemberId 일치)으로 반영 (민선)
 - 2026-10-03: 보안 점검 결과 반영 — (1) `profiles`의 은행·계좌 컬럼을 API로 직접 읽을 수 없게 하고(`restrict_profile_columns`) 내 것은 `get_my_profile()`, 받을 사람 것은 `get_payee_accounts()`로만 읽게 함. 초대코드만 아는 게스트가 같은 그룹 모든 회원의 계좌번호 전체를 읽던 문제를 "결제한 회원"으로 범위 축소 (2) 가입 때 `options.data`로 넘긴 계좌번호가 `auth.users` 메타데이터와 로그인 토큰에 복사돼 프로필 수정 후에도 옛 번호로 남던 문제 — 가입 트리거가 복사 직후 지우고 기존 회원 것도 한 번 정리 (3) 초대코드 재발급 `rotate_invite_code()` 추가 (민선)
+- 2026-10-03(추가): 실제 서버에서 확인해 보니 가입 트리거(`handle_new_user`)가 `auth.users` 메타데이터에서 계좌를 지워도 로그인 서버(GoTrue)가 가입 직후 사용자 정보를 다시 저장하며 되돌려서, 새 가입자의 메타데이터·토큰에 `bank`/`account`가 그대로 남았다(기존 회원 정리는 정상). 앱이 가입 직후 `updateUser({ data: { bank: null, account: null } })` + `refreshSession()`으로 직접 지우도록 고쳤고, 트리거의 삭제 문장은 가입 직후 되돌려지므로 효과가 없어 보조 수단으로만 남김 (민선)
