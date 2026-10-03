@@ -61,6 +61,7 @@ npm run dev
 
 - 키는 Supabase 대시보드 → Project Settings → API Keys의 **publishable** 키만 쓴다. secret / service_role 키는 넣지 않는다.
 - `.env.local`은 git에 올라가지 않는다. 테스트(`npm test`)는 이 설정과 상관없이 항상 목업으로 돈다.
+- 봇 방지(Cloudflare Turnstile): `VITE_TURNSTILE_SITE_KEY`에 사이트 키를 넣으면 로그인·가입·비밀번호 재설정·게스트 참여 때 토큰을 받아 Supabase로 보낸다. 비워두면 건너뛴다. Supabase 대시보드에서 CAPTCHA를 켠 환경에는 **반드시** 넣어야 한다(Vite는 빌드 때 값을 넣으므로 넣은 뒤 다시 배포).
 - Vercel에 배포할 때는 프로젝트 환경변수에 같은 세 값을 넣는다. `VITE_USE_SUPABASE`를 넣지 않으면 배포본은 목업으로 동작한다.
 - 코드는 `src/api/index.ts`가 각 함수 맨 앞에서 `USE_SUPABASE`이면 `supabaseApi.ts`로 넘기는 구조다. 화면·스토어는 바뀌지 않는다.
 
