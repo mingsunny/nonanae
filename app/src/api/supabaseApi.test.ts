@@ -732,11 +732,10 @@ describe('지출 (08~11)', () => {
   }
 
   describe('createExpense', () => {
-    it('지출과 참여자를 저장하고, 결제자 이름으로 알림을 남긴다', async () => {
+    it('지출과 참여자를 저장한다 — 알림은 서버 트리거가 만들므로 앱은 건드리지 않는다', async () => {
       const made = mockTables({
-        members: [members, ok({ name: null, profiles: { name: '민선' } })],
+        members,
         expenses: ok(expenseRow),
-        groups: ok({ name: '제주도 여행' }),
       })
 
       const expense = await createExpense(input)
@@ -755,24 +754,11 @@ describe('지출 (08~11)', () => {
         { expense_id: 'e-1', member_id: 'm-a', group_id: groupId, share_amount: null },
         { expense_id: 'e-1', member_id: 'm-b', group_id: groupId, share_amount: null },
       ])
-      expect(made.notifications[0].insert.mock.calls[0][0]).toEqual({
-        group_id: groupId,
-        member_id: 'm-a',
-        type: 'expense',
-        title: '[제주도 여행]에 민선님이 결제한 내역이 추가됐어요',
-      })
+      expect(made.notifications).toBeUndefined()
+      expect(mocks.from).not.toHaveBeenCalledWith('notifications')
+      expect(mocks.from).not.toHaveBeenCalledWith('groups')
       expect(expense).toMatchObject({ id: 'e-1', groupId, paidBy: 'm-a', amount: 30000, category: '식비' })
       expect(expense.participants).toHaveLength(2)
-    })
-
-    it('결제자가 이름만 있는 멤버(게스트·대기 중)면 그 이름을 알림에 쓴다', async () => {
-      const made = mockTables({
-        members: [members, ok({ name: '김민지', profiles: null })],
-        expenses: ok(expenseRow),
-        groups: ok({ name: '제주도 여행' }),
-      })
-      await createExpense(input)
-      expect(made.notifications[0].insert.mock.calls[0][0].title).toBe('[제주도 여행]에 김민지님이 결제한 내역이 추가됐어요')
     })
 
     it('참여자를 저장하지 못하면 지출도 되돌리고 에러를 던진다', async () => {
@@ -787,18 +773,6 @@ describe('지출 (08~11)', () => {
 
       expect(made.expenses[1].delete).toHaveBeenCalled()
       expect(made.expenses[1].eq).toHaveBeenCalledWith('id', 'e-1')
-      expect(made.notifications).toBeUndefined() // 알림도 만들지 않는다
-    })
-
-    it('알림을 못 만들어도 지출 등록은 성공한다', async () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      mockTables({
-        members: [members, { data: null, error: { message: 'boom' } }],
-        expenses: ok(expenseRow),
-        groups: ok({ name: '제주도 여행' }),
-      })
-      await expect(createExpense(input)).resolves.toMatchObject({ id: 'e-1' })
-      expect(spy).toHaveBeenCalled()
     })
 
     it('잘못된 입력은 서버에 쓰기 전에 막는다', async () => {
