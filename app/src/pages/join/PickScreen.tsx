@@ -4,6 +4,7 @@ import type { JoinResolution } from '../../api'
 import Avatar from '../../components/common/Avatar'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
+import PrivacyLink from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { useAppStore } from '../../store/appStore'
@@ -105,6 +106,9 @@ export default function PickScreen({ pick, onBack, onJoined }: Props) {
                 이 이름으로 참여하기
               </Button>
             </div>
+            <p className={styles.notice}>
+              참여하면 입력한 이름이 이 그룹 멤버로 저장돼요. <PrivacyLink className={styles.noticeLink} />
+            </p>
           </form>
         )}
       </div>

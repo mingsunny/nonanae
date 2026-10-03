@@ -3,9 +3,11 @@ import type { FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
+import PrivacyLink from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { BANKS } from '../../domain/constants'
+import { PRIVACY_SUMMARY } from '../../domain/privacyPolicy'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
@@ -25,11 +27,13 @@ export default function AccountScreen() {
   const [name, setName] = useState('')
   const [bank, setBank] = useState('')
   const [account, setAccount] = useState('')
+  const [consent, setConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   // 세 필드가 모두 채워져야 진행 가능 (필드별 에러 메시지는 없음). 계좌번호 형식 검증은 하지 않는다(02 예외처리).
-  const canSubmit = name.trim() !== '' && bank !== '' && account.trim() !== ''
+  // 개인정보 수집·이용 동의(필수)도 체크해야 한다.
+  const canSubmit = name.trim() !== '' && bank !== '' && account.trim() !== '' && consent
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -105,6 +109,21 @@ export default function AccountScreen() {
             setError(null)
           }}
         />
+        <div className={styles.consent}>
+          <label className={styles.consentRow}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>[필수] 개인정보 수집·이용에 동의합니다</span>
+          </label>
+          <p className={styles.consentDetail}>
+            수집 항목: {PRIVACY_SUMMARY.items}
+            <br />
+            이용 목적: {PRIVACY_SUMMARY.purpose}
+            <br />
+            보유 기간: {PRIVACY_SUMMARY.period}
+            <br />
+            동의하지 않으면 가입할 수 없어요. <PrivacyLink className={styles.consentLink}>전체 보기</PrivacyLink>
+          </p>
+        </div>
         {error && (
           <p className={fields.error} role="alert">
             {error}

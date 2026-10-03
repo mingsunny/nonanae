@@ -10,6 +10,7 @@ export const paths = {
   groupNew: '/groups/new',
   join: '/join',
   passwordReset: '/password-reset',
+  privacy: '/privacy',
 
   group: (groupId: string) => `/groups/${groupId}`,
   groupExpenses: (groupId: string) => `/groups/${groupId}/expenses`,

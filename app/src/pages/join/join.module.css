@@ -74,3 +74,17 @@ button.person {
 .addButton {
   margin-top: 14px;
 }
+
+/* 게스트 참여 시 개인정보 안내 */
+.notice {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.noticeLink {
+  color: var(--ink-soft);
+  text-decoration: underline;
+}

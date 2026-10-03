@@ -173,6 +173,7 @@ describe('01·02 회원가입 (2단계)', () => {
     await fill('이름', '신규')
     await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
     await fill('계좌번호', '1000-1234-5678')
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
     await click('회원가입')
 
     expect(await screen.findByText('신규님의 그룹')).toBeTruthy()
@@ -234,7 +235,7 @@ describe('01·02 회원가입 (2단계)', () => {
     expect((screen.getByLabelText('비밀번호') as HTMLInputElement).value).toBe('pw-1234')
   })
 
-  it('2단계는 이름·은행·계좌번호가 모두 채워져야 "회원가입"이 활성화된다', async () => {
+  it('2단계는 이름·은행·계좌번호를 채우고 개인정보 수집·이용에 동의해야 "회원가입"이 활성화된다', async () => {
     await goToSignup()
     await fillStep1()
     await click('다음')
@@ -244,7 +245,34 @@ describe('01·02 회원가입 (2단계)', () => {
     await fill('계좌번호', '1000')
     expect(submit.disabled).toBe(true)
     await userEvent.selectOptions(screen.getByLabelText('은행'), '카카오뱅크')
+    expect(submit.disabled).toBe(true) // 동의 전
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
     expect(submit.disabled).toBe(false)
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    expect(submit.disabled).toBe(true) // 동의를 거두면 다시 막힌다
+  })
+
+  it('2단계에 수집 항목 요약과 처리방침 링크(새 탭)가 보인다', async () => {
+    await goToSignup()
+    await fillStep1()
+    await click('다음')
+    expect(await screen.findByText(/수집 항목: 이메일, 비밀번호, 이름, 은행·계좌번호/)).toBeTruthy()
+    const link = screen.getByRole('link', { name: '전체 보기' })
+    expect(link.getAttribute('href')).toBe('/privacy')
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toContain('noopener')
+  })
+
+  it('개인정보 처리방침은 로그인 없이 볼 수 있다 (인트로에도 링크가 있다)', async () => {
+    await boot({ loggedIn: false })
+    renderApp('/welcome')
+    expect(screen.getByRole('link', { name: '개인정보 처리방침' }).getAttribute('href')).toBe('/privacy')
+    cleanup()
+    const router = renderApp('/privacy')
+    expect(await screen.findByRole('heading', { name: '개인정보 처리방침' })).toBeTruthy()
+    expect(screen.getByText('1. 수집하는 개인정보')).toBeTruthy()
+    expect(screen.getByText(/alstjsol8292@gmail.com/)).toBeTruthy()
+    expect(pathOf(router)).toBe('/privacy') // 로그아웃 상태여도 인트로로 튕기지 않는다
   })
 
   it('로그인 화면에 입력해 둔 이메일이 회원가입 1단계로 이어진다', async () => {
@@ -435,6 +463,9 @@ describe('06·07 초대코드로 참여', () => {
 
     const join = (await screen.findByRole('button', { name: '이 이름으로 참여하기' })) as HTMLButtonElement
     expect(join.disabled).toBe(true)
+    // 이름을 저장한다는 안내와 처리방침 링크가 보인다
+    expect(screen.getByText(/입력한 이름이 이 그룹 멤버로 저장돼요/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: '개인정보 처리방침' }).getAttribute('href')).toBe('/privacy')
     await fill('목록에 없으면 이름을 입력해주세요', '이서준')
     await userEvent.click(join)
 

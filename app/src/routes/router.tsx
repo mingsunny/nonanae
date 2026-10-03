@@ -10,6 +10,7 @@ import JoinPage from '../pages/JoinPage'
 import MemberInvitePage from '../pages/MemberInvitePage'
 import NotFoundPage from '../pages/NotFoundPage'
 import PasswordResetPage from '../pages/PasswordResetPage'
+import PrivacyPage from '../pages/PrivacyPage'
 import ProfilePage from '../pages/ProfilePage'
 import SettlePage from '../pages/SettlePage'
 import SummaryPage from '../pages/SummaryPage'
@@ -33,6 +34,7 @@ export const routes: RouteObject[] = [
   // 06·07: 초대코드 참여는 한 경로 안의 단계
   { path: 'join', element: <JoinPage /> },
   { path: 'password-reset', element: <PasswordResetPage /> },
+  { path: 'privacy', element: <PrivacyPage /> },
 
   // 03~05: 정식 회원 전용. 03/04는 인사말+알림 종과 하단 홈/프로필 탭바를 공유
   {
