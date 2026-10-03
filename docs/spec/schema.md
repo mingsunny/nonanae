@@ -145,8 +145,10 @@ erDiagram
 > - [`supabase/migrations/20260927000000_rename_guest_member.sql`](../../supabase/migrations/20260927000000_rename_guest_member.sql) — 게스트 본인 이름 수정용 함수 `rename_guest_member()`. 위 세 파일 다음에 실행
 > - [`supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql`](../../supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql) — 계좌 조회 함수(`get_my_profile`, `get_payee_accounts`), 가입 때 계좌가 로그인 정보에 복사되던 것 정리, 초대코드 재발급(`rotate_invite_code`). **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261003000100_restrict_profile_columns.sql`](../../supabase/migrations/20261003000100_restrict_profile_columns.sql) — `profiles`의 은행·계좌 컬럼을 API로 직접 못 읽게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (먼저 적용하면 옛 앱이 프로필을 못 읽음)
+> - [`supabase/migrations/20261004000000_expense_notification_trigger.sql`](../../supabase/migrations/20261004000000_expense_notification_trigger.sql) — 지출 등록 알림을 서버 트리거가 만들게 함 + 지출이 있는 그룹을 못 지우던 FK 검사 시점 수정. **추가만 하는 안전한 단계**
+> - [`supabase/migrations/20261004000100_lock_notification_writes.sql`](../../supabase/migrations/20261004000100_lock_notification_writes.sql) — 클라이언트의 알림 직접 추가를 막고 수정은 `read`만 허용. **바로 위 파일을 적용하고, 앱이 알림을 직접 만들지 않는 새 버전으로 배포된 뒤에만 적용**
 >
-> 적용 상태(2026-10-03): 앞의 네 마이그레이션(`init_schema` ~ `rename_guest_member`)은 Supabase 프로젝트(`nonanae`)에 적용됨. `account_rpc_and_invite_rotation`(2026-10-03)도 적용됨(앱 배포까지 완료). 마지막 `restrict_profile_columns`만 **미적용** — 새 앱이 로그인·프로필·정산에서 정상 동작하는 것을 확인한 뒤 적용하며, 그 전까지는 같은 그룹 멤버가 `profiles`의 계좌를 API로 직접 읽을 수 있다. 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
+> 적용 상태(2026-10-04): `init_schema` ~ `restrict_profile_columns`는 Supabase 프로젝트(`nonanae`)에 모두 적용됨. `20261004...` 두 파일은 위 순서대로 적용하는 중(적용 전에는 같은 그룹 멤버가 알림에 임의 문구를 넣을 수 있고, 지출이 있는 그룹은 삭제되지 않음). 게스트 로그인이 동작하려면 대시보드 **Authentication → Sign In / Providers → "Allow anonymous sign-ins"** 가 켜져 있어야 하고, 이메일 확인("Confirm email")을 켜 두면 가입 직후 자동 로그인되지 않음(메일 확인 후 로그인).
 
 ### 스펙 → 테이블 대응
 
@@ -248,7 +250,7 @@ erDiagram
 
 | 대상 | 결과 |
 |---|---|
-| 그룹 삭제 | 멤버·지출·알림이 함께 삭제되고, 지출에 딸린 참여자 행도 삭제됨 |
+| 그룹 삭제 | 멤버·지출·알림이 함께 삭제되고, 지출에 딸린 참여자 행도 삭제됨. 지출·참여자가 멤버를 가리키는 FK는 커밋 시점에 검사하도록(`deferrable initially deferred`) 해 둬서 지출이 있는 그룹도 지워진다(그렇지 않으면 삭제 순서에 따라 "멤버가 아직 참조 중"으로 막힘) |
 | 지출 삭제 | 그 지출의 참여자 행 삭제 |
 | 멤버 삭제 | 결제자나 참여자로 쓰인 멤버는 삭제 불가 (멤버 삭제 기능은 스펙에 없음) |
 | 회원 탈퇴 | 삭제 직전 트리거가 이름을 `members.name`으로 복사 → `user_id`가 null로 바뀌며 이름 있는 미가입 멤버로 남음. 지출/정산 기록 유지 |
@@ -264,7 +266,7 @@ erDiagram
 | groups | 멤버 | 그룹장만 수정·삭제. 생성은 `create_group()`만 |
 | members | 같은 그룹 멤버 | 멤버 누구나 이름만 있는 미가입 멤버(placeholder) 추가 가능. 참여·그룹장 지정은 RPC만 |
 | expenses, expense_participants | 같은 그룹 멤버 | 같은 그룹 멤버 누구나 등록·수정·삭제 |
-| notifications | 같은 그룹 멤버 | 같은 그룹 멤버가 추가·읽음 처리 |
+| notifications | 같은 그룹 멤버 | 클라이언트는 `read`(읽음 표시) 컬럼만 수정 가능하고 추가·삭제는 불가. 알림은 서버(트리거·`join_group`)만 만든다 |
 
 ### 트리거 · 함수(RPC)
 
@@ -272,6 +274,7 @@ erDiagram
 |---|---|
 | `on_auth_user_created` (트리거) | 회원가입 시 `raw_user_meta_data`의 name/bank/account로 `profiles` 생성. 익명 로그인은 건너뜀 |
 | `before_profile_delete` (트리거) | 탈퇴 시 멤버 행에 이름 보존 |
+| `expenses_notify_added` (트리거) | 지출이 등록되면 "[그룹]에 OO님이 결제한 내역이 추가됐어요" 알림을 서버가 직접 만든다. OO는 등록자가 아니라 결제자 이름([13](13-notifications.md) 알림1). 문구를 클라이언트가 정하지 못하므로 가짜 알림을 만들 수 없다 |
 | `create_group(p_name)` | [05](05-create-group.md) 그룹 + 그룹장 멤버를 한 번에 생성, group id 반환. **정식 회원만**(게스트 거부) |
 | `lookup_group_by_code(p_code)` | [06](06-join-group.md) 초대코드 확인 + [07](07-join-match.md) "나 고르기" 목록용 `{id, name, members[{id, name, claimed}]}` 반환. 잘못된 코드면 null |
 | `join_group(p_code, p_member_id, p_name)` | [06](06-join-group.md)/[07](07-join-match.md) 초대코드 참여. 정식 회원·게스트 공용 — `p_member_id`가 있으면 그 자리를 내 것으로, 없으면 새 멤버로 추가(게스트는 `p_name` 필수). 이미 멤버면 기존 멤버 id 반환. 새 멤버가 생기거나 정식 회원이 자리를 채울 때만 참여 알림 생성 |
@@ -289,15 +292,15 @@ erDiagram
 - **개인화 초대코드** `코드-멤버ID`: 앱이 `-`로 잘라 코드는 `join_group`의 첫 인자, 멤버ID는 두 번째 인자로 전달
 - **이메일 중복 확인·오류 메시지**: 1단계에서 가입 여부를 조회하지 않고 `signUp` 결과로 판단한다(이메일 확인이 켜져 있으면 중복 가입은 에러 없이 `identities`가 빈 배열로 돌아옴). 로그인 실패는 미가입/비밀번호 불일치를 구분하지 않고 한 가지 문구로 통일 — 구현은 `app/src/api/supabaseApi.ts`
 - **앱 타입과의 매핑**: 앱의 `User`는 `email`/`emailVerified`를 갖지만 DB에서는 `auth.users` 소속이라 API 계층에서 `profiles`와 합쳐 만들어야 함. 앱의 `ExpenseParticipant`에는 `groupId`가 없지만 DB(`expense_participants.group_id`)는 필수라 저장 시 해당 지출의 `group_id`를 채워 넣어야 함
-- **앱에서 직접 처리하는 것**: 지출 등록 알림 생성(`notifications` insert), `share_amount` 규칙(균등이면 null, 비율/금액이면 확정값 — 다른 테이블 값에 의존해서 CHECK로 못 검), 은행 목록·계좌번호 형식 검증
+- **앱에서 직접 처리하는 것**: `share_amount` 규칙(균등이면 null, 비율/금액이면 확정값 — 다른 테이블 값에 의존해서 CHECK로 못 검), 은행 목록·계좌번호 형식 검증
 
 ### 알려진 제한 · 미결정
 
 - **알림 읽음이 알림 1건당 하나** — 그룹원이 여러 명이면 한 명이 읽으면 다른 사람에게도 읽음으로 보임. 사용자별 읽음이 필요하면 스펙과 테이블을 함께 바꿔야 함
 - **돈을 받을 사람(지출을 결제한 정식 회원)의 계좌번호는 같은 그룹 멤버라면 — 초대코드로 들어온 게스트 포함 — 서버에서 읽을 수 있음** — 송금하려면 필요한 정보라 완전히 막을 수는 없고, 결제한 적 없는 회원의 계좌는 내려주지 않는 것으로 범위를 줄였다. 초대코드가 새어 나가면 이 범위가 낯선 사람에게 열리므로 방장이 `rotate_invite_code()`로 코드를 바꿀 수 있게 했다. 더 줄이려면 게스트 참여에 방장 승인을 두는 등의 제품 결정이 필요하다
-- **같은 그룹 멤버면 게스트도 알림에 임의 문구를 넣거나 남이 등록한 지출을 수정·삭제할 수 있음** — 협업 기능이라 멤버 누구나 쓰기를 열어 둔 결과. 가짜 알림(예: "계좌가 바뀌었어요")이 문제가 될 만큼 사용자가 늘면 알림 생성을 DB 트리거로 옮겨 서버가 문구를 만들게 해야 함
+- **같은 그룹 멤버면 게스트도 남이 등록한 지출을 수정·삭제할 수 있음** — 협업 기능이라 멤버 누구나 쓰기를 열어 둔 결과(알림 문구 위조는 서버 생성으로 막았다). 초대코드가 새어 나갈 수 있는 구조라, 낯선 사람이 지출을 지우는 것까지 막으려면 "등록한 사람/방장만 수정·삭제" 같은 제품 결정이 필요하다. 지출에 등록자 필드가 아직 없다
 - **영수증 사진이 지출 행에 그대로 저장됨** — `receipt_image_url`에 사진 데이터(data URL, 최대 2MB)를 넣고 있어서, 그룹 데이터를 읽을 때마다 사진이 함께 내려옴. 사진이 늘면 Supabase Storage에 올리고 주소만 저장하도록 바꿔야 함
-- **지출 등록·수정이 여러 테이블에 나눠 쓰임** — 지출 → 참여자 → 알림 순으로 저장하고, 참여자 저장이 실패하면 지출도 되돌림. 네트워크가 중간에 끊기면 일부만 저장될 수 있어, 엄격한 원자성이 필요해지면 DB 함수(RPC)로 옮겨야 함
+- **지출 등록·수정이 여러 테이블에 나눠 쓰임** — 지출 → 참여자 순으로 저장하고, 참여자 저장이 실패하면 지출도 되돌림. 네트워크가 중간에 끊기면 일부만 저장될 수 있어, 엄격한 원자성이 필요해지면 DB 함수(RPC)로 옮겨야 함. 알림은 지출이 들어가는 순간 트리거가 만들기 때문에, 참여자 저장이 실패해 지출을 되돌리는 드문 경우에는 알림이 하나 남을 수 있음
 - **방장이 탈퇴하면 그룹을 관리할 사람이 없어짐** — 방장 멤버 행의 `user_id`가 null이 되어(이름은 남음) 그룹 수정·삭제 정책(`is_group_owner`)을 통과할 사람이 없음. 방장 위임/그룹 정리 정책이 필요해지면 스펙과 함께 정해야 함
 - **익명 계정 남용 방지** 미설정 — 실서비스 전 CAPTCHA/레이트리밋 필요
 - **게스트 사칭 가능** — 재입장 시 본인 확인이 없어 같은 그룹의 누군가가 이름을 골라 그 자리를 가져갈 수 있음 (스펙에서 수용한 트레이드오프)
@@ -316,3 +319,4 @@ erDiagram
 - 2026-09-27: 게스트 본인 이름 수정용 DB 함수 `rename_guest_member()` 추가(`20260927000000_rename_guest_member.sql`) — "지금 이 익명 세션이 차지한 자리"만 name 컬럼을 바꿀 수 있게 해, 일반 UPDATE 정책을 열었을 때 생기는 권한 상승(role 변경 등) 위험을 피함. 목업 DB에도 같은 제약(viewAsMemberId 일치)으로 반영 (민선)
 - 2026-10-03: 보안 점검 결과 반영 — (1) `profiles`의 은행·계좌 컬럼을 API로 직접 읽을 수 없게 하고(`restrict_profile_columns`) 내 것은 `get_my_profile()`, 받을 사람 것은 `get_payee_accounts()`로만 읽게 함. 초대코드만 아는 게스트가 같은 그룹 모든 회원의 계좌번호 전체를 읽던 문제를 "결제한 회원"으로 범위 축소 (2) 가입 때 `options.data`로 넘긴 계좌번호가 `auth.users` 메타데이터와 로그인 토큰에 복사돼 프로필 수정 후에도 옛 번호로 남던 문제 — 가입 트리거가 복사 직후 지우고 기존 회원 것도 한 번 정리 (3) 초대코드 재발급 `rotate_invite_code()` 추가 (민선)
 - 2026-10-03(추가): 실제 서버에서 확인해 보니 가입 트리거(`handle_new_user`)가 `auth.users` 메타데이터에서 계좌를 지워도 로그인 서버(GoTrue)가 가입 직후 사용자 정보를 다시 저장하며 되돌려서, 새 가입자의 메타데이터·토큰에 `bank`/`account`가 그대로 남았다(기존 회원 정리는 정상). 앱이 가입 직후 `updateUser({ data: { bank: null, account: null } })` + `refreshSession()`으로 직접 지우도록 고쳤고, 트리거의 삭제 문장은 가입 직후 되돌려지므로 효과가 없어 보조 수단으로만 남김 (민선)
+- 2026-10-04: 알림 위조 방지 — 지출 등록 알림을 앱이 아니라 DB 트리거(`expenses_notify_added`)가 문구까지 만들게 하고, 클라이언트의 `notifications` 직접 추가를 막음(수정은 읽음 표시만). 같은 SQL에서 지출이 있는 그룹을 삭제할 수 없던 결함(지출·참여자 → 멤버 FK가 즉시 검사)을 커밋 시점 검사로 고침. 남이 등록한 지출을 수정·삭제하는 권한은 협업 기능이라 그대로 두고 "알려진 제한"에 남김 (민선)

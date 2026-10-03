@@ -3,7 +3,6 @@
 // 게스트는 Supabase 익명 로그인 세션으로 표현한다 — User(프로필)는 없고, members.guest_uid로 자기 자리를 가리킨다.
 import type { AuthError, PostgrestError, User as AuthUser } from '@supabase/supabase-js'
 import { parseInviteCode } from '../domain/inviteCode'
-import { expenseAddedTitle } from '../domain/notifications'
 import type {
   Category,
   Expense,
@@ -670,31 +669,10 @@ const withParticipants = (row: ExpenseRow, input: ExpenseInput): ExpenseWithPart
   participants: input.participants.map((p) => ({ expenseId: row.id, memberId: p.memberId, shareAmount: p.shareAmount })),
 })
 
-/** 지출 등록 알림. 앱이 직접 만든다(schema.md). 알림 하나 못 만들었다고 지출 등록을 실패시키지는 않는다. */
-async function addExpenseNotification(groupId: string, payerMemberId: string): Promise<void> {
-  try {
-    const supabase = getSupabase()
-    const [groupRes, payerRes] = await Promise.all([
-      supabase.from('groups').select('name').eq('id', groupId).single<{ name: string }>(),
-      supabase.from('members').select('name, profiles(name)').eq('id', payerMemberId).single(),
-    ])
-    if (groupRes.error) throw groupRes.error
-    if (payerRes.error) throw payerRes.error
-    const payer = payerRes.data as unknown as { name: string | null; profiles: { name: string } | { name: string }[] | null }
-    const profile = Array.isArray(payer.profiles) ? payer.profiles[0] : payer.profiles
-    const { error } = await supabase.from('notifications').insert({
-      group_id: groupId,
-      member_id: payerMemberId,
-      type: 'expense',
-      title: expenseAddedTitle(groupRes.data.name, profile?.name ?? payer.name ?? ''),
-    })
-    if (error) throw error
-  } catch (err) {
-    console.error('[supabase] 지출 등록 알림을 만들지 못했어요', err)
-  }
-}
-
-/** 지출 등록. 지출 → 참여자 → 알림 순으로 쓰고, 참여자를 못 넣으면 지출도 되돌려 "참여자 없는 지출"이 남지 않게 한다. */
+/**
+ * 지출 등록. 지출 → 참여자 순으로 쓰고, 참여자를 못 넣으면 지출도 되돌려 "참여자 없는 지출"이 남지 않게 한다.
+ * 등록 알림은 앱이 만들지 않는다 — 지출이 들어오면 DB 트리거가 문구까지 직접 만든다(위조 방지, schema.md).
+ */
 export async function createExpense(input: ExpenseInput): Promise<ExpenseWithParticipants> {
   await validateExpenseInput(input)
   const supabase = getSupabase()
@@ -712,7 +690,6 @@ export async function createExpense(input: ExpenseInput): Promise<ExpenseWithPar
     throw new Error(dbErrorMessage(participantsError))
   }
 
-  await addExpenseNotification(input.groupId, input.paidBy)
   return withParticipants(row, input)
 }
 
