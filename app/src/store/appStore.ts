@@ -11,7 +11,8 @@ import type {
 } from '../domain/types'
 
 interface AppState {
-  status: 'idle' | 'loading' | 'ready'
+  /** error: 처음 데이터를 불러오지 못한 상태 — 빈 화면으로 멈추지 않고 App이 다시 시도 화면을 보여준다 */
+  status: 'idle' | 'loading' | 'ready' | 'error'
   /** 로그인한 정식 회원. 로그인 안 했으면 null */
   currentUserId: string | null
   /**
@@ -72,9 +73,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
   notifications: [],
 
   init: async () => {
-    if (get().status !== 'idle') return
+    if (get().status !== 'idle' && get().status !== 'error') return
     set({ status: 'loading' })
-    await get().refresh()
+    try {
+      await get().refresh()
+    } catch (err) {
+      console.error('[app] 처음 데이터를 불러오지 못했어요', err)
+      set({ status: 'error' })
+    }
   },
 
   refresh: async () => {

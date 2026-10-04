@@ -1,0 +1,23 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  min-height: 100dvh;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 var(--space-xs);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.text {
+  margin: 0 0 var(--space-lg);
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}

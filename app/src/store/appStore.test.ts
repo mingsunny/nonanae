@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetMockData } from '../api'
 import { selectGroup, selectHasUnreadNotifications, useAppStore } from './appStore'
 
@@ -60,6 +60,19 @@ describe('useAppStore', () => {
     expect(g.expenses.some((e) => e.id === 'e_1')).toBe(false)
     expect(g.members.map((m) => m.name)).toContain('최수아')
     expect(selectHasUnreadNotifications(s)).toBe(false)
+  })
+
+  it('init: 처음 불러오기가 실패하면 빈 화면으로 멈추지 않고 error가 되고, 다시 부르면 재시도한다', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const original = useAppStore.getState().refresh
+    useAppStore.setState({ refresh: vi.fn().mockRejectedValue(new Error('network')) })
+
+    await useAppStore.getState().init() // 던지지 않는다
+    expect(useAppStore.getState().status).toBe('error')
+
+    useAppStore.setState({ refresh: original })
+    await useAppStore.getState().init() // error에서는 다시 시도할 수 있다
+    expect(useAppStore.getState().status).toBe('ready')
   })
 
   it('init은 두 번 불러도 다시 로드하지 않는다', async () => {
