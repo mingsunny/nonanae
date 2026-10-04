@@ -341,6 +341,53 @@ describe('fetchSnapshot', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
+  describe('방금 발급된 토큰을 서버가 "미래에 발급됨"으로 거절할 때', () => {
+    const futureJwt = { code: 'PGRST303', message: 'JWT issued at future' }
+
+    it('잠깐 기다렸다가 다시 시도해서 성공한다 (이메일 링크로 막 들어온 직후)', async () => {
+      vi.useFakeTimers()
+      try {
+        mocks.auth.getSession.mockResolvedValue(signedInSession)
+        mockTables({
+          groups: [{ data: null, error: futureJwt }, ok([groupRow('g-1')])],
+          members: ok([memberRow({ id: 'm-owner', user_id: 'user-1', role: 'owner' })]),
+          profiles: ok([profileRow]),
+        })
+        mockMyProfile(profileRow)
+
+        const pending = fetchSnapshot()
+        await vi.advanceTimersByTimeAsync(2000)
+        const snapshot = await pending
+
+        expect(snapshot.session.userId).toBe('user-1')
+        expect(snapshot.groups).toHaveLength(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('계속 실패하면 몇 번 시도한 뒤 에러를 던진다 (다른 에러는 바로 던진다)', async () => {
+      vi.useFakeTimers()
+      try {
+        mocks.auth.getSession.mockResolvedValue(signedInSession)
+        mockTables({ groups: { data: null, error: futureJwt } })
+        mockMyProfile(profileRow)
+
+        const failing = fetchSnapshot()
+        const caught = failing.catch((e: Error) => e)
+        await vi.advanceTimersByTimeAsync(10_000)
+        expect(((await caught) as Error).message).toContain('JWT issued at future')
+
+        mocks.from.mockClear()
+        mockTables({ groups: { data: null, error: { code: '42501', message: 'permission denied' } } })
+        await expect(fetchSnapshot()).rejects.toThrow('permission denied')
+        expect(mocks.from.mock.calls.filter(([t]) => t === 'groups')).toHaveLength(1) // 재시도 없음
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   it('로그인했으면 내 그룹·멤버·알림과 프로필을 앱 타입으로 담는다', async () => {
     mocks.auth.getSession.mockResolvedValue(signedInSession)
     mockTables({

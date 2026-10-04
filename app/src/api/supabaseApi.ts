@@ -116,7 +116,11 @@ async function requireAuthUserId(): Promise<string> {
 }
 
 /** 지금 로그인한 정식 회원. 로그인 안 했거나 게스트(익명)면 null. */
-async function loadSessionUser(): Promise<User | null> {
+function loadSessionUser(): Promise<User | null> {
+  return retryOnFutureJwt(readSessionUser)
+}
+
+async function readSessionUser(): Promise<User | null> {
   const supabase = getSupabase()
   const { data } = await supabase.auth.getSession()
   const authUser = data.session?.user
@@ -245,7 +249,31 @@ function writeGuestHint(memberId: string | null): void {
  * - 정식 회원: 내가 멤버인 모든 그룹
  * - 게스트(익명 세션): 지금 보고 있는 자리의 그룹 하나
  */
-export async function fetchSnapshot(): Promise<Snapshot> {
+export function fetchSnapshot(): Promise<Snapshot> {
+  return retryOnFutureJwt(readSnapshot)
+}
+
+/**
+ * 방금 발급된 토큰(이메일 링크로 막 들어왔거나 방금 로그인한 직후)을 서버가 "미래에 발급된 토큰"이라며 거절하는 일이 있다.
+ * 로그인 서버와 데이터 서버의 시계가 아주 조금 어긋나서 생기는 일시적인 오류라, 잠깐 기다렸다가 다시 시도하면 지나간다.
+ * 이 오류를 그대로 던지면 첫 화면이 비어 버린 채 멈춘다(실제 서버에서 확인).
+ */
+const FUTURE_JWT_RETRIES = 4
+const FUTURE_JWT_DELAY_MS = 700
+
+async function retryOnFutureJwt<T>(run: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await run()
+    } catch (err) {
+      const futureJwt = err instanceof Error && err.message.includes('JWT issued at future')
+      if (!futureJwt || attempt >= FUTURE_JWT_RETRIES) throw err
+      await new Promise((resolve) => setTimeout(resolve, FUTURE_JWT_DELAY_MS))
+    }
+  }
+}
+
+async function readSnapshot(): Promise<Snapshot> {
   const supabase = getSupabase()
   const empty: Snapshot = { session: { userId: null, viewAsMemberId: null }, users: [], groups: [], notifications: [] }
   const { data: sessionData } = await supabase.auth.getSession()
