@@ -8,7 +8,7 @@ export type Category = (typeof CATEGORIES)[number]
 export const SPLIT_TYPES = ['equal', 'ratio', 'amount'] as const
 export type SplitType = (typeof SPLIT_TYPES)[number]
 
-export type NotificationType = 'expense' | 'member_joined'
+export type NotificationType = 'expense' | 'member_joined' | 'expense_deleted'
 
 /** 이메일로 가입한 정식 회원. 게스트는 User가 아니라 Member로만 존재함. */
 export interface User {
