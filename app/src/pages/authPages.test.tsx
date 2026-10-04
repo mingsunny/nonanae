@@ -13,6 +13,7 @@ import {
   signOut,
   signUp,
 } from '../api'
+import { SignUpConfirmationRequired } from '../api/errors'
 import ToastHost from '../components/common/Toast'
 import { routes } from '../routes/router'
 import { useAppStore } from '../store/appStore'
@@ -250,6 +251,22 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(submit.disabled).toBe(false)
     await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
     expect(submit.disabled).toBe(true) // 동의를 거두면 다시 막힌다
+  })
+
+  it('이메일 확인이 필요한 가입이면 에러가 아니라 안내와 함께 로그인 화면으로 간다', async () => {
+    useAppStore.setState({ signUp: vi.fn().mockRejectedValue(new SignUpConfirmationRequired()) })
+    const router = await goToSignup()
+    await fillStep1()
+    await click('다음')
+    await fill('이름', '신규')
+    await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
+    await fill('계좌번호', '1000-1234-5678')
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await click('회원가입')
+
+    expect(await screen.findByText(/가입 확인 메일을 보냈어요/)).toBeTruthy()
+    expect(pathOf(router)).toBe('/login')
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('2단계에 수집 항목 요약과 처리방침 링크(새 탭)가 보인다', async () => {

@@ -17,6 +17,7 @@ import type {
   SplitType,
   User,
 } from '../domain/types'
+import { SignUpConfirmationRequired } from './errors'
 import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
@@ -251,6 +252,7 @@ export async function fetchSnapshot(): Promise<Snapshot> {
   const authUser = sessionData.session?.user
   if (!authUser) return empty
   const isGuest = authUser.is_anonymous === true
+  if (!isGuest) await dropAccountCopyIfPresent(authUser)
 
   const [groupsRes, membersRes, expensesRes, participantsRes, notificationsRes] = await Promise.all([
     supabase.from('groups').select('id, name, invite_code'),
@@ -361,13 +363,18 @@ export async function signUp(input: SignUpInput): Promise<User> {
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
     password: input.password,
-    options: { data: { name, bank: input.bank, account }, ...captchaOptions(captchaToken) },
+    options: {
+      data: { name, bank: input.bank, account },
+      // 확인 메일의 링크가 돌아올 곳. 대시보드 Redirect URLs에 등록된 주소여야 한다(로컬·운영·프리뷰 모두 등록되어 있음).
+      emailRedirectTo: `${window.location.origin}${paths.groups}`,
+      ...captchaOptions(captchaToken),
+    },
   })
   if (error) throw new Error(authErrorMessage(error))
   // 이메일 확인이 켜져 있으면 이미 가입된 이메일도 에러 없이 돌아오는데, 그땐 identities가 비어 있다
   if (data.user?.identities?.length === 0) throw new Error('이미 가입된 이메일이에요. 로그인해주세요.')
   // 세션이 없다 = Supabase에서 "이메일 확인"이 켜져 있어 확인 메일을 눌러야 로그인됨
-  if (!data.session) throw new Error('가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해주세요.')
+  if (!data.session) throw new SignUpConfirmationRequired()
 
   await dropAccountFromLoginInfo()
 
@@ -383,6 +390,20 @@ export async function signUp(input: SignUpInput): Promise<User> {
  * 가입이 끝난 뒤 여기서 한 번 더 지운다. 값을 null로 보내면 그 키가 지워진다.
  * 못 지워도 가입 자체는 성공이므로 에러로 던지지 않는다(콘솔에만 남김 — 값은 찍지 않음).
  */
+// 이미 정리를 시도한 계정 (실패해도 스냅샷을 읽을 때마다 되풀이하지 않는다)
+const accountCopyCleanupTried = new Set<string>()
+
+/**
+ * 이메일 확인을 켜 두면 가입 요청이 세션 없이 끝나서(signUp이 dropAccountFromLoginInfo까지 못 간다) 계좌 사본이 메타데이터에
+ * 남은 채 확인 링크로 처음 로그인된다. 세션을 읽을 때 사본이 보이면 그 자리에서 지운다. 평소(사본 없음)에는 아무것도 안 한다.
+ */
+async function dropAccountCopyIfPresent(authUser: AuthUser): Promise<void> {
+  const meta = authUser.user_metadata ?? {}
+  if (accountCopyCleanupTried.has(authUser.id) || (meta.bank == null && meta.account == null)) return
+  accountCopyCleanupTried.add(authUser.id)
+  await dropAccountFromLoginInfo()
+}
+
 async function dropAccountFromLoginInfo(): Promise<void> {
   const supabase = getSupabase()
   const { error } = await supabase.auth.updateUser({ data: { bank: null, account: null } })

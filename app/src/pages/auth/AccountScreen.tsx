@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { SignUpConfirmationRequired } from '../../api/errors'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import PrivacyLink from '../../components/common/PrivacyLink'
@@ -44,6 +45,12 @@ export default function AccountScreen() {
       resetAuthFlow()
       navigate(paths.groups, { replace: true })
     } catch (err) {
+      // 이메일 확인이 필요한 가입: 에러가 아니라 "메일을 확인하세요" 안내와 함께 로그인 화면으로 보낸다
+      if (err instanceof SignUpConfirmationRequired) {
+        resetAuthFlow()
+        navigate(paths.login, { replace: true, state: { notice: err.message } })
+        return
+      }
       // 1단계 이후 다른 곳에서 같은 이메일이 가입된 경우도 여기서 잡힘 — 이메일을 고치려면 1단계로 돌아가야 함
       setError(err instanceof Error ? err.message : '가입하지 못했어요')
       setBusy(false)

@@ -35,6 +35,7 @@ vi.mock('../lib/captcha', async (importOriginal) => ({
   getCaptchaToken: mocks.getCaptchaToken,
 }))
 
+import { SignUpConfirmationRequired } from './errors'
 import {
   addPendingMember,
   authErrorMessage,
@@ -251,6 +252,7 @@ describe('signUp', () => {
     await signUp(input)
     expect(mocks.auth.signUp.mock.calls[0][0].options).toEqual({
       data: { name: '신규', bank: '토스뱅크', account: '1000-1' },
+      emailRedirectTo: `${window.location.origin}/groups`,
       captchaToken: 'tok-2',
     })
   })
@@ -265,7 +267,10 @@ describe('signUp', () => {
     expect(mocks.auth.signUp).toHaveBeenCalledWith({
       email: 'new@example.com',
       password: 'pw-12345',
-      options: { data: { name: '신규', bank: '토스뱅크', account: '1000-1' } },
+      options: {
+        data: { name: '신규', bank: '토스뱅크', account: '1000-1' },
+        emailRedirectTo: `${window.location.origin}/groups`,
+      },
     })
     expect(user.name).toBe('신규')
   })
@@ -306,6 +311,7 @@ describe('signUp', () => {
   it('세션이 없으면(이메일 확인 대기) 확인 메일 안내로 던진다', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
     await expect(signUp(input)).rejects.toThrow('가입 확인 메일을 보냈어요')
+    await expect(signUp(input)).rejects.toBeInstanceOf(SignUpConfirmationRequired)
   })
 
   it('이름·은행·계좌가 비어 있으면 서버를 부르기 전에 막는다', async () => {
@@ -362,6 +368,34 @@ describe('fetchSnapshot', () => {
     expect(snapshot.notifications).toEqual([
       expect.objectContaining({ id: 'n-1', groupId: 'g-1', memberId: 'm-pending', type: 'member_joined', read: false }),
     ])
+  })
+
+  it('이메일 확인 링크로 처음 로그인했는데 메타데이터에 계좌 사본이 남아 있으면 그 자리에서 지운다', async () => {
+    const withCopy = { ...authUser, id: 'user-copy', user_metadata: { name: '민선', bank: '토스뱅크', account: '1000-1' } }
+    mocks.auth.getSession.mockResolvedValue({ data: { session: { user: withCopy } } })
+    mocks.auth.refreshSession.mockResolvedValue({ error: null })
+    mockTables({ profiles: ok([{ ...profileRow, id: 'user-copy' }]) })
+    mockMyProfile({ ...profileRow, id: 'user-copy' })
+
+    await fetchSnapshot()
+    await fetchSnapshot() // 같은 계정은 한 번만 시도한다
+
+    expect(mocks.auth.updateUser).toHaveBeenCalledTimes(1)
+    expect(mocks.auth.updateUser).toHaveBeenCalledWith({ data: { bank: null, account: null } })
+    expect(mocks.auth.refreshSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('사본이 없는 계정·게스트는 로그인 정보를 건드리지 않는다', async () => {
+    mocks.auth.getSession.mockResolvedValue({ data: { session: { user: { ...authUser, id: 'user-clean', user_metadata: { name: '민선' } } } } })
+    mockTables({ profiles: ok([profileRow]) })
+    mockMyProfile(profileRow)
+    await fetchSnapshot()
+    mocks.auth.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'anon-9', is_anonymous: true, user_metadata: { bank: 'x', account: 'y' } } } },
+    })
+    mockTables({})
+    await fetchSnapshot()
+    expect(mocks.auth.updateUser).not.toHaveBeenCalled()
   })
 
   it('지출과 그 참여자를 묶어서 돌려준다', async () => {
