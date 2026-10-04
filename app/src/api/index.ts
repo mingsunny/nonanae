@@ -3,7 +3,7 @@
 // Supabase가 붙으면 함수 안쪽만 supabase-js 호출로 바꾸면 되고 호출하는 쪽은 그대로다.
 import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
-import { expenseAddedTitle } from '../domain/notifications'
+import { expenseAddedTitle, expenseDeletedTitle } from '../domain/notifications'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -154,9 +154,36 @@ export async function updateExpense(expenseId: string, input: ExpenseInput): Pro
 export async function deleteExpense(expenseId: string): Promise<void> {
   if (USE_SUPABASE) return remote.deleteExpense(expenseId)
   const d = getDb()
-  if (!d.expenses.some((e) => e.id === expenseId)) throw new Error('존재하지 않는 지출이에요')
+  const expense = d.expenses.find((e) => e.id === expenseId)
+  if (!expense) throw new Error('존재하지 않는 지출이에요')
   d.expenses = d.expenses.filter((e) => e.id !== expenseId)
   d.expenseParticipants = d.expenseParticipants.filter((p) => p.expenseId !== expenseId)
+
+  // 삭제는 흔적을 남긴다: 지운 사람(지금 이 세션의 멤버)이 있을 때 같은 그룹에 알림. 지운 사람을 못 찾으면 만들지 않는다(DB 트리거와 같은 규칙).
+  const { userId, viewAsMemberId } = d.session
+  const deleter = d.members.find(
+    (m) => m.groupId === expense.groupId && (userId !== null ? m.userId === userId : m.id === viewAsMemberId),
+  )
+  const group = d.groups.find((g) => g.id === expense.groupId)
+  const payer = d.members.find((m) => m.id === expense.paidBy)
+  if (deleter && group) {
+    const users = usersById(d)
+    d.notifications.push({
+      id: uid('n'),
+      groupId: group.id,
+      memberId: deleter.id,
+      type: 'expense_deleted',
+      title: expenseDeletedTitle({
+        groupName: group.name,
+        itemTitle: expense.title,
+        amount: expense.amount,
+        payerName: payer ? memberDisplayName(payer, users) : '',
+        deleterName: memberDisplayName(deleter, users),
+      }),
+      createdAt: nowIso(),
+      read: false,
+    })
+  }
   commit()
 }
 

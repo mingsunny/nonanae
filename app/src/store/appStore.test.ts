@@ -54,7 +54,11 @@ describe('useAppStore', () => {
     await store.init()
     await store.removeExpense('e_1')
     await store.addPendingMember('g_jeju', '최수아')
+    // 삭제하면 "누가 지웠는지" 알림이 안 읽음으로 생긴다
+    const deleted = useAppStore.getState().notifications.find((n) => n.type === 'expense_deleted')!
+    expect(deleted.read).toBe(false)
     await store.markNotificationRead('n_2')
+    await store.markNotificationRead(deleted.id)
     const s = useAppStore.getState()
     const g = selectGroup('g_jeju')(s)!
     expect(g.expenses.some((e) => e.id === 'e_1')).toBe(false)

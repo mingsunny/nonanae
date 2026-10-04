@@ -8,6 +8,7 @@ import {
   renameGuestMember,
   resolveInviteCode,
   rotateInviteCode,
+  signIn,
   signOut,
   fetchSnapshot,
   markNotificationRead,
@@ -155,6 +156,32 @@ describe('deleteExpense', () => {
 
   it('없는 지출은 거절', async () => {
     await expect(deleteExpense('e_none')).rejects.toThrow()
+  })
+
+  it('삭제하면 같은 그룹에 누가 무엇을 지웠는지 알림이 남는다 (남이 결제한 내역도 지울 수 있기 때문)', async () => {
+    const before = await fetchSnapshot()
+    const nameOf = (id: string) => {
+      const m = before.groups[0].members.find((x) => x.id === id)!
+      return m.name ?? before.users.find((u) => u.id === m.userId)!.name
+    }
+
+    await deleteExpense('e_5') // 하준이 결제한 '오후 카페'(24,000원)를 로그인한 내가 지운다
+
+    const { notifications } = await fetchSnapshot()
+    const created = notifications.find((n) => n.type === 'expense_deleted')!
+    expect(created).toMatchObject({ groupId: 'g_jeju', memberId: 'm_me', read: false })
+    expect(created.title).toBe(
+      `[제주도 여행]에서 '오후 카페' 내역(₩24,000, 결제: ${nameOf('m_hajun')})을 ${nameOf('m_me')}님이 삭제했어요`,
+    )
+    expect(notifications[0].id).toBe(created.id) // 최신순이라 맨 위
+  })
+
+  it('지운 사람을 알 수 없으면(세션 없음) 알림을 만들지 않는다', async () => {
+    await signOut()
+    await deleteExpense('e_5')
+    await signIn('a@naver.com', 'aaaaaaaa')
+    const { notifications } = await fetchSnapshot()
+    expect(notifications.some((n) => n.type === 'expense_deleted')).toBe(false)
   })
 })
 

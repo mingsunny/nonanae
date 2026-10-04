@@ -98,7 +98,7 @@
 | id | string | 내부 식별자 |
 | groupId | string | 어느 그룹에서 발생한 알림인지 |
 | memberId | string \| null | 이벤트를 일으킨 사람의 Member.id — 지출 등록 알림이면 결제자, 멤버 참여 알림이면 그 새 멤버 |
-| type | 'expense' \| 'member_joined' | 알림 종류 — [마스터 데이터](#마스터-데이터) 참고 |
+| type | 'expense' \| 'member_joined' \| 'expense_deleted' | 알림 종류 — [마스터 데이터](#마스터-데이터) 참고 |
 | title | string | 화면에 보여줄 문구. 생성 시점에 이름을 채워 고정 저장(이후 이름이 바뀌어도 문구는 그대로) |
 | createdAt | timestamp | 생성 일시(화면엔 상대 시간으로 표시) |
 | read | boolean | 읽음 여부. 기본값 false |
@@ -107,7 +107,7 @@
 
 - **카테고리(6종)**: 숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
 - **splitType(3종)**: equal(균등) / ratio(비율) / amount(금액)
-- **Notification.type(2종)**: expense(지출 등록) / member_joined(멤버 참여)
+- **Notification.type(3종)**: expense(지출 등록) / member_joined(멤버 참여) / expense_deleted(지출 삭제)
 - **은행 목록**: [conventions.md](conventions.md#은행-목록) 참고
 
 ## 계산 로직
@@ -144,6 +144,7 @@ erDiagram
 > - [`supabase/migrations/20260921000000_delete_account.sql`](../../supabase/migrations/20260921000000_delete_account.sql) — 회원 탈퇴용 함수 `delete_my_account()`. 위 두 파일 다음에 실행
 > - [`supabase/migrations/20260927000000_rename_guest_member.sql`](../../supabase/migrations/20260927000000_rename_guest_member.sql) — 게스트 본인 이름 수정용 함수 `rename_guest_member()`. 위 세 파일 다음에 실행
 > - [`supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql`](../../supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql) — 계좌 조회 함수(`get_my_profile`, `get_payee_accounts`), 가입 때 계좌가 로그인 정보에 복사되던 것 정리, 초대코드 재발급(`rotate_invite_code`). **추가만 하는 안전한 단계**
+> - [`supabase/migrations/20261005000000_expense_deleted_notification.sql`](../../supabase/migrations/20261005000000_expense_deleted_notification.sql) — 지출을 삭제하면 같은 그룹에 알림이 가도록 하는 트리거(`notify_expense_deleted`). **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261003000100_restrict_profile_columns.sql`](../../supabase/migrations/20261003000100_restrict_profile_columns.sql) — `profiles`의 은행·계좌 컬럼을 API로 직접 못 읽게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (먼저 적용하면 옛 앱이 프로필을 못 읽음)
 > - [`supabase/migrations/20261004000000_expense_notification_trigger.sql`](../../supabase/migrations/20261004000000_expense_notification_trigger.sql) — 지출 등록 알림을 서버 트리거가 만들게 함 + 지출이 있는 그룹을 못 지우던 FK 검사 시점 수정. **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261004000100_lock_notification_writes.sql`](../../supabase/migrations/20261004000100_lock_notification_writes.sql) — 클라이언트의 알림 직접 추가를 막고 수정은 `read`만 허용. **바로 위 파일을 적용하고, 앱이 알림을 직접 만들지 않는 새 버전으로 배포된 뒤에만 적용**
@@ -241,7 +242,7 @@ erDiagram
 | id | uuid | PK | |
 | group_id | uuid | NOT NULL, FK → groups ON DELETE CASCADE | |
 | member_id | uuid | FK → members ON DELETE SET NULL | 이벤트를 일으킨 멤버 |
-| type | text | NOT NULL, `expense`/`member_joined` | |
+| type | text | NOT NULL, `expense`/`member_joined`/`expense_deleted` | |
 | title | text | NOT NULL | 생성 시점에 이름을 채워 고정 저장한 문구 |
 | read | boolean | NOT NULL, 기본 false | 알림 1건당 읽음 플래그 1개 (스펙 그대로) |
 | created_at | timestamptz | NOT NULL, 기본 now() | |
@@ -274,6 +275,7 @@ erDiagram
 |---|---|
 | `on_auth_user_created` (트리거) | 회원가입 시 `raw_user_meta_data`의 name/bank/account로 `profiles` 생성. 익명 로그인은 건너뜀 |
 | `before_profile_delete` (트리거) | 탈퇴 시 멤버 행에 이름 보존 |
+| `expenses_notify_deleted` (트리거) | 지출이 삭제되면 "[그룹]에서 '항목' 내역(₩금액, 결제: OO)을 XX님이 삭제했어요" 알림을 서버가 만든다. XX는 지금 요청한 사람의 멤버 이름. 지운 사람을 알 수 없거나(대시보드·관리용 SQL), 그룹이 통째로 지워지는 중이면 알림을 만들지 않는다 |
 | `expenses_notify_added` (트리거) | 지출이 등록되면 "[그룹]에 OO님이 결제한 내역이 추가됐어요" 알림을 서버가 직접 만든다. OO는 등록자가 아니라 결제자 이름([13](13-notifications.md) 알림1). 문구를 클라이언트가 정하지 못하므로 가짜 알림을 만들 수 없다 |
 | `create_group(p_name)` | [05](05-create-group.md) 그룹 + 그룹장 멤버를 한 번에 생성, group id 반환. **정식 회원만**(게스트 거부) |
 | `lookup_group_by_code(p_code)` | [06](06-join-group.md) 초대코드 확인 + [07](07-join-match.md) "나 고르기" 목록용 `{id, name, members[{id, name, claimed}]}` 반환. 잘못된 코드면 null |
@@ -298,7 +300,7 @@ erDiagram
 
 - **알림 읽음이 알림 1건당 하나** — 그룹원이 여러 명이면 한 명이 읽으면 다른 사람에게도 읽음으로 보임. 사용자별 읽음이 필요하면 스펙과 테이블을 함께 바꿔야 함
 - **돈을 받을 사람(지출을 결제한 정식 회원)의 계좌번호는 같은 그룹 멤버라면 — 초대코드로 들어온 게스트 포함 — 서버에서 읽을 수 있음** — 송금하려면 필요한 정보라 완전히 막을 수는 없고, 결제한 적 없는 회원의 계좌는 내려주지 않는 것으로 범위를 줄였다. 초대코드가 새어 나가면 이 범위가 낯선 사람에게 열리므로 방장이 `rotate_invite_code()`로 코드를 바꿀 수 있게 했다. 더 줄이려면 게스트 참여에 방장 승인을 두는 등의 제품 결정이 필요하다
-- **같은 그룹 멤버면 게스트도 남이 등록한 지출을 수정·삭제할 수 있음** — 협업 기능이라 멤버 누구나 쓰기를 열어 둔 결과(알림 문구 위조는 서버 생성으로 막았다). 초대코드가 새어 나갈 수 있는 구조라, 낯선 사람이 지출을 지우는 것까지 막으려면 "등록한 사람/방장만 수정·삭제" 같은 제품 결정이 필요하다. 지출에 등록자 필드가 아직 없다
+- **같은 그룹 멤버면 게스트도 남이 등록한 지출을 수정·삭제할 수 있음 (의도된 동작, 2026-10-05 결정)** — 협업 기능이라 멤버 누구나 쓰기를 열어 둔다. 대신 **삭제는 같은 그룹에 알림이 간다**(누가 무엇을 지웠는지, 서버가 문구를 만든다). 수정은 알림이 없다(13 알림1). 알림 문구 위조는 서버 생성으로 막았다. 초대코드가 새어 나갈 수 있는 구조라, 낯선 사람이 지출을 지우는 것까지 막으려면 "등록한 사람/방장만 수정·삭제" 같은 제품 결정이 필요하다. 지출에 등록자 필드가 아직 없다
 - **영수증 사진이 지출 행에 그대로 저장됨** — `receipt_image_url`에 사진 데이터(data URL, 최대 2MB)를 넣고 있어서, 그룹 데이터를 읽을 때마다 사진이 함께 내려옴. 사진이 늘면 Supabase Storage에 올리고 주소만 저장하도록 바꿔야 함
 - **지출 등록·수정이 여러 테이블에 나눠 쓰임** — 지출 → 참여자 순으로 저장하고, 참여자 저장이 실패하면 지출도 되돌림. 네트워크가 중간에 끊기면 일부만 저장될 수 있어, 엄격한 원자성이 필요해지면 DB 함수(RPC)로 옮겨야 함. 알림은 지출이 들어가는 순간 트리거가 만들기 때문에, 참여자 저장이 실패해 지출을 되돌리는 드문 경우에는 알림이 하나 남을 수 있음
 - **방장이 탈퇴하면 그룹을 관리할 사람이 없어짐** — 방장 멤버 행의 `user_id`가 null이 되어(이름은 남음) 그룹 수정·삭제 정책(`is_group_owner`)을 통과할 사람이 없음. 방장 위임/그룹 정리 정책이 필요해지면 스펙과 함께 정해야 함
@@ -324,3 +326,4 @@ erDiagram
 - 2026-10-04(추가): 봇 방지 — 앱이 Turnstile 토큰을 받아 Supabase Auth 호출(로그인·가입·재설정·익명 로그인)에 `captchaToken`으로 보내도록 함. 사이트 키가 없으면 건너뜀(목업·로컬). 서버 쪽 강제는 대시보드에서 CAPTCHA를 켜야 시작됨 (민선)
 - 2026-10-04(추가): 이메일 확인(Confirm email)을 켤 수 있도록 앱을 맞춤 — 가입 요청에 `emailRedirectTo`(현재 주소의 `/groups`)를 실어 확인 링크가 돌아올 곳을 정하고, 확인이 필요한 가입은 에러가 아니라 안내와 함께 로그인 화면으로 보냄. 확인 메일을 켜면 가입 요청이 세션 없이 끝나 계좌 사본 정리(`dropAccountFromLoginInfo`)를 건너뛰므로, 확인 링크로 처음 로그인된 세션에서 메타데이터에 사본이 보이면 그 자리에서 지움 (민선)
 - 2026-10-04(추가): 이메일 링크(재설정·가입 확인)로 처음 들어올 때 화면이 빈 채로 멈추던 문제 수정 — 방금 발급된 토큰을 데이터 서버가 `JWT issued at future`로 잠깐 거절하는 일시적 오류(서버 시계 차이)가 원인이었고, 첫 데이터 로딩 실패가 처리되지 않아 빈 화면에서 멈췄다. 이 오류는 잠깐 기다려 최대 4번 다시 시도하고, 그래도 실패하면 빈 화면 대신 "다시 시도" 화면을 보여준다 (민선)
+- 2026-10-05: 지출 삭제 알림 추가 — 남이 등록한 지출도 수정·삭제할 수 있게 두기로 하면서, 삭제는 흔적을 남기도록 DB 트리거(`expenses_notify_deleted`)가 "누가 어떤 내역(금액·결제자)을 지웠는지" 알림을 만든다. `notifications.type`에 `expense_deleted` 추가. 그룹이 통째로 지워질 때는 알림을 만들지 않는다 (민선)
