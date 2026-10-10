@@ -411,7 +411,7 @@ export async function signUp(input: SignUpInput): Promise<User> {
     options: {
       data: { name, bank: input.bank, account },
       // 확인 메일의 링크가 돌아올 곳. 대시보드 Redirect URLs에 등록된 주소여야 한다(로컬·운영·프리뷰 모두 등록되어 있음).
-      emailRedirectTo: `${window.location.origin}${paths.groups}`,
+      emailRedirectTo: `${window.location.origin}${input.redirectPath ?? paths.groups}`,
       ...captchaOptions(captchaToken),
     },
   })

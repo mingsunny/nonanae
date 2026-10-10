@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
   createGroup,
   joinAsNewAccountMember,
@@ -285,7 +285,9 @@ describe('01·02 회원가입 (2단계)', () => {
   })
 
   it('이메일 확인이 필요한 가입이면 에러가 아니라 안내와 함께 로그인 화면으로 간다', async () => {
+    const originalSignUp = useAppStore.getState().signUp
     useAppStore.setState({ signUp: vi.fn().mockRejectedValue(new SignUpConfirmationRequired()) })
+    onTestFinished(() => useAppStore.setState({ signUp: originalSignUp }))
     const router = await goToSignup()
     await fillStep1()
     await click('다음')
@@ -611,6 +613,29 @@ describe('06·07 초대코드로 참여', () => {
     const minji = state().groups.find((g) => g.id === 'g_test42')!.members.find((m) => m.id === 'm_minji')!
     expect(minji.userId).toBe('u_test')
     expect(screen.queryByText(/게스트로 참여 중이에요/)).toBeNull()
+  })
+
+  it('게스트로 참여한 뒤 그룹 화면에서 "회원가입"하면 게스트 자리가 새 계정에 연결되고 그 그룹으로 돌아온다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/join?code=TEST42-m_minji')
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
+    await screen.findByText(/게스트로 참여 중이에요/)
+    await click('회원가입')
+    expect(pathOf(router)).toBe('/signup')
+    await fill('이메일', 'guest@example.com')
+    await fill('비밀번호', 'pw-12345')
+    await fill('비밀번호 확인', 'pw-12345')
+    await click('다음')
+    await fill('이름', '김민지')
+    await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
+    await fill('계좌번호', '1000-1234-5678')
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await click('회원가입')
+
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
+    expect(await screen.findByText('초대코드 테스트방')).toBeTruthy()
+    const minji = state().groups.find((g) => g.id === 'g_test42')!.members.find((m) => m.id === 'm_minji')!
+    expect(minji.userId).toBe(state().currentUserId)
   })
 
   it('가입 확인 메일을 거쳐 그룹 목록으로 들어와도, 저장해 둔 초대 링크로 이어간다', async () => {
