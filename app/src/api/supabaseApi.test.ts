@@ -58,6 +58,7 @@ import {
   signIn,
   signOut,
   SIGNUP_RATE_LIMIT_MESSAGE,
+  isEmailRegistered,
   signUp,
   updateExpense,
   updateProfile,
@@ -239,6 +240,20 @@ describe('signIn', () => {
   it('잘못된 비밀번호면 한국어 에러로 던진다', async () => {
     mocks.auth.signInWithPassword.mockResolvedValue({ error: authError('invalid_credentials') })
     await expect(signIn('me@example.com', 'wrong')).rejects.toThrow('이메일 또는 비밀번호가 일치하지 않아요.')
+  })
+})
+
+describe('isEmailRegistered (가입 1단계 중복 확인)', () => {
+  it('DB 함수에 앞뒤 공백을 뺀 이메일을 넘기고 결과를 돌려준다', async () => {
+    mocks.rpc.mockResolvedValue({ data: true, error: null })
+    await expect(isEmailRegistered(' a@naver.com ')).resolves.toBe(true)
+    expect(mocks.rpc).toHaveBeenCalledWith('is_email_registered', { p_email: 'a@naver.com' })
+  })
+
+  it('함수가 아직 적용되지 않았거나 실패하면 막지 않고 false로 넘긴다', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202', message: 'not found' } })
+    await expect(isEmailRegistered('a@naver.com')).resolves.toBe(false)
   })
 })
 

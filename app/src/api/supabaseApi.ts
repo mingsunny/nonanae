@@ -381,6 +381,20 @@ export async function signIn(email: string, password: string): Promise<User> {
  * 회원가입 2단계 제출. 이름·은행·계좌는 auth 메타데이터로 함께 보내고,
  * DB 트리거(handle_new_user)가 그 값으로 profiles 행을 만든다.
  */
+/**
+ * 회원가입 1단계의 이메일 중복 확인. 2단계(이름·계좌)를 입력하기 전에 알려주려고 쓴다.
+ * DB 함수(20261010000000_email_registered_check.sql)가 아직 적용되지 않았거나 실패하면 false로 넘긴다 —
+ * 그래도 가입 제출(signUp) 때 한 번 더 걸러지므로 가입이 막히지는 않는다.
+ */
+export async function isEmailRegistered(email: string): Promise<boolean> {
+  const { data, error } = await getSupabase().rpc('is_email_registered', { p_email: email.trim() })
+  if (error) {
+    console.warn('[supabase] 이메일 중복 확인을 건너뜀', error.code)
+    return false
+  }
+  return data === true
+}
+
 export const SIGNUP_RATE_LIMIT_MESSAGE =
   '이미 가입했거나 가입 확인 메일을 보낸 이메일일 수 있어요. 메일함을 확인하거나 로그인해주세요.'
 

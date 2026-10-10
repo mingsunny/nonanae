@@ -146,6 +146,7 @@ erDiagram
 > - [`supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql`](../../supabase/migrations/20261003000000_account_rpc_and_invite_rotation.sql) — 계좌 조회 함수(`get_my_profile`, `get_payee_accounts`), 가입 때 계좌가 로그인 정보에 복사되던 것 정리, 초대코드 재발급(`rotate_invite_code`). **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261005000000_expense_deleted_notification.sql`](../../supabase/migrations/20261005000000_expense_deleted_notification.sql) — 지출을 삭제하면 같은 그룹에 알림이 가도록 하는 트리거(`notify_expense_deleted`). **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261003000100_restrict_profile_columns.sql`](../../supabase/migrations/20261003000100_restrict_profile_columns.sql) — `profiles`의 은행·계좌 컬럼을 API로 직접 못 읽게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (먼저 적용하면 옛 앱이 프로필을 못 읽음)
+> - [`supabase/migrations/20261010000000_email_registered_check.sql`](../../supabase/migrations/20261010000000_email_registered_check.sql) — 회원가입 1단계 이메일 중복 확인 함수(`is_email_registered`). **추가만 하는 안전한 단계** (앱은 함수가 없으면 확인을 건너뜀)
 > - [`supabase/migrations/20261004000000_expense_notification_trigger.sql`](../../supabase/migrations/20261004000000_expense_notification_trigger.sql) — 지출 등록 알림을 서버 트리거가 만들게 함 + 지출이 있는 그룹을 못 지우던 FK 검사 시점 수정. **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261004000100_lock_notification_writes.sql`](../../supabase/migrations/20261004000100_lock_notification_writes.sql) — 클라이언트의 알림 직접 추가를 막고 수정은 `read`만 허용. **바로 위 파일을 적용하고, 앱이 알림을 직접 만들지 않는 새 버전으로 배포된 뒤에만 적용**
 >
