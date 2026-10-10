@@ -57,6 +57,7 @@ import {
   rotateInviteCode,
   signIn,
   signOut,
+  SIGNUP_RATE_LIMIT_MESSAGE,
   signUp,
   updateExpense,
   updateProfile,
@@ -255,6 +256,11 @@ describe('signUp', () => {
       emailRedirectTo: `${window.location.origin}/groups`,
       captchaToken: 'tok-2',
     })
+  })
+
+  it('가입 확인 전인 이메일로 다시 가입해 발송 한도에 걸리면, 이미 가입 요청된 이메일일 수 있다고 안내한다', async () => {
+    mocks.auth.signUp.mockResolvedValue({ data: { user: null, session: null }, error: { code: 'over_email_send_rate_limit' } })
+    await expect(signUp(input)).rejects.toThrow(SIGNUP_RATE_LIMIT_MESSAGE)
   })
 
   it('이름·은행·계좌를 auth 메타데이터로 보내고, 가입 후 User를 돌려준다', async () => {

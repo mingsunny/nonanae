@@ -5,7 +5,9 @@ import { RECOVERY_LINK_TOKEN, hasPasswordResetLink, isPasswordResetTokenValid, r
 import Button from '../components/common/Button'
 import Callout from '../components/common/Callout'
 import fields from '../components/common/Field.module.css'
+import PasswordInput from '../components/common/PasswordInput'
 import Topbar from '../components/common/Topbar'
+import { PASSWORD_RULE_HINT, passwordProblem } from '../domain/password'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import styles from './PasswordResetPage.module.css'
@@ -53,7 +55,7 @@ function RequestStep() {
 
   return (
     <div>
-      <Topbar title="비밀번호 재설정" onBack={() => navigate(paths.login)} />
+      <Topbar title="비밀번호 재설정" onBack={() => navigate(paths.login)} brand />
       <div className={styles.body}>
         <form onSubmit={submit}>
           <Callout>가입하신 이메일을 입력하시면 비밀번호 재설정 링크를 보내드려요</Callout>
@@ -105,7 +107,8 @@ function NewPasswordStep({ token }: { token: string }) {
 
   const confirmed = confirm.length > 0
   const matches = password === confirm
-  const canSubmit = password.length > 0 && confirmed && matches
+  const ruleProblem = password.length > 0 ? passwordProblem(password) : null
+  const canSubmit = password.length > 0 && ruleProblem === null && confirmed && matches
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -122,12 +125,12 @@ function NewPasswordStep({ token }: { token: string }) {
     }
   }
 
-  if (valid === null) return <Topbar title="비밀번호 재설정" />
+  if (valid === null) return <Topbar title="비밀번호 재설정" brand />
 
   if (!valid) {
     return (
       <div>
-        <Topbar title="비밀번호 재설정" onBack={() => navigate(paths.login)} />
+        <Topbar title="비밀번호 재설정" onBack={() => navigate(paths.login)} brand />
         <div className={styles.body}>
           <Callout>링크가 만료되었거나 이미 사용됐어요. 재설정 링크를 다시 받아주세요.</Callout>
           <Button onClick={() => navigate(paths.passwordReset, { replace: true })}>재설정 링크 다시 받기</Button>
@@ -138,29 +141,27 @@ function NewPasswordStep({ token }: { token: string }) {
 
   return (
     <div>
-      <Topbar title="새 비밀번호 설정" />
+      <Topbar title="새 비밀번호 설정" brand />
       <form className={styles.body} onSubmit={submit}>
         <label className={fields.label} htmlFor="reset-password">
           새 비밀번호
         </label>
-        <input
+        <PasswordInput
           id="reset-password"
-          className={fields.input}
-          type="password"
           autoComplete="new-password"
+          placeholder={PASSWORD_RULE_HINT}
           value={password}
           onChange={(e) => {
             setPassword(e.target.value)
             setError(null)
           }}
         />
+        {ruleProblem && <p className={fields.error}>{ruleProblem}</p>}
         <label className={fields.label} htmlFor="reset-password-confirm">
           비밀번호 확인
         </label>
-        <input
+        <PasswordInput
           id="reset-password-confirm"
-          className={fields.input}
-          type="password"
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => {

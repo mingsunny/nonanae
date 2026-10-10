@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
+import PasswordInput from '../../components/common/PasswordInput'
 import Topbar from '../../components/common/Topbar'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
@@ -22,6 +23,7 @@ export default function LoginScreen() {
   const email = useAuthFlowStore((s) => s.loginEmail)
   const setEmail = useAuthFlowStore((s) => s.setLoginEmail)
   const resetAuthFlow = useAuthFlowStore((s) => s.reset)
+  const returnTo = useAuthFlowStore((s) => s.returnTo)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -36,7 +38,7 @@ export default function LoginScreen() {
     try {
       await signIn(email, password)
       resetAuthFlow()
-      navigate(paths.groups, { replace: true })
+      navigate(returnTo ?? paths.groups, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인하지 못했어요')
       setBusy(false)
@@ -45,7 +47,7 @@ export default function LoginScreen() {
 
   return (
     <div>
-      <Topbar title="로그인" onBack={() => navigate(paths.welcome)} />
+      <Topbar title="로그인" onBack={() => navigate(returnTo ?? paths.welcome)} brand />
       <form className={styles.body} onSubmit={submit}>
         {notice && <Callout>{notice}</Callout>}
         <label className={fields.label} htmlFor="login-email">
@@ -65,10 +67,8 @@ export default function LoginScreen() {
         <label className={fields.label} htmlFor="login-password">
           비밀번호
         </label>
-        <input
+        <PasswordInput
           id="login-password"
-          className={fields.input}
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={(e) => {

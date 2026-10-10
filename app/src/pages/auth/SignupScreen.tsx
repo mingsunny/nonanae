@@ -3,8 +3,10 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import fields from '../../components/common/Field.module.css'
+import PasswordInput from '../../components/common/PasswordInput'
 import Topbar from '../../components/common/Topbar'
 import { isEmailTaken } from '../../api'
+import { PASSWORD_RULE_HINT, passwordProblem } from '../../domain/password'
 import { paths } from '../../routes/paths'
 import { useAuthFlowStore } from '../../store/authFlowStore'
 import type { SignupDraft } from '../../store/authFlowStore'
@@ -15,12 +17,16 @@ export default function SignupScreen() {
   const navigate = useNavigate()
   const draft = useAuthFlowStore((s) => s.draft)
   const patchDraft = useAuthFlowStore((s) => s.patchDraft)
+  const returnTo = useAuthFlowStore((s) => s.returnTo)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const confirmed = draft.passwordConfirm.length > 0
   const matches = draft.password === draft.passwordConfirm
-  const canSubmit = draft.email.trim().includes('@') && draft.password.length > 0 && confirmed && matches
+  // 규칙 안내는 입력을 시작한 뒤에만 에러로 보여준다
+  const ruleProblem = draft.password.length > 0 ? passwordProblem(draft.password) : null
+  const canSubmit =
+    draft.email.trim().includes('@') && draft.password.length > 0 && ruleProblem === null && confirmed && matches
 
   function edit(patch: Partial<SignupDraft>) {
     patchDraft(patch)
@@ -44,7 +50,7 @@ export default function SignupScreen() {
 
   return (
     <div>
-      <Topbar title="회원가입" onBack={() => navigate(paths.welcome)} />
+      <Topbar title="회원가입" onBack={() => navigate(returnTo ?? paths.welcome)} brand />
       <form className={styles.body} onSubmit={submit}>
         <label className={fields.label} htmlFor="signup-email">
           이메일
@@ -54,29 +60,26 @@ export default function SignupScreen() {
           className={fields.input}
           type="email"
           autoComplete="email"
-          placeholder="예) mingsun@example.com"
+          placeholder="예) nonanae@gmail.com"
           value={draft.email}
           onChange={(e) => edit({ email: e.target.value })}
         />
         <label className={fields.label} htmlFor="signup-password">
           비밀번호
         </label>
-        <input
+        <PasswordInput
           id="signup-password"
-          className={fields.input}
-          type="password"
           autoComplete="new-password"
-          placeholder="8자 이상"
+          placeholder={PASSWORD_RULE_HINT}
           value={draft.password}
           onChange={(e) => edit({ password: e.target.value })}
         />
+        {ruleProblem && <p className={fields.error}>{ruleProblem}</p>}
         <label className={fields.label} htmlFor="signup-password-confirm">
           비밀번호 확인
         </label>
-        <input
+        <PasswordInput
           id="signup-password-confirm"
-          className={fields.input}
-          type="password"
           autoComplete="new-password"
           placeholder="비밀번호를 한 번 더 입력해주세요"
           value={draft.passwordConfirm}

@@ -7,6 +7,7 @@ import Callout from '../../components/common/Callout'
 import PrivacyLink from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
+import AuthLinks from './AuthLinks'
 import { useAppStore } from '../../store/appStore'
 import { showToast } from '../../store/toastStore'
 import styles from './join.module.css'
@@ -15,6 +16,8 @@ export type PickResolution = Extract<JoinResolution, { kind: 'pick' }>
 
 interface Props {
   pick: PickResolution
+  /** 로그인·가입 후 같은 그룹으로 돌아오기 위한 초대코드 */
+  code: string
   onBack: () => void
   /** 참여가 끝나 그룹 안으로 들어갈 때 */
   onJoined: (groupId: string) => void
@@ -24,7 +27,7 @@ interface Props {
  * 07 참여하기 (멤버 매칭) — 공용 코드로 들어왔을 때 그룹 멤버 목록에서 본인을 고르거나, 없으면 새로 참여한다.
  * 이미 계정이 연결된 멤버는 고를 수 없다. 로그인 여부에 따라 "새로 참여"의 모양이 다르다(이름 입력 / 내 계정으로).
  */
-export default function PickScreen({ pick, onBack, onJoined }: Props) {
+export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   const joinAsExistingMember = useAppStore((s) => s.joinAsExistingMember)
   const joinAsNewGuest = useAppStore((s) => s.joinAsNewGuest)
@@ -51,7 +54,7 @@ export default function PickScreen({ pick, onBack, onJoined }: Props) {
 
   return (
     <div>
-      <Topbar title="참여하기" onBack={onBack} />
+      <Topbar title="참여하기" onBack={onBack} brand />
       <div className={styles.body}>
         <Callout>[{pick.groupName}] 그룹에 참여해요. 본인이 누구인지 골라주세요.</Callout>
 
@@ -109,6 +112,7 @@ export default function PickScreen({ pick, onBack, onJoined }: Props) {
             <p className={styles.notice}>
               참여하면 입력한 이름이 이 그룹 멤버로 저장돼요. <PrivacyLink className={styles.noticeLink} />
             </p>
+            <AuthLinks code={code} />
           </form>
         )}
       </div>

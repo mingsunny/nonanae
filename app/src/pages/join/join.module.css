@@ -88,3 +88,12 @@ button.person {
   color: var(--ink-soft);
   text-decoration: underline;
 }
+
+/* 비로그인 참여자에게 보여주는 로그인 / 회원가입 안내 */
+.authLinks {
+  margin: 18px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+  text-align: center;
+}
