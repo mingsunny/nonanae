@@ -24,6 +24,7 @@ export default function AccountScreen() {
   const draft = useAuthFlowStore((s) => s.draft)
   const resetAuthFlow = useAuthFlowStore((s) => s.reset)
   const returnTo = useAuthFlowStore((s) => s.returnTo)
+  const setReturnTo = useAuthFlowStore((s) => s.setReturnTo)
   // 가입을 마치며 입력값을 비워도 이 화면이 1단계로 되돌려 보내지 않도록, 들어올 때 한 번만 확인한다
   const [hasDraft] = useState(() => draft.email.trim() !== '' && draft.password !== '')
   const [name, setName] = useState('')
@@ -49,6 +50,8 @@ export default function AccountScreen() {
       // 이메일 확인이 필요한 가입: 에러가 아니라 "메일을 확인하세요" 안내와 함께 로그인 화면으로 보낸다
       if (err instanceof SignUpConfirmationRequired) {
         resetAuthFlow()
+        // 메일 링크로 로그인된 뒤에도 초대 링크(게스트 자리 연결)로 이어가도록 돌아갈 주소는 남긴다
+        setReturnTo(returnTo)
         navigate(paths.login, { replace: true, state: { notice: err.message } })
         return
       }
@@ -62,7 +65,7 @@ export default function AccountScreen() {
 
   return (
     <div>
-      <Topbar title="계좌 등록" onBack={() => navigate(paths.signup)} brand />
+      <Topbar title="계좌 등록" onBack={() => navigate(paths.signup)} />
       <form className={styles.body} onSubmit={submit}>
         <Callout>
           정산할 때 보낼 계좌를 바로 안내할 수 있도록

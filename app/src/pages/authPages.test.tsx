@@ -229,6 +229,15 @@ describe('01·02 회원가입 (2단계)', () => {
     expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('로고는 링크로 바로 들어오는 화면(로그인)에만 있고, 이어지는 가입 단계에는 없다', async () => {
+    await boot({ loggedIn: false })
+    renderApp('/login')
+    expect(await screen.findByAltText('노나내')).toBeTruthy()
+    cleanup()
+    await goToSignup()
+    expect(screen.queryByAltText('노나내')).toBeNull()
+  })
+
   it('눈 버튼으로 입력한 비밀번호를 보였다 숨길 수 있다', async () => {
     await goToSignup()
     const input = screen.getByLabelText('비밀번호') as HTMLInputElement
@@ -584,6 +593,37 @@ describe('06·07 초대코드로 참여', () => {
     renderApp('/join')
     await screen.findByLabelText('초대코드')
     expect(screen.queryByText(/계정이 있으면 로그인하고 참여할 수 있어요/)).toBeNull()
+  })
+
+  it('게스트로 참여한 뒤 그룹 화면에서 "로그인"하면 게스트 자리가 내 계정에 연결된다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/join?code=TEST42-m_minji')
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
+    expect(await screen.findByText(/게스트로 참여 중이에요/)).toBeTruthy()
+
+    await click('로그인')
+    expect(pathOf(router)).toBe('/login')
+    await fill('이메일', 'a@naver.com')
+    await fill('비밀번호', 'aaaaaaaa')
+    await userEvent.click(screen.getByRole('button', { name: '로그인' }))
+
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
+    const minji = state().groups.find((g) => g.id === 'g_test42')!.members.find((m) => m.id === 'm_minji')!
+    expect(minji.userId).toBe('u_test')
+    expect(screen.queryByText(/게스트로 참여 중이에요/)).toBeNull()
+  })
+
+  it('가입 확인 메일을 거쳐 그룹 목록으로 들어와도, 저장해 둔 초대 링크로 이어간다', async () => {
+    useAuthFlowStore.getState().setReturnTo('/join?code=TEST42-m_minji')
+    const router = renderApp('/groups')
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
+    expect(useAuthFlowStore.getState().returnTo).toBeNull()
+  })
+
+  it('로그인한 회원에게는 그룹 화면에 게스트 연결 안내가 없다', async () => {
+    renderApp('/groups/g_jeju/expenses')
+    await screen.findByRole('link', { name: '그룹 목록으로' })
+    expect(screen.queryByText(/게스트로 참여 중이에요/)).toBeNull()
   })
 
   it('게스트가 그룹에서 뒤로가기를 누르면 세션을 끝내고 인트로로 나간다', async () => {

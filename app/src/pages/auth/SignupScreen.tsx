@@ -50,7 +50,7 @@ export default function SignupScreen() {
 
   return (
     <div>
-      <Topbar title="회원가입" onBack={() => navigate(returnTo ?? paths.welcome)} brand />
+      <Topbar title="회원가입" onBack={() => navigate(returnTo ?? paths.welcome)} />
       <form className={styles.body} onSubmit={submit}>
         <label className={fields.label} htmlFor="signup-email">
           이메일
