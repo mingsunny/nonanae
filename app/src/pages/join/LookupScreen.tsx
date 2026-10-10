@@ -3,7 +3,6 @@ import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
-import AuthLinks from './AuthLinks'
 import styles from './join.module.css'
 
 interface Props {
@@ -58,7 +57,6 @@ export default function LookupScreen({ code, onCodeChange, notFound, busy, onSub
             다음
           </Button>
         </div>
-        <AuthLinks code={code} />
       </form>
     </div>
   )

@@ -591,6 +591,16 @@ describe('06·07 초대코드로 참여', () => {
     expect(router.state.location.pathname + router.state.location.search).toBe('/join?code=TEST42')
   })
 
+  it('로그인 / 회원가입 안내는 코드를 확인한 뒤(멤버 고르기)에만 보이고, 코드 입력 화면에는 없다', async () => {
+    await boot({ loggedIn: false })
+    renderApp('/join')
+    await screen.findByLabelText('초대코드')
+    expect(screen.queryByText(/계정이 있으면 로그인하고 참여할 수 있어요/)).toBeNull()
+    await fill('초대코드', 'TEST42')
+    await click('다음')
+    expect(await screen.findByText(/계정이 있으면 로그인하고 참여할 수 있어요/)).toBeTruthy()
+  })
+
   it('로그인 상태에서는 참여 화면에 로그인 / 회원가입 안내가 없다', async () => {
     renderApp('/join')
     await screen.findByLabelText('초대코드')
