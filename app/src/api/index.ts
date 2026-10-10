@@ -272,8 +272,8 @@ function requireSessionUser(d: MockDb): User {
 
 /** 회원가입 1단계에서 "다음" 누를 때 쓰는 이메일 중복 체크 (2단계 제출 때 signUp이 한 번 더 검사) */
 export async function isEmailTaken(email: string): Promise<boolean> {
-  // Supabase 모드: 이메일 중복은 2단계 제출(signUp) 때 확인한다 — 1단계에서 가입 여부를 조회하면 계정 존재 여부가 노출된다
-  if (USE_SUPABASE) return false
+  // Supabase 모드: DB 함수 is_email_registered로 확인한다 (계정 존재 여부가 노출되는 트레이드오프는 수용)
+  if (USE_SUPABASE) return remote.isEmailRegistered(email)
   return getDb().users.some((u) => u.email === normalizeEmail(email))
 }
 
