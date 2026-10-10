@@ -1,5 +1,31 @@
 import { create } from 'zustand'
 
+/**
+ * 돌아갈 주소는 이 기기에 하루 동안 남겨 둔다. 가입 확인 메일의 링크는 새 탭으로 열려 메모리 상태가 사라지기 때문.
+ * 저장소를 못 쓰는 환경(사생활 보호 모드 등)에서는 메모리에만 둔다.
+ */
+const RETURN_TO_KEY = 'nonanae:return-to'
+const RETURN_TO_TTL_MS = 24 * 60 * 60 * 1000
+
+function loadReturnTo(): string | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RETURN_TO_KEY) ?? 'null') as { path: string; at: number } | null
+    if (saved && Date.now() - saved.at < RETURN_TO_TTL_MS) return saved.path
+  } catch {
+    // 무시: 저장된 값이 없거나 읽을 수 없음
+  }
+  return null
+}
+
+function saveReturnTo(path: string | null) {
+  try {
+    if (path) localStorage.setItem(RETURN_TO_KEY, JSON.stringify({ path, at: Date.now() }))
+    else localStorage.removeItem(RETURN_TO_KEY)
+  } catch {
+    // 무시: 메모리 상태만으로도 같은 탭 안에서는 동작한다
+  }
+}
+
 /** 회원가입 1단계 입력값. 2단계(`/signup/account`)에서 뒤로 돌아와도 남아 있도록 화면 밖에서 들고 있다 (02 진입 경로). */
 export interface SignupDraft {
   email: string
@@ -29,11 +55,17 @@ interface AuthFlowState {
 export const useAuthFlowStore = create<AuthFlowState>()((set, get) => ({
   loginEmail: '',
   draft: emptyDraft,
-  returnTo: null,
+  returnTo: loadReturnTo(),
 
   setLoginEmail: (email) => set({ loginEmail: email }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
   startSignup: () => set({ draft: { ...emptyDraft, email: get().loginEmail } }),
-  setReturnTo: (path) => set({ returnTo: path }),
-  reset: () => set({ loginEmail: '', draft: emptyDraft, returnTo: null }),
+  setReturnTo: (path) => {
+    saveReturnTo(path)
+    set({ returnTo: path })
+  },
+  reset: () => {
+    saveReturnTo(null)
+    set({ loginEmail: '', draft: emptyDraft, returnTo: null })
+  },
 }))

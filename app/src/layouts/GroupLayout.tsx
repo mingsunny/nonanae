@@ -8,6 +8,7 @@ import { won } from '../lib/format'
 import { useElementHeight } from '../lib/useElementHeight'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
+import { useAuthFlowStore } from '../store/authFlowStore'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
 import { showToast } from '../store/toastStore'
 import styles from './GroupLayout.module.css'
@@ -27,6 +28,9 @@ function GroupShell({ group }: { group: GroupDetail }) {
   const { nameOf, isPending } = useGroupView(group)
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   const signOut = useAppStore((s) => s.signOut)
+  const guestMemberId = useAppStore((s) => (s.currentUserId === null ? s.viewAsMemberId : null))
+  const setReturnTo = useAuthFlowStore((s) => s.setReturnTo)
+  const startSignup = useAuthFlowStore((s) => s.startSignup)
   // 헤더가 고정(position: fixed)이라 실제 높이만큼 콘텐츠 위쪽을 띄워야 헤더에 안 가려진다.
   // 헤더 높이는 그룹 이름 줄바꿈·멤버 수에 따라 달라지므로 고정값 대신 실측한다.
   const [headerRef, headerHeight] = useElementHeight<HTMLElement>()
@@ -41,6 +45,17 @@ function GroupShell({ group }: { group: GroupDetail }) {
   function leaveAsGuest() {
     navigate(paths.welcome)
     void signOut()
+  }
+
+  /**
+   * 게스트 자리를 계정에 연결: 로그인·가입을 마치면 내 자리를 가리키는 개인 초대 링크(`코드-멤버ID`)로 돌아온다.
+   * 그 링크는 로그인한 사람이 들어오면 자리를 계정에 연결하므로(join_group), 게스트로 남긴 지출·정산 기록이 그대로 이어진다.
+   */
+  function connectAccount(to: 'login' | 'signup') {
+    if (!guestMemberId) return
+    if (to === 'signup') startSignup()
+    setReturnTo(`${paths.join}?code=${encodeURIComponent(`${group.inviteCode}-${guestMemberId}`)}`)
+    navigate(to === 'login' ? paths.login : paths.signup)
   }
 
   async function copyInviteCode() {
@@ -90,6 +105,19 @@ function GroupShell({ group }: { group: GroupDetail }) {
             초대 코드 복사
           </button>
         </div>
+
+        {guestMemberId && (
+          <p className={styles.guestLink}>
+            게스트로 참여 중이에요. 계정에 연결하면 다른 기기에서도 볼 수 있어요.{' '}
+            <button type="button" onClick={() => connectAccount('login')}>
+              로그인
+            </button>
+            {' · '}
+            <button type="button" onClick={() => connectAccount('signup')}>
+              회원가입
+            </button>
+          </p>
+        )}
       </header>
 
       <main className={styles.content} style={{ paddingTop: headerHeight + 18 }}>

@@ -26,9 +26,22 @@
   font-weight: 700;
 }
 
-/* 정사각 로고 이미지의 위아래 여백을 잘라 상단바 높이를 늘리지 않게 */
-.brand {
-  width: 84px;
-  height: 84px;
-  margin: -26px -8px -26px auto;
+/* brand: 메일·링크로 바로 들어오는 화면의 가운데 로고 + 제목 */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-xs) 20px var(--space-xs);
+}
+
+.logo {
+  width: 150px;
+  height: auto;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
 }

@@ -1,10 +1,12 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import Button from '../components/common/Button'
 import { sortGroupsNewestFirst } from '../domain/members'
 import { groupTotal } from '../domain/settlement'
 import { won } from '../lib/format'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
+import { useAuthFlowStore } from '../store/authFlowStore'
 import styles from './GroupListPage.module.css'
 
 /**
@@ -20,6 +22,11 @@ export default function GroupListPage() {
     s.currentUserId ? (s.usersById[s.currentUserId]?.seenGroupCreateCoach ?? true) : true,
   )
   const markGroupCreateCoachSeen = useAppStore((s) => s.markGroupCreateCoachSeen)
+  // 게스트가 가입 확인 메일의 링크로 로그인돼 여기로 오면, 가입 전에 있던 그룹 자리를 이어서 연결한다
+  const [pendingReturn] = useState(() => useAuthFlowStore.getState().returnTo)
+  useEffect(() => {
+    if (pendingReturn) useAuthFlowStore.getState().setReturnTo(null)
+  }, [pendingReturn])
 
   // 그룹이 하나도 없고 아직 안내를 못 봤을 때만 1회 노출. 그룹이 없다는 안내를 목록 영역에 또 쓰지 않고 이 문구 하나로 통일 (03 예외처리)
   const showHint = groups.length === 0 && !seenCoach
@@ -29,6 +36,8 @@ export default function GroupListPage() {
     await markGroupCreateCoachSeen()
     navigate(paths.groupNew)
   }
+
+  if (pendingReturn) return <Navigate to={pendingReturn} replace />
 
   return (
     <>

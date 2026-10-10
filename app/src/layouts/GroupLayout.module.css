@@ -149,3 +149,23 @@
 .active {
   color: var(--brand-deep);
 }
+
+/* 게스트에게만: 로그인 / 회원가입으로 내 자리를 계정에 연결 */
+.guestLink {
+  margin: 12px 0 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.guestLink button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
