@@ -87,9 +87,9 @@ describe('01 인트로 / 로그인', () => {
     await boot({ loggedIn: false })
     const router = renderApp('/login')
     expect(await screen.findByLabelText('비밀번호')).toBeTruthy()
-    expect(screen.queryByAltText('노나내')).toBeNull()
+    expect(screen.queryByText(/가장 간단하게 나눠 정산해요/)).toBeNull()
     await click('뒤로가기')
-    expect(await screen.findByAltText('노나내')).toBeTruthy()
+    expect(await screen.findByText(/가장 간단하게 나눠 정산해요/)).toBeTruthy()
     expect(pathOf(router)).toBe('/welcome')
   })
 
@@ -157,7 +157,7 @@ describe('01·02 회원가입 (2단계)', () => {
     return router
   }
 
-  async function fillStep1(email = 'new@example.com', password = 'pw-1234') {
+  async function fillStep1(email = 'new@example.com', password = 'pw-12345') {
     await fill('이메일', email)
     await fill('비밀번호', password)
     await fill('비밀번호 확인', password)
@@ -206,15 +206,37 @@ describe('01·02 회원가입 (2단계)', () => {
   it('비밀번호 확인이 다르면 안내 문구가 뜨고 "다음"이 비활성이다', async () => {
     await goToSignup()
     await fill('이메일', 'new@example.com')
-    await fill('비밀번호', 'pw-1234')
-    await fill('비밀번호 확인', 'pw-9999')
+    await fill('비밀번호', 'pw-12345')
+    await fill('비밀번호 확인', 'pw-99999')
     expect(screen.getByText('비밀번호가 일치하지 않아요.')).toBeTruthy()
     expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(true)
 
     await userEvent.clear(screen.getByLabelText('비밀번호 확인'))
-    await fill('비밀번호 확인', 'pw-1234')
+    await fill('비밀번호 확인', 'pw-12345')
     expect(screen.getByText('비밀번호가 일치해요.')).toBeTruthy()
     expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('비밀번호가 8자 미만이거나 영문·숫자가 섞이지 않으면 안내 문구가 뜨고 "다음"이 비활성이다', async () => {
+    await goToSignup()
+    await fill('이메일', 'new@example.com')
+    await fill('비밀번호', 'abc12')
+    expect(screen.getByText('비밀번호는 8자 이상이어야 해요.')).toBeTruthy()
+    await userEvent.clear(screen.getByLabelText('비밀번호'))
+    await fill('비밀번호', 'abcdefgh')
+    expect(screen.getByText('비밀번호에 영문과 숫자를 모두 넣어주세요.')).toBeTruthy()
+    await fill('비밀번호 확인', 'abcdefgh')
+    expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('눈 버튼으로 입력한 비밀번호를 보였다 숨길 수 있다', async () => {
+    await goToSignup()
+    const input = screen.getByLabelText('비밀번호') as HTMLInputElement
+    expect(input.type).toBe('password')
+    await userEvent.click(screen.getAllByRole('button', { name: '비밀번호 보기' })[0])
+    expect(input.type).toBe('text')
+    await userEvent.click(screen.getByRole('button', { name: '비밀번호 숨기기' }))
+    expect(input.type).toBe('password')
   })
 
   it('이미 가입된 이메일이면 1단계에서 막는다', async () => {
@@ -233,7 +255,7 @@ describe('01·02 회원가입 (2단계)', () => {
     await click('뒤로가기')
     expect(pathOf(router)).toBe('/signup')
     expect((screen.getByLabelText('이메일') as HTMLInputElement).value).toBe('new@example.com')
-    expect((screen.getByLabelText('비밀번호') as HTMLInputElement).value).toBe('pw-1234')
+    expect((screen.getByLabelText('비밀번호') as HTMLInputElement).value).toBe('pw-12345')
   })
 
   it('2단계는 이름·은행·계좌번호를 채우고 개인정보 수집·이용에 동의해야 "회원가입"이 활성화된다', async () => {
@@ -392,7 +414,7 @@ describe('04 프로필', () => {
     await click('로그아웃')
     expect(await screen.findByLabelText('비밀번호')).toBeTruthy()
     expect(pathOf(router)).toBe('/login')
-    expect(screen.queryByAltText('노나내')).toBeNull()
+    expect(screen.queryByText(/가장 간단하게 나눠 정산해요/)).toBeNull()
     await waitFor(() => expect(state().currentUserId).toBeNull())
   })
 
@@ -544,6 +566,26 @@ describe('06·07 초대코드로 참여', () => {
     expect(pathOf(router2)).toBe('/groups')
   })
 
+  it('비로그인으로 참여하다 "로그인"을 누르면, 로그인 후 같은 초대코드로 돌아와 내 계정으로 참여할 수 있다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/join?code=TEST42')
+    await screen.findByText(/본인이 누구인지/)
+    await click('로그인')
+    expect(pathOf(router)).toBe('/login')
+    await fill('이메일', 'a@naver.com')
+    await fill('비밀번호', 'aaaaaaaa')
+    await userEvent.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('button', { name: '새 멤버로 참여하기' })).toBeTruthy()
+    expect(router.state.location.pathname + router.state.location.search).toBe('/join?code=TEST42')
+  })
+
+  it('로그인 상태에서는 참여 화면에 로그인 / 회원가입 안내가 없다', async () => {
+    renderApp('/join')
+    await screen.findByLabelText('초대코드')
+    expect(screen.queryByText(/계정이 있으면 로그인하고 참여할 수 있어요/)).toBeNull()
+  })
+
   it('게스트가 그룹에서 뒤로가기를 누르면 세션을 끝내고 인트로로 나간다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
@@ -588,8 +630,8 @@ describe('14 비밀번호 재설정', () => {
 
     const change = (await screen.findByRole('button', { name: '비밀번호 변경' })) as HTMLButtonElement
     expect(change.disabled).toBe(true)
-    await fill('새 비밀번호', 'brand-new')
-    await fill('비밀번호 확인', 'brand-new')
+    await fill('새 비밀번호', 'brand-new1')
+    await fill('비밀번호 확인', 'brand-new1')
     expect(screen.getByText('비밀번호가 일치해요.')).toBeTruthy()
     await userEvent.click(change)
 
@@ -597,7 +639,7 @@ describe('14 비밀번호 재설정', () => {
     expect(pathOf(router)).toBe('/login')
     expect(await screen.findByLabelText('비밀번호')).toBeTruthy()
     await signOut()
-    await expect(signIn('a@naver.com', 'brand-new')).resolves.toMatchObject({ id: 'u_test' })
+    await expect(signIn('a@naver.com', 'brand-new1')).resolves.toMatchObject({ id: 'u_test' })
   })
 
   it('확인 값이 다르면 변경할 수 없다', async () => {

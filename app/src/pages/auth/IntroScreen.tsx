@@ -11,8 +11,11 @@ import styles from './auth.module.css'
 export default function IntroScreen() {
   const navigate = useNavigate()
   const startSignup = useAuthFlowStore((s) => s.startSignup)
+  // 초대 링크에서 로그인하러 갔다가 인트로로 빠져나온 경우, 이후 로그인은 다시 그룹 목록으로 가야 한다
+  const setReturnTo = useAuthFlowStore((s) => s.setReturnTo)
 
   function openSignup() {
+    setReturnTo(null)
     startSignup() // 비밀번호는 비우고, 이메일은 로그인 화면에 입력해둔 값을 이어서 채운다 (01 액션 & 결과)
     navigate(paths.signup)
   }
@@ -30,7 +33,14 @@ export default function IntroScreen() {
         </p>
       </div>
       <div className={styles.actions}>
-        <Button onClick={() => navigate(paths.login)}>로그인</Button>
+        <Button
+          onClick={() => {
+            setReturnTo(null)
+            navigate(paths.login)
+          }}
+        >
+          로그인
+        </Button>
         <div className={styles.actionGap}>
           <Button variant="outline" onClick={openSignup}>
             회원가입

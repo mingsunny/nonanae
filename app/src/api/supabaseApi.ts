@@ -381,6 +381,9 @@ export async function signIn(email: string, password: string): Promise<User> {
  * 회원가입 2단계 제출. 이름·은행·계좌는 auth 메타데이터로 함께 보내고,
  * DB 트리거(handle_new_user)가 그 값으로 profiles 행을 만든다.
  */
+export const SIGNUP_RATE_LIMIT_MESSAGE =
+  '이미 가입했거나 가입 확인 메일을 보낸 이메일일 수 있어요. 메일함을 확인하거나 로그인해주세요.'
+
 export async function signUp(input: SignUpInput): Promise<User> {
   const name = input.name.trim()
   const account = input.account.trim()
@@ -398,7 +401,14 @@ export async function signUp(input: SignUpInput): Promise<User> {
       ...captchaOptions(captchaToken),
     },
   })
-  if (error) throw new Error(authErrorMessage(error))
+  if (error) {
+    // 가입 확인을 아직 안 한 이메일로 다시 가입하면 Supabase가 확인 메일을 또 보내려다 발송 한도에 걸린다.
+    // 가입 화면에서 "요청이 너무 많아요"만 보이면 이유를 알 수 없으므로, 이미 가입 요청된 이메일일 수 있다고 안내한다.
+    if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
+      throw new Error(SIGNUP_RATE_LIMIT_MESSAGE)
+    }
+    throw new Error(authErrorMessage(error))
+  }
   // 이메일 확인이 켜져 있으면 이미 가입된 이메일도 에러 없이 돌아오는데, 그땐 identities가 비어 있다
   if (data.user?.identities?.length === 0) throw new Error('이미 가입된 이메일이에요. 로그인해주세요.')
   // 세션이 없다 = Supabase에서 "이메일 확인"이 켜져 있어 확인 메일을 눌러야 로그인됨

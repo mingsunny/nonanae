@@ -3,6 +3,7 @@ import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
+import AuthLinks from './AuthLinks'
 import styles from './join.module.css'
 
 interface Props {
@@ -27,7 +28,7 @@ export default function LookupScreen({ code, onCodeChange, notFound, busy, onSub
 
   return (
     <div>
-      <Topbar title="초대코드로 참여" onBack={onBack} />
+      <Topbar title="초대코드로 참여" onBack={onBack} brand />
       <form className={styles.body} onSubmit={submit}>
         <Callout>
           로그인하지 않아도 참여할 수 있어요.
@@ -57,6 +58,7 @@ export default function LookupScreen({ code, onCodeChange, notFound, busy, onSub
             다음
           </Button>
         </div>
+        <AuthLinks code={code} />
       </form>
     </div>
   )

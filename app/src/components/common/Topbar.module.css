@@ -25,3 +25,10 @@
   font-size: 16px;
   font-weight: 700;
 }
+
+/* 정사각 로고 이미지의 위아래 여백을 잘라 상단바 높이를 늘리지 않게 */
+.brand {
+  width: 84px;
+  height: 84px;
+  margin: -26px -8px -26px auto;
+}

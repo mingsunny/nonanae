@@ -62,7 +62,7 @@ export default function JoinPage() {
   }, [codeFromLink, lookup])
 
   if (pick) {
-    return <PickScreen pick={pick} onBack={() => setPick(null)} onJoined={enterGroup} />
+    return <PickScreen pick={pick} code={code} onBack={() => setPick(null)} onJoined={enterGroup} />
   }
 
   return (
