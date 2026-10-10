@@ -43,7 +43,7 @@ export default function AccountScreen() {
     if (!canSubmit || busy) return
     setBusy(true)
     try {
-      await signUp({ email: draft.email, password: draft.password, name, bank, account })
+      await signUp({ email: draft.email, password: draft.password, name, bank, account, redirectPath: returnTo ?? undefined })
       resetAuthFlow()
       navigate(returnTo ?? paths.groups, { replace: true })
     } catch (err) {

@@ -296,6 +296,11 @@ export interface SignUpInput {
   name: string
   bank: string
   account: string
+  /**
+   * 가입 확인 메일의 링크가 돌아올 앱 안 경로 (기본: 그룹 목록). 게스트가 가입하면 자기 자리의 초대 링크를 넘겨,
+   * 메일을 다른 브라우저(메일 앱 안 브라우저 등)에서 열어도 그 자리가 새 계정에 연결되게 한다.
+   */
+  redirectPath?: string
 }
 
 /** 회원가입 2단계 제출. 여기서 비로소 User가 만들어지고 바로 로그인 상태가 된다 (02 데이터). */
@@ -359,6 +364,11 @@ export interface ProfileInput {
   name: string
   bank: string
   account: string
+  /**
+   * 가입 확인 메일의 링크가 돌아올 앱 안 경로 (기본: 그룹 목록). 게스트가 가입하면 자기 자리의 초대 링크를 넘겨,
+   * 메일을 다른 브라우저(메일 앱 안 브라우저 등)에서 열어도 그 자리가 새 계정에 연결되게 한다.
+   */
+  redirectPath?: string
 }
 
 /** 프로필 저장(04). 멤버 화면의 이름/계좌는 매번 User에서 읽으므로 모든 그룹에 바로 반영된다. */

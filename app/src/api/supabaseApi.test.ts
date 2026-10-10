@@ -278,6 +278,12 @@ describe('signUp', () => {
     await expect(signUp(input)).rejects.toThrow(SIGNUP_RATE_LIMIT_MESSAGE)
   })
 
+  it('돌아올 경로를 넘기면 가입 확인 메일 링크가 그 경로로 돌아온다 (게스트 자리 연결)', async () => {
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
+    await expect(signUp({ ...input, redirectPath: '/join?code=ABCDEF-m1' })).rejects.toThrow()
+    expect(mocks.auth.signUp.mock.calls[0][0].options.emailRedirectTo).toBe(`${window.location.origin}/join?code=ABCDEF-m1`)
+  })
+
   it('이름·은행·계좌를 auth 메타데이터로 보내고, 가입 후 User를 돌려준다', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
     mocks.auth.getSession.mockResolvedValue(signedInSession)
