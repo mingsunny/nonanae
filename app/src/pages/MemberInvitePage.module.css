@@ -44,6 +44,16 @@
   line-height: 1.5;
 }
 
+.requests {
+  margin-bottom: 22px;
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-sm);
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
 .card {
   padding: 4px 14px;
   border: 1px solid var(--line);

@@ -19,15 +19,16 @@ interface Props {
   /** 로그인·가입 후 같은 그룹으로 돌아오기 위한 초대코드 */
   code: string
   onBack: () => void
-  /** 참여가 끝나 그룹 안으로 들어갈 때 */
-  onJoined: (groupId: string) => void
+  /** 참여 요청을 보냈을 때 → 그룹장 승인 대기 화면으로 */
+  onRequested: () => void
 }
 
 /**
  * 07 참여하기 (멤버 매칭) — 공용 코드로 들어왔을 때 그룹 멤버 목록에서 본인을 고르거나, 없으면 새로 참여한다.
  * 이미 계정이 연결된 멤버는 고를 수 없다. 로그인 여부에 따라 "새로 참여"의 모양이 다르다(이름 입력 / 내 계정으로).
+ * 어느 쪽이든 바로 들어가지 않고 그룹장에게 참여 요청을 보낸다.
  */
-export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
+export default function PickScreen({ pick, code, onBack, onRequested }: Props) {
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   const joinAsExistingMember = useAppStore((s) => s.joinAsExistingMember)
   const joinAsNewGuest = useAppStore((s) => s.joinAsNewGuest)
@@ -40,7 +41,7 @@ export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
     setBusy(true)
     try {
       await action()
-      onJoined(pick.groupId)
+      onRequested()
     } catch (err) {
       showToast(err instanceof Error ? err.message : '참여하지 못했어요')
       setBusy(false)
@@ -56,7 +57,11 @@ export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
     <div>
       <Topbar title="참여하기" onBack={onBack} brand />
       <div className={styles.body}>
-        <Callout>[{pick.groupName}] 그룹에 참여해요. 본인이 누구인지 골라주세요.</Callout>
+        <Callout>
+          [{pick.groupName}] 그룹에 참여해요. 본인이 누구인지 골라주세요.
+          <br />
+          그룹장이 승인하면 들어갈 수 있어요.
+        </Callout>
         <AuthLinks code={code} />
 
         <div className={styles.list}>
@@ -89,7 +94,7 @@ export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
           <div>
             <p className={styles.plain}>목록에 없으면 새 멤버로 참여할 수 있어요.</p>
             <Button variant="outline" disabled={busy} onClick={() => run(() => joinAsNewAccountMember(pick.groupId))}>
-              새 멤버로 참여하기
+              새 멤버로 참여 요청하기
             </Button>
           </div>
         ) : (
@@ -107,7 +112,7 @@ export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
             />
             <div className={styles.addButton}>
               <Button type="submit" disabled={newName.trim() === '' || busy}>
-                이 이름으로 참여하기
+                이 이름으로 참여 요청하기
               </Button>
             </div>
             <p className={styles.notice}>

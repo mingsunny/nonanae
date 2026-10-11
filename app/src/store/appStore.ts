@@ -6,6 +6,7 @@ import type {
   ExpenseWithParticipants,
   Group,
   GroupDetail,
+  JoinRequest,
   Member,
   Notification,
   User,
@@ -34,6 +35,8 @@ interface AppState {
   groups: GroupDetail[]
   /** 내가 속한 그룹들의 알림, 최신순 */
   notifications: Notification[]
+  /** 내가 보낸 참여 요청(mine) + 내가 방장인 그룹에 들어온 참여 요청 */
+  joinRequests: JoinRequest[]
 
   /** 앱 시작 시 한 번 호출해 데이터를 불러옴 */
   init: () => Promise<void>
@@ -65,11 +68,18 @@ interface AppState {
   /** 12: 초대코드 재발급(방장 전용). 새 코드를 돌려주고, 이전 코드는 즉시 못 쓴다. */
   rotateInviteCode: (groupId: string) => Promise<string>
 
-  // 06/07: 초대코드로 참여. 그룹 안으로 들어가는 결과가 나오면 그 그룹이 스토어에 들어 있도록 refresh까지 마친다.
+  // 06/07: 초대코드로 참여. 참여는 요청만 남기고 방장이 승인해야 멤버가 된다.
+  // 그룹 안으로 들어가는 결과가 나오면 그 그룹이 스토어에 들어 있도록 refresh까지 마친다.
   resolveInviteCode: (raw: string) => Promise<api.JoinResolution>
   joinAsExistingMember: (groupId: string, memberId: string) => Promise<void>
   joinAsNewGuest: (groupId: string, name: string) => Promise<void>
   joinAsNewAccountMember: (groupId: string) => Promise<void>
+  /** 승인 대기 화면이 확인: 승인됐으면(joined) 그 그룹이 스토어에 들어 있도록 refresh까지 마친다 */
+  checkJoinRequest: (groupId: string) => Promise<api.JoinRequestStatus>
+  cancelJoinRequest: (groupId: string) => Promise<void>
+  /** 12: 방장이 참여 요청을 승인/거절 */
+  approveJoinRequest: (requestId: string) => Promise<void>
+  rejectJoinRequest: (requestId: string) => Promise<void>
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -81,6 +91,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   usersById: {},
   groups: [],
   notifications: [],
+  joinRequests: [],
 
   init: async () => {
     if (get().status !== 'idle' && get().status !== 'error') return
@@ -103,6 +114,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       usersById: Object.fromEntries(snapshot.users.map((u) => [u.id, u])),
       groups: snapshot.groups,
       notifications: snapshot.notifications,
+      joinRequests: snapshot.joinRequests,
     })
   },
 
@@ -199,8 +211,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   resolveInviteCode: async (raw) => {
     const resolution = await api.resolveInviteCode(raw)
-    // 개인 초대 링크로 바로 연결된 경우 데이터가 바뀌었으므로 다시 불러옴 (재입장은 바뀐 게 없어도 무해)
-    if (resolution.kind === 'joined') await get().refresh()
+    // 재입장(승인 뒤 처음 들어오는 경우 포함)이면 그 그룹을, 개인 초대 링크로 요청을 보냈으면 내 요청을 다시 불러옴
+    if (resolution.kind !== 'not-found' && resolution.kind !== 'pick') await get().refresh()
     return resolution
   },
 
@@ -216,6 +228,27 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   joinAsNewAccountMember: async (groupId) => {
     await api.joinAsNewAccountMember(groupId)
+    await get().refresh()
+  },
+
+  checkJoinRequest: async (groupId) => {
+    const status = await api.checkJoinRequest(groupId)
+    if (status === 'joined') await get().refresh()
+    return status
+  },
+
+  cancelJoinRequest: async (groupId) => {
+    await api.cancelJoinRequest(groupId)
+    await get().refresh()
+  },
+
+  approveJoinRequest: async (requestId) => {
+    await api.approveJoinRequest(requestId)
+    await get().refresh()
+  },
+
+  rejectJoinRequest: async (requestId) => {
+    await api.rejectJoinRequest(requestId)
     await get().refresh()
   },
 }))

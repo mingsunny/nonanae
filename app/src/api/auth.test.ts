@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProfileIncomplete } from './errors'
 import {
+  approveJoinRequest,
+  cancelJoinRequest,
+  checkJoinRequest,
   completeProfile,
+  createExpense,
   createGroup,
   deleteAccount,
   fetchSnapshot,
@@ -11,6 +15,7 @@ import {
   joinAsNewAccountMember,
   joinAsNewGuest,
   markGroupCreateCoachSeen,
+  rejectJoinRequest,
   requestPasswordReset,
   resetMockData,
   resetPassword,
@@ -23,6 +28,14 @@ import {
 
 const newAccount = { email: 'new@example.com', password: 'pw-1234' }
 const newProfile = { name: '신규', bank: '토스뱅크', account: '1000-1' }
+
+/** 방장데모(TEST42 '초대코드 테스트방'의 방장)로 로그인해 그 그룹에 들어온 첫 참여 요청을 승인한다 */
+async function approveAsOwner42() {
+  await signIn('owner.demo@example.com', 'owner1234')
+  const request = (await fetchSnapshot()).joinRequests.find((r) => r.groupId === 'g_test42' && !r.mine)!
+  await approveJoinRequest(request.id)
+  return request
+}
 
 /** 가입 1단계(이메일·비밀번호) + 이름·계좌 등록까지 마친 신규 회원 */
 async function signUpAndComplete() {
@@ -159,16 +172,33 @@ describe('signOut / deleteAccount', () => {
   })
 
   it('탈퇴해도 그 멤버가 결제한 지출과 참여 기록은 그대로 남는다', async () => {
-    const before = (await fetchSnapshot()).groups.find((g) => g.id === 'g_jeju')!
-    const paidByMe = before.expenses.filter((e) => e.paidBy === 'm_me').length
-    expect(paidByMe).toBeGreaterThan(0)
+    // 테스트 계정이 TEST42에 일반 멤버로 들어가 지출을 하나 남긴다
+    await joinAsNewAccountMember('g_test42')
+    await approveAsOwner42()
+    await signIn('a@naver.com', 'aaaaaaaa')
+    const myMemberId = (await fetchSnapshot()).groups
+      .find((g) => g.id === 'g_test42')!
+      .members.find((m) => m.userId === 'u_test')!.id
+    await createExpense({
+      groupId: 'g_test42',
+      paidBy: myMemberId,
+      title: '저녁',
+      amount: 30000,
+      category: '식비',
+      receiptImageUrl: null,
+      splitType: 'equal',
+      spentAt: '2026-10-01',
+      participants: [{ memberId: myMemberId, shareAmount: null }],
+    })
 
     await deleteAccount()
-    // 탈퇴하면 세션이 비어 내 그룹이 안 보인다. 새 계정으로 그 자리를 다시 고르면 지출 기록이 그대로 이어진다
+    // 새 계정으로 그 자리를 다시 고르고 방장이 승인하면 지출 기록이 그대로 이어진다
     await signUpAndComplete()
-    await joinAsExistingMember('g_jeju', 'm_me')
-    const g = (await fetchSnapshot()).groups.find((x) => x.id === 'g_jeju')!
-    expect(g.expenses.filter((e) => e.paidBy === 'm_me')).toHaveLength(paidByMe)
+    await joinAsExistingMember('g_test42', myMemberId)
+    await approveAsOwner42()
+    const group = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')!
+    expect(group.members.find((m) => m.id === myMemberId)).toMatchObject({ name: null })
+    expect(group.expenses.filter((e) => e.paidBy === myMemberId)).toHaveLength(1)
   })
 
   it('로그인하지 않은 상태로는 탈퇴할 수 없다', async () => {
@@ -221,7 +251,7 @@ describe('resolveInviteCode', () => {
   })
 
   it('이미 멤버인 그룹은 안내 없이 joined (재입장)', async () => {
-    expect(await resolveInviteCode('jeju26')).toEqual({ kind: 'joined', groupId: 'g_jeju', matchedName: null })
+    expect(await resolveInviteCode('jeju26')).toEqual({ kind: 'joined', groupId: 'g_jeju' })
   })
 
   it('공용 코드는 pick — 멤버 목록에서 계정이 있는 사람은 hasAccount, 이름만 있는 사람은 고를 수 있다', async () => {
@@ -237,42 +267,57 @@ describe('resolveInviteCode', () => {
     })
   })
 
-  it('개인 초대 링크(로그인)는 그 자리에 내 계정을 연결하고 알림을 남긴다. 멤버 id는 그대로다', async () => {
-    const resolution = await resolveInviteCode('TEST42-m_minji')
-    expect(resolution).toEqual({ kind: 'joined', groupId: 'g_test42', matchedName: '김민지' })
-
+  it('개인 초대 링크(로그인)는 바로 연결하지 않고 그 자리로 참여 요청을 보낸다. 방장에게 알림이 간다', async () => {
+    expect(await resolveInviteCode('TEST42-m_minji')).toEqual({
+      kind: 'requested',
+      groupId: 'g_test42',
+      groupName: '초대코드 테스트방',
+    })
     const snapshot = await fetchSnapshot()
-    const group = snapshot.groups.find((g) => g.id === 'g_test42')!
-    expect(group.members.find((m) => m.id === 'm_minji')).toMatchObject({ userId: 'u_test', name: null })
-    expect(snapshot.notifications[0]).toMatchObject({ type: 'member_joined', groupId: 'g_test42', memberId: 'm_minji' })
-    expect(snapshot.notifications[0].title).toBe('테스트님이 [초대코드 테스트방] 그룹에 참여했어요')
+    expect(snapshot.groups.map((g) => g.id)).toEqual(['g_jeju']) // 아직 멤버가 아니다
+    expect(snapshot.joinRequests).toEqual([
+      expect.objectContaining({ groupId: 'g_test42', name: '테스트', memberId: 'm_minji', isGuest: false, mine: true }),
+    ])
+
+    const request = await approveAsOwner42()
+    expect(request).toMatchObject({ name: '테스트', memberName: '김민지', mine: false })
+    const ownerView = await fetchSnapshot()
+    expect(ownerView.notifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'join_request', memberId: null, title: '테스트님이 [초대코드 테스트방] 그룹에 참여를 요청했어요' }),
+        expect.objectContaining({ type: 'member_joined', memberId: 'm_minji', title: '테스트님이 [초대코드 테스트방] 그룹에 참여했어요' }),
+      ]),
+    )
   })
 
-  it('개인 초대 링크(비로그인)는 그 자리로 세션만 지정하고 알림은 만들지 않는다', async () => {
-    await signOut()
-    const before = (await fetchSnapshot()).notifications.length
-    expect(await resolveInviteCode('TEST42-m_minji')).toEqual({ kind: 'joined', groupId: 'g_test42', matchedName: '김민지' })
+  it('승인되면 그 자리에 내 계정이 연결된다. 멤버 id는 그대로라 기존 기록이 이어진다', async () => {
+    await resolveInviteCode('TEST42-m_minji')
+    await approveAsOwner42()
+    await signIn('a@naver.com', 'aaaaaaaa')
+    expect(await resolveInviteCode('TEST42')).toEqual({ kind: 'joined', groupId: 'g_test42' })
+    const group = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')!
+    expect(group.members.find((m) => m.id === 'm_minji')).toMatchObject({ userId: 'u_test', name: null })
+  })
 
-    const snapshot = await fetchSnapshot()
-    expect(snapshot.session.viewAsMemberId).toBe('m_minji')
-    expect(snapshot.groups.map((g) => g.id)).toEqual(['g_test42'])
-    expect(snapshot.notifications.length - before).toBe(0)
+  it('요청을 보낸 뒤 다시 들어오면 새로 요청하지 않고 대기(requested)로 이어진다', async () => {
+    await resolveInviteCode('TEST42-m_minji')
+    expect((await resolveInviteCode('TEST42')).kind).toBe('requested')
+    expect((await fetchSnapshot()).joinRequests).toHaveLength(1)
   })
 
   it('개인 초대 링크의 자리를 이미 다른 계정이 차지했으면 조용히 pick으로 넘어간다', async () => {
     const resolution = await resolveInviteCode('TEST42-m_owner42')
     expect(resolution.kind).toBe('pick')
   })
-
-  it('한 번 연결된 뒤 다시 들어오면 재입장(joined, 안내 이름 없음)이다', async () => {
-    await resolveInviteCode('TEST42-m_minji')
-    expect(await resolveInviteCode('TEST42')).toEqual({ kind: 'joined', groupId: 'g_test42', matchedName: null })
-  })
 })
 
-describe('참여 (07)', () => {
-  it('로그인 상태로 대기 멤버를 고르면 그 자리가 내 계정이 된다', async () => {
+describe('참여 요청 (07)', () => {
+  it('로그인 상태로 대기 멤버를 고르면 그 자리로 요청하고, 승인되면 그 자리가 내 계정이 된다', async () => {
     await joinAsExistingMember('g_test42', 'm_minji')
+    expect(await checkJoinRequest('g_test42')).toBe('pending')
+    await approveAsOwner42()
+    await signIn('a@naver.com', 'aaaaaaaa')
+    expect(await checkJoinRequest('g_test42')).toBe('joined')
     const group = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')!
     expect(group.members.find((m) => m.id === 'm_minji')!.userId).toBe('u_test')
   })
@@ -282,23 +327,33 @@ describe('참여 (07)', () => {
     await expect(joinAsExistingMember('g_test42', 'm_none')).rejects.toThrow('존재하지 않는')
   })
 
-  it('비로그인으로 대기 멤버를 고르면 데이터는 그대로고 세션만 그 자리를 본다 (알림 없음)', async () => {
+  it('비로그인으로 대기 멤버를 고르면 승인 전엔 그룹이 안 보이고, 승인되면 이 브라우저가 그 자리로 들어간다 (알림 없음)', async () => {
     await signOut()
     await joinAsExistingMember('g_test42', 'm_minji')
+    expect((await fetchSnapshot()).groups).toEqual([])
+
+    const request = await approveAsOwner42()
+    expect(request).toMatchObject({ name: '김민지', isGuest: true, memberId: 'm_minji' })
+    expect((await fetchSnapshot()).notifications.map((n) => n.type)).toEqual(['join_request'])
+
+    await signOut()
+    expect(await checkJoinRequest('g_test42')).toBe('joined')
     const snapshot = await fetchSnapshot()
     expect(snapshot.session.viewAsMemberId).toBe('m_minji')
     expect(snapshot.groups[0].members.find((m) => m.id === 'm_minji')).toMatchObject({ userId: null, name: '김민지' })
-    expect(snapshot.notifications).toEqual([])
   })
 
-  it('비로그인으로 이름만 입력해 새로 참여하면 계정 없는 멤버가 생기고 알림이 남는다', async () => {
+  it('비로그인으로 이름만 입력해 요청하면, 승인될 때 계정 없는 멤버가 생기고 참여 알림이 남는다', async () => {
     await signOut()
-    const member = await joinAsNewGuest('g_test42', '  이서준 ')
-    expect(member).toMatchObject({ userId: null, name: '이서준', role: 'member', groupId: 'g_test42' })
+    await joinAsNewGuest('g_test42', '  이서준 ')
+    await approveAsOwner42()
+    await signOut()
+    expect((await resolveInviteCode('TEST42')).kind).toBe('joined')
 
     const snapshot = await fetchSnapshot()
-    expect(snapshot.session.viewAsMemberId).toBe(member.id)
-    expect(snapshot.notifications[0].title).toBe('이서준님이 [초대코드 테스트방] 그룹에 참여했어요')
+    const me = snapshot.groups[0].members.find((m) => m.id === snapshot.session.viewAsMemberId)
+    expect(me).toMatchObject({ userId: null, name: '이서준', role: 'member' })
+    expect(snapshot.notifications.map((n) => n.title)).toContain('이서준님이 [초대코드 테스트방] 그룹에 참여했어요')
   })
 
   it('이름만으로 참여는 로그인 상태에선 못 하고, 이름이 비면 못 한다', async () => {
@@ -307,12 +362,72 @@ describe('참여 (07)', () => {
     await expect(joinAsNewGuest('g_test42', '  ')).rejects.toThrow('이름을 입력')
   })
 
-  it('로그인 상태로 새 멤버로 참여하면 내 계정 멤버가 추가되고 알림이 남는다', async () => {
-    const member = await joinAsNewAccountMember('g_test42')
-    expect(member).toMatchObject({ userId: 'u_test', name: null, role: 'member' })
+  it('로그인 상태로 새 멤버로 요청하면, 승인될 때 내 계정 멤버가 추가되고 알림이 남는다', async () => {
+    await joinAsNewAccountMember('g_test42')
+    await approveAsOwner42()
+    await signIn('a@naver.com', 'aaaaaaaa')
     const snapshot = await fetchSnapshot()
     expect(snapshot.groups.map((g) => g.id).sort()).toEqual(['g_jeju', 'g_test42'])
-    expect(snapshot.notifications[0].title).toBe('테스트님이 [초대코드 테스트방] 그룹에 참여했어요')
+    expect(snapshot.groups.find((g) => g.id === 'g_test42')!.members.at(-1)).toMatchObject({
+      userId: 'u_test',
+      name: null,
+      role: 'member',
+    })
+    expect(snapshot.notifications.map((n) => n.title)).toContain('테스트님이 [초대코드 테스트방] 그룹에 참여했어요')
+  })
+
+  it('다시 요청하면 이전 요청을 바꾸고, 방장 알림은 처음 한 번만 만든다', async () => {
+    await joinAsExistingMember('g_test42', 'm_minji')
+    await joinAsNewAccountMember('g_test42')
+    const { joinRequests } = await fetchSnapshot()
+    expect(joinRequests).toEqual([expect.objectContaining({ memberId: null })])
+
+    await signIn('owner.demo@example.com', 'owner1234')
+    const titles = (await fetchSnapshot()).notifications.filter((n) => n.type === 'join_request')
+    expect(titles).toHaveLength(1)
+  })
+
+  it('방장이 거절하면 요청이 사라지고 요청한 쪽은 none으로 확인된다', async () => {
+    await joinAsNewAccountMember('g_test42')
+    await signIn('owner.demo@example.com', 'owner1234')
+    const request = (await fetchSnapshot()).joinRequests[0]
+    await rejectJoinRequest(request.id)
+    expect((await fetchSnapshot()).joinRequests).toEqual([])
+
+    await signIn('a@naver.com', 'aaaaaaaa')
+    expect(await checkJoinRequest('g_test42')).toBe('none')
+    expect((await fetchSnapshot()).groups.map((g) => g.id)).toEqual(['g_jeju'])
+  })
+
+  it('요청한 사람은 요청을 취소할 수 있다', async () => {
+    await joinAsNewAccountMember('g_test42')
+    await cancelJoinRequest('g_test42')
+    expect(await checkJoinRequest('g_test42')).toBe('none')
+    expect((await fetchSnapshot()).joinRequests).toEqual([])
+  })
+
+  it('방장이 아니면 승인·거절할 수 없다', async () => {
+    await signOut()
+    await joinAsNewGuest('g_test42', '이서준')
+    await signIn('a@naver.com', 'aaaaaaaa') // 테스트 계정은 TEST42의 방장이 아니라 요청이 보이지도 않는다
+    expect((await fetchSnapshot()).joinRequests).toEqual([])
+
+    await signIn('owner.demo@example.com', 'owner1234')
+    const request = (await fetchSnapshot()).joinRequests[0]
+    await signIn('a@naver.com', 'aaaaaaaa')
+    await expect(approveJoinRequest(request.id)).rejects.toThrow('방장만')
+    await expect(rejectJoinRequest(request.id)).rejects.toThrow('방장만')
+  })
+
+  it('요청한 자리를 그 사이 다른 사람이 차지했으면 승인할 수 없다고 알린다', async () => {
+    await signOut()
+    await joinAsExistingMember('g_test42', 'm_minji') // 게스트 요청
+    await signIn('a@naver.com', 'aaaaaaaa')
+    await joinAsExistingMember('g_test42', 'm_minji') // 회원 요청
+    await signIn('owner.demo@example.com', 'owner1234')
+    const [guestRequest, memberRequest] = (await fetchSnapshot()).joinRequests
+    await approveJoinRequest(memberRequest.id)
+    await expect(approveJoinRequest(guestRequest.id)).rejects.toThrow('이미 다른 사람이 차지했어요')
   })
 })
 

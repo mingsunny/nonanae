@@ -271,7 +271,8 @@ describe('11 지출 폼', () => {
     await userEvent.click(screen.getByRole('button', { name: '지출 등록하기' }))
 
     expect(await screen.findByText('지출이 등록되었습니다')).toBeTruthy()
-    expect(text()).toContain('택시')
+    // 토스트가 뜬 직후 08로 이동하므로, 목록이 다시 그려질 때까지 기다린다
+    await waitFor(() => expect(text()).toContain('택시'))
     expect(groupState().expenses).toHaveLength(7)
     const added = groupState().expenses.at(-1)!
     expect(added).toMatchObject({ title: '택시', amount: 10000, paidBy: 'm_me', splitType: 'equal', category: '식비' })

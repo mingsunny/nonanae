@@ -131,8 +131,12 @@ export function createSeed(now: number = Date.now(), { signedIn = true }: SeedOp
     expenses,
     expenseParticipants,
     notifications,
-    // 데모 유저들은 화면에 이름만 나오면 되므로 로그인 가능한 계정은 테스트 계정 하나뿐
-    credentials: { u_test: 'aaaaaaaa' },
+    // 데모 유저들은 화면에 이름만 나오면 되므로 로그인 가능한 계정은 테스트 계정과,
+    // '초대코드 테스트방'(TEST42)의 참여 요청을 승인해 볼 수 있는 방장데모(owner.demo@example.com) 둘뿐
+    credentials: { u_test: 'aaaaaaaa', u_owner: 'owner1234' },
     passwordResets: [],
+    joinRequests: [],
+    guestKey: null,
+    guestSeats: {},
   }
 }

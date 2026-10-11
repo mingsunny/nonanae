@@ -47,6 +47,11 @@
   font-weight: 800;
 }
 
+.thumbPending {
+  background: var(--line);
+  color: var(--ink-soft);
+}
+
 .meta {
   display: flex;
   flex: 1;

@@ -12,6 +12,7 @@ import type {
   ExpenseWithParticipants,
   Group,
   GroupDetail,
+  JoinRequest,
   Member,
   Notification,
   NotificationType,
@@ -22,7 +23,7 @@ import { ProfileIncomplete, SignUpConfirmationRequired } from './errors'
 import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
-import type { JoinResolution, ProfileInput, SignUpInput, Snapshot } from './index'
+import type { JoinRequestStatus, JoinResolution, ProfileInput, SignUpInput, Snapshot } from './index'
 
 /**
  * 다른 회원도 읽을 수 있는 프로필 컬럼 (DB는 snake_case). 은행·계좌번호는 일부러 뺐다 —
@@ -277,14 +278,20 @@ async function retryOnFutureJwt<T>(run: () => Promise<T>): Promise<T> {
 
 async function readSnapshot(): Promise<Snapshot> {
   const supabase = getSupabase()
-  const empty: Snapshot = { session: { userId: null, viewAsMemberId: null }, users: [], groups: [], notifications: [] }
+  const empty: Snapshot = {
+    session: { userId: null, viewAsMemberId: null },
+    users: [],
+    groups: [],
+    notifications: [],
+    joinRequests: [],
+  }
   const { data: sessionData } = await supabase.auth.getSession()
   const authUser = sessionData.session?.user
   if (!authUser) return empty
   const isGuest = authUser.is_anonymous === true
   if (!isGuest) await dropAccountCopyIfPresent(authUser)
 
-  const [groupsRes, membersRes, expensesRes, participantsRes, notificationsRes] = await Promise.all([
+  const [groupsRes, membersRes, expensesRes, participantsRes, notificationsRes, joinRequests] = await Promise.all([
     supabase.from('groups').select('id, name, invite_code'),
     supabase.from('members').select(MEMBER_COLUMNS).order('joined_at'),
     supabase.from('expenses').select(EXPENSE_COLUMNS).order('created_at'),
@@ -293,6 +300,7 @@ async function readSnapshot(): Promise<Snapshot> {
       .from('notifications')
       .select('id, group_id, member_id, type, title, created_at, read')
       .order('created_at', { ascending: false }),
+    listJoinRequests(),
   ])
   const allGroups = rowsOrThrow<GroupRow>(groupsRes, '그룹')
   const allMembers = rowsOrThrow<MemberRow>(membersRes, '멤버')
@@ -365,6 +373,7 @@ async function readSnapshot(): Promise<Snapshot> {
     users,
     groups,
     notifications: allNotifications.filter((n) => visibleGroupIds.has(n.group_id)).map(toNotification),
+    joinRequests,
   }
 }
 
@@ -554,6 +563,9 @@ function rpcErrorMessage(error: PostgrestError): string {
   if (message.includes('rename target not available')) return '본인 자리만 이름을 수정할 수 있어요'
   if (message.includes('guests cannot rotate invite codes')) return '로그인한 회원만 초대코드를 새로 만들 수 있어요'
   if (message.includes('only the owner can rotate')) return '방장만 초대코드를 새로 만들 수 있어요'
+  if (message.includes('request not found')) return '이미 처리된 요청이에요'
+  if (message.includes('only the owner can review join requests')) return '방장만 참여 요청을 처리할 수 있어요'
+  if (message.includes('profile required')) return '이름·계좌 등록을 먼저 마쳐주세요'
   if (message.includes('not authenticated')) return '로그인이 필요해요'
   if (message.includes('guests cannot delete accounts')) return '로그인한 회원만 탈퇴할 수 있어요'
   console.error('[supabase rpc]', error)
@@ -632,15 +644,18 @@ async function findMyMemberId(groupId: string, authUserId: string): Promise<stri
   return (data as { id: string }[] | null)?.[0]?.id ?? null
 }
 
-/** join_group 호출. 정식 회원/게스트에 따라 하는 일은 DB 함수가 나눈다(참여 알림도 거기서 만든다). */
-async function joinGroup(code: string, memberId: string | null, name: string | null): Promise<string> {
-  const { data, error } = await getSupabase().rpc('join_group', {
+/**
+ * request_join 호출 — 참여 요청을 남긴다(방장이 승인해야 멤버가 됨). 정식 회원/게스트에 따라 하는 일은 DB 함수가 나눈다.
+ * 이미 이 그룹 멤버면 DB가 그 멤버 id를 돌려준다(재입장). 요청을 남겼으면 null.
+ */
+async function requestJoin(code: string, memberId: string | null, name: string | null): Promise<string | null> {
+  const { data, error } = await getSupabase().rpc('request_join', {
     p_code: code,
     p_member_id: memberId,
     p_name: name,
   })
   if (error) throw new Error(rpcErrorMessage(error))
-  return data as string
+  return (data as string | null) ?? null
 }
 
 /** 게스트가 참여/재입장한 자리를 "지금 보는 자리"로 기억 (fetchSnapshot이 이 그룹만 보여준다) */
@@ -648,7 +663,47 @@ function rememberIfGuest(authUser: AuthUser, memberId: string): void {
   if (authUser.is_anonymous) writeGuestHint(memberId)
 }
 
-/** 06: 코드 확인. 존재 여부·재입장·개인 초대 링크 여부에 따라 바로 들어가거나 07로 넘긴다. */
+/** list_join_requests가 돌려주는 행 */
+interface JoinRequestRow {
+  id: string
+  group_id: string
+  group_name: string
+  name: string
+  member_id: string | null
+  member_name: string | null
+  is_guest: boolean
+  mine: boolean
+  created_at: string
+}
+
+/**
+ * 내가 보낸 참여 요청 + 내가 방장인 그룹에 들어온 요청. 승인 기능 SQL(20261011000100_join_approval.sql)이 아직
+ * 적용되지 않았거나 실패하면 빈 목록으로 넘긴다 — 그룹·지출 화면까지 같이 멈추지 않게.
+ */
+async function listJoinRequests(): Promise<JoinRequest[]> {
+  const { data, error } = await getSupabase().rpc('list_join_requests')
+  if (error) {
+    console.warn('[supabase] 참여 요청을 불러오지 못함', error.code)
+    return []
+  }
+  return ((data as JoinRequestRow[] | null) ?? []).map((r) => ({
+    id: r.id,
+    groupId: r.group_id,
+    groupName: r.group_name,
+    name: r.name,
+    memberId: r.member_id,
+    memberName: r.member_name,
+    isGuest: r.is_guest,
+    mine: r.mine,
+    createdAt: r.created_at,
+  }))
+}
+
+async function hasMyJoinRequest(groupId: string): Promise<boolean> {
+  return (await listJoinRequests()).some((r) => r.mine && r.groupId === groupId)
+}
+
+/** 06: 코드 확인. 재입장이면 바로 들어가고, 이미 보낸 요청이 있으면 대기, 개인 초대 링크면 그 자리로 요청, 아니면 07로 넘긴다. */
 export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
   const parsed = parseInviteCode(raw)
   // 개인 초대 링크의 멤버 id는 uuid여야 한다. 아니면 공용 코드로 취급한다
@@ -661,19 +716,20 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
   const group = data as LookupResult
   inviteCodeByGroupId.set(group.id, parsed.code)
 
-  // 이미 이 그룹 멤버(재입장)
+  // 이미 이 그룹 멤버(재입장 — 방장이 승인한 뒤 처음 들어오는 경우 포함)
   const myMemberId = await findMyMemberId(group.id, authUser.id)
   if (myMemberId) {
     rememberIfGuest(authUser, myMemberId)
-    return { kind: 'joined', groupId: group.id, matchedName: null }
+    return { kind: 'joined', groupId: group.id }
   }
 
-  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 바로 연결. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
+  if (await hasMyJoinRequest(group.id)) return { kind: 'requested', groupId: group.id, groupName: group.name }
+
+  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 바로 요청. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
   const target = targetMemberId ? group.members.find((m) => m.id === targetMemberId && !m.claimed) : undefined
   if (target) {
-    const memberId = await joinGroup(parsed.code, target.id, null)
-    rememberIfGuest(authUser, memberId)
-    return { kind: 'joined', groupId: group.id, matchedName: target.name ?? '' }
+    await requestJoin(parsed.code, target.id, null)
+    return { kind: 'requested', groupId: group.id, groupName: group.name }
   }
 
   return {
@@ -690,30 +746,67 @@ function requireInviteCode(groupId: string): string {
   return code
 }
 
-/** 07: 목록에서 "이게 나예요". 로그인 상태면 그 자리를 내 계정에 연결(+알림), 게스트면 그 자리를 내 세션에 연결(알림 없음). */
+/** 07: 목록에서 "이게 나예요" → 그 자리로 참여 요청. */
 export async function joinAsExistingMember(groupId: string, memberId: string): Promise<void> {
   const authUser = await ensureSession()
-  const joinedId = await joinGroup(requireInviteCode(groupId), memberId, null)
-  rememberIfGuest(authUser, joinedId)
+  const joinedId = await requestJoin(requireInviteCode(groupId), memberId, null)
+  if (joinedId) rememberIfGuest(authUser, joinedId)
 }
 
-/** 07(로그인 안 함): 목록에 없으면 이름만으로 새로 참여. 계정 없는 멤버(게스트)가 만들어진다. */
-export async function joinAsNewGuest(groupId: string, name: string): Promise<Member> {
+/** 07(로그인 안 함): 목록에 없으면 이름만으로 새로 참여 요청. 승인되면 계정 없는 멤버(게스트)가 만들어진다. */
+export async function joinAsNewGuest(groupId: string, name: string): Promise<void> {
   const trimmed = name.trim()
   if (!trimmed) throw new Error('이름을 입력해주세요')
   const authUser = await ensureSession()
   if (!authUser.is_anonymous) throw new Error('로그인한 상태에서는 이름만으로 참여할 수 없어요')
 
-  const memberId = await joinGroup(requireInviteCode(groupId), null, trimmed)
-  rememberIfGuest(authUser, memberId)
-  return { id: memberId, userId: null, groupId, role: 'member', name: trimmed, joinedAt: new Date().toISOString() }
+  const joinedId = await requestJoin(requireInviteCode(groupId), null, trimmed)
+  if (joinedId) rememberIfGuest(authUser, joinedId)
 }
 
-/** 07(로그인 함): 목록에 없으면 내 계정으로 새 멤버 추가 (이름은 계정 이름 그대로). */
-export async function joinAsNewAccountMember(groupId: string): Promise<Member> {
-  const userId = await requireAuthUserId()
-  const memberId = await joinGroup(requireInviteCode(groupId), null, null)
-  return { id: memberId, userId, groupId, role: 'member', name: null, joinedAt: new Date().toISOString() }
+/** 07(로그인 함): 목록에 없으면 내 계정으로 새 멤버 참여 요청 (이름은 계정 이름 그대로). */
+export async function joinAsNewAccountMember(groupId: string): Promise<void> {
+  await requireAuthUserId()
+  await requestJoin(requireInviteCode(groupId), null, null)
+}
+
+/** 승인 대기 화면에서 주기적으로 확인: 승인돼 멤버가 됐는지, 아직 대기 중인지, 요청이 없어졌는지(거절·취소). */
+export async function checkJoinRequest(groupId: string): Promise<JoinRequestStatus> {
+  const { data } = await getSupabase().auth.getSession()
+  const authUser = data.session?.user
+  if (!authUser) return 'none'
+  const myMemberId = await findMyMemberId(groupId, authUser.id)
+  if (myMemberId) {
+    rememberIfGuest(authUser, myMemberId)
+    return 'joined'
+  }
+  return (await hasMyJoinRequest(groupId)) ? 'pending' : 'none'
+}
+
+/** 요청한 사람이 참여 요청을 취소 */
+export async function cancelJoinRequest(groupId: string): Promise<void> {
+  const { error } = await getSupabase().rpc('cancel_join_request', { p_group_id: groupId })
+  if (error) throw new Error(rpcErrorMessage(error))
+}
+
+/** 방장 승인 → 이때 실제 멤버가 된다. 참여 알림도 DB 함수가 만든다. */
+export async function approveJoinRequest(requestId: string): Promise<void> {
+  await requireAuthUserId()
+  const { error } = await getSupabase().rpc('approve_join_request', { p_request_id: requestId })
+  if (error) {
+    // 요청한 자리를 그 사이 다른 사람이 차지함 — 방장이 거절하고 다시 요청받아야 한다
+    if (error.message.includes('member not available')) {
+      throw new Error('그 자리는 이미 다른 사람이 차지했어요. 거절한 뒤 다시 요청해달라고 해주세요.')
+    }
+    throw new Error(rpcErrorMessage(error))
+  }
+}
+
+/** 방장 거절 → 요청 삭제 */
+export async function rejectJoinRequest(requestId: string): Promise<void> {
+  await requireAuthUserId()
+  const { error } = await getSupabase().rpc('reject_join_request', { p_request_id: requestId })
+  if (error) throw new Error(rpcErrorMessage(error))
 }
 
 /**

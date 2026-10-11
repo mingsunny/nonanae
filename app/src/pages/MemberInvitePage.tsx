@@ -5,7 +5,7 @@ import Avatar from '../components/common/Avatar'
 import Button from '../components/common/Button'
 import fields from '../components/common/Field.module.css'
 import { BackIcon } from '../components/common/icons'
-import type { GroupDetail } from '../domain/types'
+import type { GroupDetail, JoinRequest } from '../domain/types'
 import { copyText } from '../lib/clipboard'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
@@ -31,6 +31,12 @@ function MemberInvite({ group }: { group: GroupDetail }) {
   const addPendingMember = useAppStore((s) => s.addPendingMember)
   const renameGuestMember = useAppStore((s) => s.renameGuestMember)
   const rotateInviteCode = useAppStore((s) => s.rotateInviteCode)
+  const approveJoinRequest = useAppStore((s) => s.approveJoinRequest)
+  const rejectJoinRequest = useAppStore((s) => s.rejectJoinRequest)
+  const allJoinRequests = useAppStore((s) => s.joinRequests)
+  // 방장에게만 온다(내가 보낸 요청은 빼고 이 그룹 것만)
+  const joinRequests = allJoinRequests.filter((r) => r.groupId === group.id && !r.mine)
+  const [reviewing, setReviewing] = useState<string | null>(null)
   const { me, nameOf, isMe, isPending } = useGroupView(group)
   const [name, setName] = useState('')
   const trimmed = name.trim()
@@ -73,6 +79,25 @@ function MemberInvite({ group }: { group: GroupDetail }) {
     }
   }
 
+  /** 방장이 참여 요청을 승인/거절 */
+  async function review(request: JoinRequest, approve: boolean) {
+    if (reviewing) return
+    setReviewing(request.id)
+    try {
+      if (approve) {
+        await approveJoinRequest(request.id)
+        showToast(`${request.name}님의 참여를 승인했어요`)
+      } else {
+        await rejectJoinRequest(request.id)
+        showToast(`${request.name}님의 참여 요청을 거절했어요`)
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '처리하지 못했어요')
+    } finally {
+      setReviewing(null)
+    }
+  }
+
   /** 그 멤버 전용 개인화 링크(`{초대코드}-{Member.id}`)를 복사. 이 링크로 들어오면 매칭 화면 없이 그 자리에 연결됨. */
   async function sendInvite(memberId: string) {
     const link = `${window.location.origin}${paths.join}?code=${group.inviteCode}-${memberId}`
@@ -97,6 +122,39 @@ function MemberInvite({ group }: { group: GroupDetail }) {
           <br />
           카카오톡/초대 코드 복사 버튼으로 언제든 할 수 있어요.
         </div>
+
+        {joinRequests.length > 0 && (
+          <section className={styles.requests} aria-label="참여 요청">
+            <h2 className={styles.sectionTitle}>참여 요청 {joinRequests.length}</h2>
+            <div className={styles.card}>
+              {joinRequests.map((r) => (
+                <div key={r.id} className={styles.person}>
+                  <Avatar name={r.name} />
+                  <div className={styles.info}>
+                    <div className={styles.name}>{r.name}</div>
+                    <div className={styles.badge}>{joinRequestDetail(r)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.cancelEdit}
+                    disabled={reviewing !== null}
+                    onClick={() => review(r, false)}
+                  >
+                    거절
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.send}
+                    disabled={reviewing !== null}
+                    onClick={() => review(r, true)}
+                  >
+                    승인
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className={styles.card}>
           {group.members.map((m) => {
@@ -197,4 +255,14 @@ function MemberInvite({ group }: { group: GroupDetail }) {
       </div>
     </div>
   )
+}
+
+/** 요청 한 줄의 설명 — 어떤 자리로, 어떤 방식(회원/게스트)으로 들어오려는지 */
+function joinRequestDetail(r: JoinRequest): string {
+  if (r.memberId) {
+    // 게스트가 기존 자리를 고른 경우 요청 이름이 곧 그 자리 이름이다(다른 기기에서 다시 들어오는 경우 등)
+    if (r.isGuest) return '로그인 없이 · 기존 자리로 참여'
+    return `'${r.memberName ?? ''}' 자리로 참여`
+  }
+  return r.isGuest ? '로그인 없이 · 새로 참여' : '새 멤버로 참여'
 }

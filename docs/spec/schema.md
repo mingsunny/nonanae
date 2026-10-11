@@ -8,6 +8,7 @@
 - Expense — 그룹 내 지출 1건
 - ExpenseParticipant — 지출 1건에 대한 참여자 1명의 분담 정보
 - Notification — 그룹 내 이벤트(지출 등록, 멤버 참여) 알림 1건
+- JoinRequest — 초대코드로 들어온 사람의 참여 요청 1건. 방장이 승인해야 Member가 된다 ([06-join-group.md](06-join-group.md), [12-group-invite.md](12-group-invite.md))
 
 ## User
 
@@ -98,16 +99,29 @@
 | id | string | 내부 식별자 |
 | groupId | string | 어느 그룹에서 발생한 알림인지 |
 | memberId | string \| null | 이벤트를 일으킨 사람의 Member.id — 지출 등록 알림이면 결제자, 멤버 참여 알림이면 그 새 멤버 |
-| type | 'expense' \| 'member_joined' \| 'expense_deleted' | 알림 종류 — [마스터 데이터](#마스터-데이터) 참고 |
+| type | 'expense' \| 'member_joined' \| 'expense_deleted' \| 'join_request' | 알림 종류 — [마스터 데이터](#마스터-데이터) 참고 |
 | title | string | 화면에 보여줄 문구. 생성 시점에 이름을 채워 고정 저장(이후 이름이 바뀌어도 문구는 그대로) |
 | createdAt | timestamp | 생성 일시(화면엔 상대 시간으로 표시) |
 | read | boolean | 읽음 여부. 기본값 false |
+
+## JoinRequest
+
+초대코드로 참여하려는 사람의 요청. [06](06-join-group.md)/[07](07-join-match.md)에서 만들어지고, [12](12-group-invite.md)에서 방장이 승인하면 지워지며 그때 Member가 생기거나 기존 자리가 연결된다. 거절·취소하면 그냥 지워진다. 한 사람은 한 그룹에 요청 하나만 가진다(다시 요청하면 바뀜).
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | string | 내부 식별자 |
+| groupId | string | 참여하려는 Group.id |
+| requester | User.id 또는 게스트 세션 | 요청한 사람. 정식 회원이면 계정, 게스트면 그 브라우저의 익명 세션 |
+| memberId | string \| null | "이게 나예요"로 고른 자리(아직 계정이 연결되지 않은 Member). 새 멤버로 참여하면 null |
+| name | string | 방장에게 보여줄 이름. 요청 시점에 고정(회원: 프로필 이름, 게스트: 입력한 이름 또는 고른 자리의 이름) |
+| createdAt | timestamp | 요청 시각 |
 
 ## 마스터 데이터
 
 - **카테고리(6종)**: 숙소 / 식비 / 교통 / 액티비티 / 쇼핑 / 기타
 - **splitType(3종)**: equal(균등) / ratio(비율) / amount(금액)
-- **Notification.type(3종)**: expense(지출 등록) / member_joined(멤버 참여) / expense_deleted(지출 삭제)
+- **Notification.type(4종)**: expense(지출 등록) / member_joined(멤버 참여) / expense_deleted(지출 삭제) / join_request(참여 요청)
 - **은행 목록**: [conventions.md](conventions.md#은행-목록) 참고
 
 ## 계산 로직
@@ -134,6 +148,10 @@ erDiagram
     expenses ||--o{ expense_participants : ""
     members ||--o{ expense_participants : "member_id"
     members |o--o{ notifications : "member_id"
+    groups ||--o{ join_requests : ""
+    profiles |o--o{ join_requests : "user_id (정식 회원)"
+    "auth.users" |o--o{ join_requests : "guest_uid (게스트)"
+    members |o--o{ join_requests : "member_id (고른 자리)"
 ```
 
 ## DB 구현 (Supabase / PostgreSQL)
@@ -148,6 +166,8 @@ erDiagram
 > - [`supabase/migrations/20261003000100_restrict_profile_columns.sql`](../../supabase/migrations/20261003000100_restrict_profile_columns.sql) — `profiles`의 은행·계좌 컬럼을 API로 직접 못 읽게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (먼저 적용하면 옛 앱이 프로필을 못 읽음)
 > - [`supabase/migrations/20261010000000_email_registered_check.sql`](../../supabase/migrations/20261010000000_email_registered_check.sql) — 회원가입 1단계 이메일 중복 확인 함수(`is_email_registered`). **추가만 하는 안전한 단계** (앱은 함수가 없으면 확인을 건너뜀)
 > - [`supabase/migrations/20261011000000_profile_after_confirmation.sql`](../../supabase/migrations/20261011000000_profile_after_confirmation.sql) — 가입 순서 변경("이메일 확인 → 이름·계좌 등록")용: 가입 트리거가 이름·계좌가 있을 때만 프로필을 만들고, 로그인한 본인이 프로필을 만드는 `complete_profile()` 추가. **추가만 하는 안전한 단계 — 새 앱을 배포하기 전에 먼저 적용**
+> - [`supabase/migrations/20261011000100_join_approval.sql`](../../supabase/migrations/20261011000100_join_approval.sql) — 초대코드 참여에 **방장 승인** 추가: `join_requests` 테이블, `request_join()`·`list_join_requests()`·`approve_join_request()`·`reject_join_request()`·`cancel_join_request()`, 알림 종류 `join_request`. **추가만 하는 안전한 단계 — 새 앱을 배포하기 전에 먼저 적용** (앱은 요청 목록을 못 불러오면 빈 목록으로 넘김)
+> - [`supabase/migrations/20261011000200_lock_direct_join.sql`](../../supabase/migrations/20261011000200_lock_direct_join.sql) — 승인 없이 바로 멤버가 되던 `join_group()`을 클라이언트가 못 부르게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (그 전까지는 API로 `join_group()`을 직접 불러 승인을 건너뛸 수 있음)
 > - [`supabase/migrations/20261004000000_expense_notification_trigger.sql`](../../supabase/migrations/20261004000000_expense_notification_trigger.sql) — 지출 등록 알림을 서버 트리거가 만들게 함 + 지출이 있는 그룹을 못 지우던 FK 검사 시점 수정. **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261004000100_lock_notification_writes.sql`](../../supabase/migrations/20261004000100_lock_notification_writes.sql) — 클라이언트의 알림 직접 추가를 막고 수정은 `read`만 허용. **바로 위 파일을 적용하고, 앱이 알림을 직접 만들지 않는 새 버전으로 배포된 뒤에만 적용**
 >
@@ -244,10 +264,26 @@ erDiagram
 | id | uuid | PK | |
 | group_id | uuid | NOT NULL, FK → groups ON DELETE CASCADE | |
 | member_id | uuid | FK → members ON DELETE SET NULL | 이벤트를 일으킨 멤버 |
-| type | text | NOT NULL, `expense`/`member_joined`/`expense_deleted` | |
+| type | text | NOT NULL, `expense`/`member_joined`/`expense_deleted`/`join_request` | |
 | title | text | NOT NULL | 생성 시점에 이름을 채워 고정 저장한 문구 |
 | read | boolean | NOT NULL, 기본 false | 알림 1건당 읽음 플래그 1개 (스펙 그대로) |
 | created_at | timestamptz | NOT NULL, 기본 now() | |
+
+**join_requests** — 참여 요청 (방장 승인 대기)
+
+| 컬럼 | 타입 | 제약 / 기본값 | 설명 |
+|---|---|---|---|
+| id | uuid | PK | |
+| group_id | uuid | NOT NULL, FK → groups ON DELETE CASCADE | |
+| user_id | uuid | FK → profiles ON DELETE CASCADE | 정식 회원이 보낸 요청 |
+| guest_uid | uuid | FK → auth.users ON DELETE CASCADE | 게스트(익명 세션)가 보낸 요청 |
+| member_id | uuid | FK → members ON DELETE CASCADE | 고른 자리. 새 멤버로 참여하면 null |
+| name | text | NOT NULL, 공백 불가 | 방장에게 보여줄 이름 (요청 시점 고정) |
+| created_at | timestamptz | NOT NULL, 기본 now() | |
+
+- `user_id`와 `guest_uid` 중 정확히 하나만 있음
+- 한 그룹에서 같은 계정·같은 익명 세션은 요청 하나만 (unique 인덱스) — 다시 요청하면 함수가 이전 요청을 지우고 새로 넣는다
+- 클라이언트 역할(`anon`, `authenticated`)은 이 테이블을 직접 읽고 쓸 수 없고, 아래 함수로만 다룬다
 
 ### 삭제 시 동작
 
@@ -257,7 +293,8 @@ erDiagram
 | 지출 삭제 | 그 지출의 참여자 행 삭제 |
 | 멤버 삭제 | 결제자나 참여자로 쓰인 멤버는 삭제 불가 (멤버 삭제 기능은 스펙에 없음) |
 | 회원 탈퇴 | 삭제 직전 트리거가 이름을 `members.name`으로 복사 → `user_id`가 null로 바뀌며 이름 있는 미가입 멤버로 남음. 지출/정산 기록 유지 |
-| 익명 계정 정리 | 해당 멤버의 `guest_uid`만 null이 됨 (이름·기록 유지) |
+| 익명 계정 정리 | 해당 멤버의 `guest_uid`만 null이 됨 (이름·기록 유지). 그 세션이 보낸 참여 요청은 삭제 |
+| 참여 요청 | 그룹 삭제·요청한 회원 탈퇴·고른 자리 삭제 시 함께 삭제. 승인·거절·취소해도 삭제 |
 
 ### 접근 권한 (RLS)
 
@@ -267,9 +304,10 @@ erDiagram
 |---|---|---|
 | profiles | 내 프로필 + 같은 그룹 멤버의 프로필 중 **이름 등 일부 컬럼만**. 은행·계좌번호 컬럼은 테이블에서 직접 읽을 수 없고 `get_my_profile()`(내 것) / `get_payee_accounts()`(돈을 받을 사람 것)로만 읽는다 | 내 프로필만 수정. 생성은 가입 트리거만 |
 | groups | 멤버 | 그룹장만 수정·삭제. 생성은 `create_group()`만 |
-| members | 같은 그룹 멤버 | 멤버 누구나 이름만 있는 미가입 멤버(placeholder) 추가 가능. 참여·그룹장 지정은 RPC만 |
+| members | 같은 그룹 멤버 | 멤버 누구나 이름만 있는 미가입 멤버(placeholder) 추가 가능. 참여는 방장 승인 RPC(`approve_join_request`)만, 그룹장 지정은 `create_group`만 |
+| join_requests | 직접 조회 불가 — `list_join_requests()`로 내가 보낸 요청과 내가 방장인 그룹의 요청만 | 직접 쓰기 불가 — `request_join`/`cancel_join_request`(요청자), `approve_join_request`/`reject_join_request`(방장)만 |
 | expenses, expense_participants | 같은 그룹 멤버 | 같은 그룹 멤버 누구나 등록·수정·삭제 |
-| notifications | 같은 그룹 멤버 | 클라이언트는 `read`(읽음 표시) 컬럼만 수정 가능하고 추가·삭제는 불가. 알림은 서버(트리거·`join_group`)만 만든다 |
+| notifications | 같은 그룹 멤버 | 클라이언트는 `read`(읽음 표시) 컬럼만 수정 가능하고 추가·삭제는 불가. 알림은 서버(트리거·`request_join`·`approve_join_request`)만 만든다 |
 
 ### 트리거 · 함수(RPC)
 
@@ -282,7 +320,12 @@ erDiagram
 | `expenses_notify_added` (트리거) | 지출이 등록되면 "[그룹]에 OO님이 결제한 내역이 추가됐어요" 알림을 서버가 직접 만든다. OO는 등록자가 아니라 결제자 이름([13](13-notifications.md) 알림1). 문구를 클라이언트가 정하지 못하므로 가짜 알림을 만들 수 없다 |
 | `create_group(p_name)` | [05](05-create-group.md) 그룹 + 그룹장 멤버를 한 번에 생성, group id 반환. **정식 회원만**(게스트 거부) |
 | `lookup_group_by_code(p_code)` | [06](06-join-group.md) 초대코드 확인 + [07](07-join-match.md) "나 고르기" 목록용 `{id, name, members[{id, name, claimed}]}` 반환. 잘못된 코드면 null |
-| `join_group(p_code, p_member_id, p_name)` | [06](06-join-group.md)/[07](07-join-match.md) 초대코드 참여. 정식 회원·게스트 공용 — `p_member_id`가 있으면 그 자리를 내 것으로, 없으면 새 멤버로 추가(게스트는 `p_name` 필수). 이미 멤버면 기존 멤버 id 반환. 새 멤버가 생기거나 정식 회원이 자리를 채울 때만 참여 알림 생성 |
+| `request_join(p_code, p_member_id, p_name)` | [06](06-join-group.md)/[07](07-join-match.md) 참여 요청. 정식 회원·게스트 공용 — `p_member_id`가 있으면 그 자리(계정이 연결되지 않은 자리)로, 없으면 새 멤버로 들어가겠다는 요청(게스트는 `p_name` 필수). **이미 이 그룹 멤버면 요청 없이 그 멤버 id를 반환**(재입장), 아니면 요청을 남기고 null. 처음 요청할 때만 그룹에 `join_request` 알림 |
+| `list_join_requests()` | 내가 보낸 요청(`mine = true`) + 내가 방장인 그룹에 들어온 요청. 그룹 이름·고른 자리 이름·게스트 여부를 함께 돌려준다 |
+| `approve_join_request(p_request_id)` | [12](12-group-invite.md) **방장만**. 예전 `join_group`이 하던 일을 실행해 실제 멤버로 만든다 — 회원은 고른 자리의 `user_id`를 채우거나 새 멤버 추가, 게스트는 고른 자리의 `guest_uid`를 바꾸거나 새 멤버 추가. 그 사이 자리가 찼으면 거부(`member not available`). 참여 알림 규칙은 예전과 같다(새 멤버·정식 회원 연결은 알림, 게스트의 기존 자리 재선택은 알림 없음) |
+| `reject_join_request(p_request_id)` | [12](12-group-invite.md) **방장만**. 요청 삭제 |
+| `cancel_join_request(p_group_id)` | 요청한 사람이 그 그룹에 보낸 자기 요청을 취소 |
+| `join_group(p_code, p_member_id, p_name)` | (예전 방식, 승인 없이 바로 참여) `20261011000200_lock_direct_join.sql` 적용 뒤에는 클라이언트가 부를 수 없다 |
 | `get_my_profile()` | [04](04-profile.md) 내 이름·은행·계좌·안내 확인 여부. 본인 것만(게스트는 프로필이 없어 빈 결과) |
 | `get_payee_accounts()` | [09](09-group-settle.md) 정산 화면의 "받을 사람 계좌". **내가 속한 그룹에서 지출을 결제한 적 있는 정식 회원**의 은행·계좌만 돌려준다 — 정산에서 돈을 받는 쪽은 반드시 결제한 사람이라 이것만으로 충분하고, 결제한 적 없는 회원의 계좌는 같은 그룹이어도 내려주지 않는다. 게스트도 호출 가능(송금하려면 필요) |
 | `rotate_invite_code(p_group_id)` | [12](12-group-invite.md) 초대코드 재발급. **방장(정식 회원)만**. 새 코드를 돌려주고, 이전 코드와 그 코드로 만든 개인 초대 링크는 즉시 못 쓴다. 이미 참여한 멤버는 영향 없음 |
@@ -293,8 +336,8 @@ erDiagram
 ### 앱 연동 규칙
 
 - **회원가입**: 1단계([01](01-login.md))는 `signUp({ email, password, options: { emailRedirectTo } })` — 이메일·비밀번호만 보낸다. 이메일 확인이 켜져 있으면 세션 없이 끝나고, 확인 메일 링크는 앱의 `/signup/account`(필요하면 `?next=`)로 돌아온다. 링크로 로그인된 뒤 2단계([02](02-onboarding.md))에서 `rpc('complete_profile', { p_name, p_bank, p_account })`로 프로필을 만든다. 계좌를 가입 요청의 메타데이터에 싣지 않으므로 로그인 정보에 사본이 남지 않는다
-- **게스트 참여**: `signInAnonymously()` → `join_group(code, null, 이름)` (새 참여) 또는 `join_group(code, memberId)` (기존 자리 선택·재입장)
-- **개인화 초대코드** `코드-멤버ID`: 앱이 `-`로 잘라 코드는 `join_group`의 첫 인자, 멤버ID는 두 번째 인자로 전달
+- **참여(방장 승인)**: 게스트는 `signInAnonymously()` 뒤에 `request_join(code, null, 이름)` (새 참여) 또는 `request_join(code, memberId)` (기존 자리 선택), 정식 회원은 `request_join(code)` / `request_join(code, memberId)`. 요청을 보낸 뒤 앱은 승인 대기 화면에서 몇 초마다 "내가 멤버가 됐는지(members 조회) / 요청이 남아 있는지(`list_join_requests`)"를 확인한다. 이미 멤버인 재입장은 요청 없이 바로 들어간다
+- **개인화 초대코드** `코드-멤버ID`: 앱이 `-`로 잘라 코드는 `request_join`의 첫 인자, 멤버ID는 두 번째 인자로 전달 — 그 자리로 바로 **요청**한다(바로 연결되지 않음)
 - **이메일 중복 확인·오류 메시지**: 1단계에서 DB 함수 `is_email_registered`로 미리 확인하고(함수가 없으면 건너뜀), 최종 제출 때는 `signUp` 결과로 한 번 더 판단한다(이메일 확인이 켜져 있으면 중복 가입은 에러 없이 `identities`가 빈 배열로 돌아옴). 로그인 실패는 미가입/비밀번호 불일치를 구분하지 않고 한 가지 문구로 통일 — 구현은 `app/src/api/supabaseApi.ts`
 - **앱 타입과의 매핑**: 앱의 `User`는 `email`/`emailVerified`를 갖지만 DB에서는 `auth.users` 소속이라 API 계층에서 `profiles`와 합쳐 만들어야 함. 앱의 `ExpenseParticipant`에는 `groupId`가 없지만 DB(`expense_participants.group_id`)는 필수라 저장 시 해당 지출의 `group_id`를 채워 넣어야 함
 - **앱에서 직접 처리하는 것**: `share_amount` 규칙(균등이면 null, 비율/금액이면 확정값 — 다른 테이블 값에 의존해서 CHECK로 못 검), 은행 목록·계좌번호 형식 검증
@@ -302,13 +345,13 @@ erDiagram
 ### 알려진 제한 · 미결정
 
 - **알림 읽음이 알림 1건당 하나** — 그룹원이 여러 명이면 한 명이 읽으면 다른 사람에게도 읽음으로 보임. 사용자별 읽음이 필요하면 스펙과 테이블을 함께 바꿔야 함
-- **돈을 받을 사람(지출을 결제한 정식 회원)의 계좌번호는 같은 그룹 멤버라면 — 초대코드로 들어온 게스트 포함 — 서버에서 읽을 수 있음** — 송금하려면 필요한 정보라 완전히 막을 수는 없고, 결제한 적 없는 회원의 계좌는 내려주지 않는 것으로 범위를 줄였다. 초대코드가 새어 나가면 이 범위가 낯선 사람에게 열리므로 방장이 `rotate_invite_code()`로 코드를 바꿀 수 있게 했다. 더 줄이려면 게스트 참여에 방장 승인을 두는 등의 제품 결정이 필요하다
+- **돈을 받을 사람(지출을 결제한 정식 회원)의 계좌번호는 같은 그룹 멤버라면 — 초대코드로 들어온 게스트 포함 — 서버에서 읽을 수 있음** — 송금하려면 필요한 정보라 완전히 막을 수는 없고, 결제한 적 없는 회원의 계좌는 내려주지 않는 것으로 범위를 줄였다. 초대코드가 새어 나가도 **방장이 승인해야 멤버가 되므로**(2026-10-11) 낯선 사람이 코드만으로 이 범위를 보지는 못한다. 코드가 새면 방장이 `rotate_invite_code()`로 바꿀 수도 있다. 단, 승인 전에도 `lookup_group_by_code()`로 그룹 이름과 멤버 이름 목록은 보인다("나 고르기"에 필요)
 - **같은 그룹 멤버면 게스트도 남이 등록한 지출을 수정·삭제할 수 있음 (의도된 동작, 2026-10-05 결정)** — 협업 기능이라 멤버 누구나 쓰기를 열어 둔다. 대신 **삭제는 같은 그룹에 알림이 간다**(누가 무엇을 지웠는지, 서버가 문구를 만든다). 수정은 알림이 없다(13 알림1). 알림 문구 위조는 서버 생성으로 막았다. 초대코드가 새어 나갈 수 있는 구조라, 낯선 사람이 지출을 지우는 것까지 막으려면 "등록한 사람/방장만 수정·삭제" 같은 제품 결정이 필요하다. 지출에 등록자 필드가 아직 없다
 - **영수증 사진이 지출 행에 그대로 저장됨** — `receipt_image_url`에 사진 데이터(data URL, 최대 2MB)를 넣고 있어서, 그룹 데이터를 읽을 때마다 사진이 함께 내려옴. 사진이 늘면 Supabase Storage에 올리고 주소만 저장하도록 바꿔야 함
 - **지출 등록·수정이 여러 테이블에 나눠 쓰임** — 지출 → 참여자 순으로 저장하고, 참여자 저장이 실패하면 지출도 되돌림. 네트워크가 중간에 끊기면 일부만 저장될 수 있어, 엄격한 원자성이 필요해지면 DB 함수(RPC)로 옮겨야 함. 알림은 지출이 들어가는 순간 트리거가 만들기 때문에, 참여자 저장이 실패해 지출을 되돌리는 드문 경우에는 알림이 하나 남을 수 있음
-- **방장이 탈퇴하면 그룹을 관리할 사람이 없어짐** — 방장 멤버 행의 `user_id`가 null이 되어(이름은 남음) 그룹 수정·삭제 정책(`is_group_owner`)을 통과할 사람이 없음. 방장 위임/그룹 정리 정책이 필요해지면 스펙과 함께 정해야 함
+- **방장이 탈퇴하면 그룹을 관리할 사람이 없어짐** — 방장 멤버 행의 `user_id`가 null이 되어(이름은 남음) 그룹 수정·삭제 정책(`is_group_owner`)을 통과할 사람이 없음. 참여 승인도 방장만 할 수 있어서 **그 그룹에는 새 사람이 들어올 수 없게 된다**(기존 멤버의 재입장은 가능). 방장 위임/그룹 정리 정책이 필요해지면 스펙과 함께 정해야 함
 - **익명 계정 남용 방지** — 앱은 로그인·가입·비밀번호 재설정·게스트 참여(익명 로그인)에 Cloudflare Turnstile 토큰을 실어 보낸다(`app/src/lib/captcha.ts`, 사이트 키 `VITE_TURNSTILE_SITE_KEY`). 서버가 토큰 없는 요청을 거절하려면 Supabase 대시보드 Authentication → Attack Protection에서 CAPTCHA를 켜고 Turnstile 비밀 키를 넣어야 한다. 대시보드 설정이 켜지기 전에는 효과가 없다
-- **게스트 사칭 가능** — 재입장 시 본인 확인이 없어 같은 그룹의 누군가가 이름을 골라 그 자리를 가져갈 수 있음 (스펙에서 수용한 트레이드오프)
+- **게스트 사칭** — 게스트에게는 본인 확인이 없어 누군가 이름을 골라 그 자리를 요청할 수 있다. 다만 2026-10-11부터 그 요청은 **방장이 승인해야** 자리가 넘어간다(같은 브라우저 세션의 재입장만 승인 없이 들어감). 게스트가 다른 기기·브라우저에서 다시 들어오거나 로그인·가입해 자기 자리를 계정에 연결할 때도 승인이 필요하다
 
 ## 변경 이력
 
@@ -331,3 +374,4 @@ erDiagram
 - 2026-10-04(추가): 이메일 링크(재설정·가입 확인)로 처음 들어올 때 화면이 빈 채로 멈추던 문제 수정 — 방금 발급된 토큰을 데이터 서버가 `JWT issued at future`로 잠깐 거절하는 일시적 오류(서버 시계 차이)가 원인이었고, 첫 데이터 로딩 실패가 처리되지 않아 빈 화면에서 멈췄다. 이 오류는 잠깐 기다려 최대 4번 다시 시도하고, 그래도 실패하면 빈 화면 대신 "다시 시도" 화면을 보여준다 (민선)
 - 2026-10-05: 지출 삭제 알림 추가 — 남이 등록한 지출도 수정·삭제할 수 있게 두기로 하면서, 삭제는 흔적을 남기도록 DB 트리거(`expenses_notify_deleted`)가 "누가 어떤 내역(금액·결제자)을 지웠는지" 알림을 만든다. `notifications.type`에 `expense_deleted` 추가. 그룹이 통째로 지워질 때는 알림을 만들지 않는다 (민선)
 - 2026-10-11: 회원가입 순서를 "이메일·비밀번호 → 이메일 확인 → 이름·계좌 등록"으로 변경 — 가입 요청에는 이메일·비밀번호만 보내고, `handle_new_user`는 name/bank/account가 모두 있을 때만 프로필을 만들며, 확인 뒤 `complete_profile()`로 프로필을 만든다. 프로필이 없는 로그인 상태(`needsProfile`)를 앱이 따로 다뤄 계좌 등록으로 보낸다 (민선)
+- 2026-10-11: **초대코드 참여에 방장 승인 추가** — 로그인·가입·게스트·개인 초대 링크 모두 바로 멤버가 되지 않고 `join_requests`에 요청을 남기며, 방장이 `approve_join_request()`로 승인할 때 실제 멤버가 된다(이미 멤버인 계정·세션의 재입장만 승인 없음). 알림 종류 `join_request` 추가. 초대코드가 새어 나가도 낯선 사람이 지출·계좌를 보지 못하게 하려는 보안 점검 후속 조치. 예전 `join_group()`은 새 앱 배포 뒤 클라이언트 실행 권한을 회수한다(`20261011000200`). SQL은 PGlite(Postgres)에서 승인·거절·취소·재입장·자리 충돌·권한·탈퇴 시 정리까지 확인

@@ -38,11 +38,11 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
-  /** 알림 종류와 상관없이 해당 그룹의 지출 탭으로. 읽음 처리 → 패널 닫힘 → 이동 (13 §4) */
+  /** 해당 그룹의 지출 탭으로(참여 요청 알림은 승인할 수 있는 멤버 화면으로). 읽음 처리 → 패널 닫힘 → 이동 (13 §4) */
   async function openNotification(n: Notification) {
     await markNotificationRead(n.id)
     onClose()
-    navigate(paths.groupExpenses(n.groupId))
+    navigate(n.type === 'join_request' ? paths.groupMembers(n.groupId) : paths.groupExpenses(n.groupId))
   }
 
   return (
