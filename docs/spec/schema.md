@@ -293,7 +293,7 @@ erDiagram
 - **회원가입**: `signUp({ email, password, options: { data: { name, bank, account } } })` — 회원가입 1단계([01](01-login.md))·2단계([02](02-onboarding.md)) 입력값을 2단계 완료 시점에 한 번에 전달
 - **게스트 참여**: `signInAnonymously()` → `join_group(code, null, 이름)` (새 참여) 또는 `join_group(code, memberId)` (기존 자리 선택·재입장)
 - **개인화 초대코드** `코드-멤버ID`: 앱이 `-`로 잘라 코드는 `join_group`의 첫 인자, 멤버ID는 두 번째 인자로 전달
-- **이메일 중복 확인·오류 메시지**: 1단계에서 가입 여부를 조회하지 않고 `signUp` 결과로 판단한다(이메일 확인이 켜져 있으면 중복 가입은 에러 없이 `identities`가 빈 배열로 돌아옴). 로그인 실패는 미가입/비밀번호 불일치를 구분하지 않고 한 가지 문구로 통일 — 구현은 `app/src/api/supabaseApi.ts`
+- **이메일 중복 확인·오류 메시지**: 1단계에서 DB 함수 `is_email_registered`로 미리 확인하고(함수가 없으면 건너뜀), 최종 제출 때는 `signUp` 결과로 한 번 더 판단한다(이메일 확인이 켜져 있으면 중복 가입은 에러 없이 `identities`가 빈 배열로 돌아옴). 로그인 실패는 미가입/비밀번호 불일치를 구분하지 않고 한 가지 문구로 통일 — 구현은 `app/src/api/supabaseApi.ts`
 - **앱 타입과의 매핑**: 앱의 `User`는 `email`/`emailVerified`를 갖지만 DB에서는 `auth.users` 소속이라 API 계층에서 `profiles`와 합쳐 만들어야 함. 앱의 `ExpenseParticipant`에는 `groupId`가 없지만 DB(`expense_participants.group_id`)는 필수라 저장 시 해당 지출의 `group_id`를 채워 넣어야 함
 - **앱에서 직접 처리하는 것**: `share_amount` 규칙(균등이면 null, 비율/금액이면 확정값 — 다른 테이블 값에 의존해서 CHECK로 못 검), 은행 목록·계좌번호 형식 검증
 
