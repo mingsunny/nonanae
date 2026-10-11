@@ -3,6 +3,7 @@
 // 게스트는 Supabase 익명 로그인 세션으로 표현한다 — User(프로필)는 없고, members.guest_uid로 자기 자리를 가리킨다.
 import type { AuthError, PostgrestError, User as AuthUser } from '@supabase/supabase-js'
 import { parseInviteCode } from '../domain/inviteCode'
+import { PASSWORD_RULE_HINT } from '../domain/password'
 import type {
   Category,
   Expense,
@@ -88,7 +89,8 @@ export function authErrorMessage(error: AuthError): string {
     case 'email_exists':
       return '이미 가입된 이메일이에요. 로그인해주세요.'
     case 'weak_password':
-      return '비밀번호가 너무 짧거나 쉬워요. 더 길게 만들어주세요.'
+      // 서버(Supabase Auth)의 비밀번호 규칙은 화면 규칙과 같다(domain/password.ts). 규칙을 그대로 알려준다.
+      return `비밀번호는 ${PASSWORD_RULE_HINT}.`
     case 'same_password':
       return '이전과 다른 비밀번호를 입력해주세요.'
     case 'email_address_invalid':
