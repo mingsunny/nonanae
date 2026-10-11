@@ -194,6 +194,10 @@ describe('authErrorMessage', () => {
     expect(authErrorMessage(authError('email_exists'))).toBe('이미 가입된 이메일이에요. 로그인해주세요.')
   })
 
+  it('서버가 약한 비밀번호를 거절하면 화면과 같은 규칙을 그대로 알려준다', () => {
+    expect(authErrorMessage(authError('weak_password'))).toBe('비밀번호는 8자 이상, 영문과 숫자를 섞어주세요.')
+  })
+
   it('모르는 에러는 원문 대신 일반 문구를 보여주고 콘솔에만 남긴다', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(authErrorMessage(authError('something_new'))).toBe('요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.')
@@ -318,6 +322,15 @@ describe('signUp (가입 1단계: 이메일·비밀번호만)', () => {
   it('이메일 확인이 켜져 있을 때 이미 가입된 이메일은 identities가 비어서 온다', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [] }, session: null }, error: null })
     await expect(signUp(input)).rejects.toThrow('이미 가입된 이메일이에요. 로그인해주세요.')
+  })
+})
+
+describe('signUp — 서버가 비밀번호 규칙으로 거절할 때', () => {
+  it('규칙 안내 문구로 던진다', async () => {
+    mocks.auth.signUp.mockResolvedValue({ data: { user: null, session: null }, error: authError('weak_password') })
+    await expect(signUp({ email: 'new@example.com', password: 'abcdefgh' })).rejects.toThrow(
+      '비밀번호는 8자 이상, 영문과 숫자를 섞어주세요.',
+    )
   })
 })
 
@@ -1237,6 +1250,14 @@ describe('비밀번호 재설정 (14)', () => {
     it('비어 있으면 서버를 부르지 않는다', async () => {
       await expect(resetPassword('')).rejects.toThrow('새 비밀번호를 입력해주세요')
       expect(mocks.auth.getSession).not.toHaveBeenCalled()
+    })
+
+    it('서버가 약한 비밀번호를 거절하면 규칙을 그대로 알려주고 로그아웃하지 않는다', async () => {
+      mocks.recovery.opened = true
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      mocks.auth.updateUser.mockResolvedValue({ error: authError('weak_password') })
+      await expect(resetPassword('abcdefgh')).rejects.toThrow('비밀번호는 8자 이상, 영문과 숫자를 섞어주세요.')
+      expect(mocks.auth.signOut).not.toHaveBeenCalled()
     })
 
     it('이전과 같은 비밀번호면 한국어로 안내하고 로그아웃하지 않는다', async () => {
