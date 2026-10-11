@@ -15,6 +15,7 @@ import ProfilePage from '../pages/ProfilePage'
 import SettlePage from '../pages/SettlePage'
 import SummaryPage from '../pages/SummaryPage'
 import AccountScreen from '../pages/auth/AccountScreen'
+import CheckEmailScreen from '../pages/auth/CheckEmailScreen'
 import IntroScreen from '../pages/auth/IntroScreen'
 import LoginScreen from '../pages/auth/LoginScreen'
 import SignupScreen from '../pages/auth/SignupScreen'
@@ -30,6 +31,7 @@ export const routes: RouteObject[] = [
   { path: 'welcome', element: <IntroScreen /> },
   { path: 'login', element: <LoginScreen /> },
   { path: 'signup', element: <SignupScreen /> },
+  { path: 'signup/confirm', element: <CheckEmailScreen /> },
   { path: 'signup/account', element: <AccountScreen /> },
   // 06·07: 초대코드 참여는 한 경로 안의 단계
   { path: 'join', element: <JoinPage /> },

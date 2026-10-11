@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import * as api from '../api'
+import { ProfileIncomplete } from '../api/errors'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -21,6 +22,11 @@ interface AppState {
    * 처음부터 로그인 안 된 상태(새로고침, 직접 URL 진입)와 구분하기 위함. signIn/signUp에서 새 세션을 시작할 때 끈다.
    */
   leavingToLogin: boolean
+  /**
+   * 로그인은 됐지만 이름·계좌(프로필)를 아직 등록하지 않음 — 가입 확인 메일을 눌러 들어온 직후 등.
+   * 이 동안은 currentUserId가 null이고, 화면은 계좌 등록(`/signup/account`)으로 보낸다.
+   */
+  needsProfile: boolean
   /** 로그인 없이 초대코드로 참여한 게스트가 지금 보고 있는 Member.id */
   viewAsMemberId: string | null
   usersById: Record<string, User>
@@ -44,7 +50,10 @@ interface AppState {
 
   // 01/02/04: 로그인·가입·프로필
   signIn: (email: string, password: string) => Promise<void>
+  /** 회원가입 1단계(이메일·비밀번호). 이메일 확인이 필요하면 SignUpConfirmationRequired로 던진다. */
   signUp: (input: api.SignUpInput) => Promise<void>
+  /** 이메일 확인 뒤 이름·은행·계좌를 처음 등록 (02) */
+  completeProfile: (input: api.ProfileInput) => Promise<void>
   /** 로그아웃. 로그인 없이 참여한 게스트가 그룹 화면에서 나갈 때도 쓴다. */
   signOut: () => Promise<void>
   deleteAccount: () => Promise<void>
@@ -67,6 +76,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   status: 'idle',
   currentUserId: null,
   leavingToLogin: false,
+  needsProfile: false,
   viewAsMemberId: null,
   usersById: {},
   groups: [],
@@ -88,6 +98,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set({
       status: 'ready',
       currentUserId: snapshot.session.userId,
+      needsProfile: snapshot.session.needsProfile === true,
       viewAsMemberId: snapshot.session.viewAsMemberId,
       usersById: Object.fromEntries(snapshot.users.map((u) => [u.id, u])),
       groups: snapshot.groups,
@@ -129,7 +140,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   signIn: async (email, password) => {
-    await api.signIn(email, password)
+    try {
+      await api.signIn(email, password)
+    } catch (err) {
+      // 가입 확인은 했지만 이름·계좌 등록을 마치지 않은 계정: 로그인 자체는 됐으니 상태를 읽어 계좌 등록으로 이어가게 한다
+      if (!(err instanceof ProfileIncomplete)) throw err
+    }
     set({ leavingToLogin: false })
     await get().refresh()
   },
@@ -137,6 +153,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
   signUp: async (input) => {
     await api.signUp(input)
     set({ leavingToLogin: false })
+    await get().refresh()
+  },
+
+  completeProfile: async (input) => {
+    await api.completeProfile(input)
     await get().refresh()
   },
 

@@ -4,6 +4,7 @@
 import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
 import { expenseAddedTitle, expenseDeletedTitle } from '../domain/notifications'
+import { ProfileIncomplete } from './errors'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -34,7 +35,8 @@ const nowIso = () => new Date().toISOString()
 
 /** 화면이 한 번에 그리는 데이터: 내가 속한 그룹들과 관련 유저·알림 */
 export interface Snapshot {
-  session: MockSession
+  /** needsProfile: 로그인은 됐지만 이름·계좌(프로필)를 아직 등록하지 않음 → 화면이 계좌 등록으로 보낸다 */
+  session: MockSession & { needsProfile?: boolean }
   users: User[]
   groups: GroupDetail[]
   /** 최신순 */
@@ -74,6 +76,17 @@ export async function fetchSnapshot(): Promise<Snapshot> {
   const notifications = d.notifications
     .filter((n) => myGroupIds.has(n.groupId))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+
+  // 이름·계좌를 아직 등록하지 않은 계정(가입 확인만 마친 상태): 로그인된 회원으로 다루지 않고 계좌 등록으로 보낸다
+  const me = userId !== null ? d.users.find((u) => u.id === userId) : undefined
+  if (me && me.name === '') {
+    return structuredClone({
+      session: { userId: null, viewAsMemberId: null, needsProfile: true },
+      users: [],
+      groups: [],
+      notifications: [],
+    })
+  }
 
   return structuredClone({ session: d.session, users, groups, notifications })
 }
@@ -287,32 +300,32 @@ export async function signIn(email: string, password: string): Promise<User> {
   }
   d.session = { userId: user.id, viewAsMemberId: null }
   commit()
+  // 이름·계좌 등록을 마치지 않은 계정은 로그인은 되었지만 계좌 등록으로 이어가야 한다
+  if (user.name === '') throw new ProfileIncomplete()
   return structuredClone(user)
 }
 
 export interface SignUpInput {
   email: string
   password: string
-  name: string
-  bank: string
-  account: string
   /**
-   * 가입 확인 메일의 링크가 돌아올 앱 안 경로 (기본: 그룹 목록). 게스트가 가입하면 자기 자리의 초대 링크를 넘겨,
-   * 메일을 다른 브라우저(메일 앱 안 브라우저 등)에서 열어도 그 자리가 새 계정에 연결되게 한다.
+   * 가입 확인 메일을 눌러 로그인된 뒤 이름·계좌 등록까지 마치고 돌아갈 앱 안 경로 (기본: 그룹 목록).
+   * 게스트가 가입하면 자기 자리의 초대 링크를 넘겨, 메일을 다른 브라우저에서 열어도 그 자리가 새 계정에 연결되게 한다.
    */
   redirectPath?: string
 }
 
-/** 회원가입 2단계 제출. 여기서 비로소 User가 만들어지고 바로 로그인 상태가 된다 (02 데이터). */
-export async function signUp(input: SignUpInput): Promise<User> {
+/**
+ * 회원가입 1단계 제출. 이메일·비밀번호로 계정만 만든다 — 이름·계좌는 이메일 확인 뒤 `completeProfile`로 받는다.
+ * Supabase 모드에서 이메일 확인이 켜져 있으면 SignUpConfirmationRequired로 던진다(화면이 "메일을 확인하세요"를 보여줌).
+ * 목업은 메일 확인이 없어서 바로 로그인 상태가 되고, 이름·계좌가 빈 "프로필 미완성" 유저가 된다.
+ */
+export async function signUp(input: SignUpInput): Promise<void> {
   if (USE_SUPABASE) return remote.signUp(input)
   const d = getDb()
   const email = normalizeEmail(input.email)
-  const name = input.name.trim()
-  const account = input.account.trim()
   if (!email.includes('@')) throw new Error('이메일 형식이 올바르지 않아요')
   if (!input.password) throw new Error('비밀번호를 입력해주세요')
-  if (!name || !input.bank || !account) throw new Error('이름, 은행, 계좌번호를 모두 입력해주세요')
   if (d.users.some((u) => u.email === email)) throw new Error('이미 가입된 이메일이에요. 로그인해주세요.')
 
   const user: User = {
@@ -320,14 +333,31 @@ export async function signUp(input: SignUpInput): Promise<User> {
     authProvider: 'email',
     email,
     emailVerified: false,
-    name,
-    bank: input.bank,
-    account,
+    name: '',
+    bank: '',
+    account: '',
     seenGroupCreateCoach: false,
   }
   d.users.push(user)
   d.credentials[user.id] = input.password
   d.session = { userId: user.id, viewAsMemberId: null }
+  commit()
+}
+
+/** 가입 확인 메일 다시 보내기. 목업은 메일을 보내지 않아 할 일이 없다. */
+export async function resendSignupEmail(email: string, redirectPath?: string): Promise<void> {
+  if (USE_SUPABASE) return remote.resendSignupEmail(email, redirectPath)
+}
+
+/** 이메일 확인 뒤 이름·은행·계좌(프로필)를 처음 등록한다 (02). 로그인한 상태여야 한다. */
+export async function completeProfile(input: ProfileInput): Promise<User> {
+  if (USE_SUPABASE) return remote.completeProfile(input)
+  const d = getDb()
+  const user = requireSessionUser(d)
+  const name = input.name.trim()
+  const account = input.account.trim()
+  if (!name || !input.bank || !account) throw new Error('이름, 은행, 계좌번호를 모두 입력해주세요')
+  Object.assign(user, { name, bank: input.bank, account })
   commit()
   return structuredClone(user)
 }
@@ -364,11 +394,6 @@ export interface ProfileInput {
   name: string
   bank: string
   account: string
-  /**
-   * 가입 확인 메일의 링크가 돌아올 앱 안 경로 (기본: 그룹 목록). 게스트가 가입하면 자기 자리의 초대 링크를 넘겨,
-   * 메일을 다른 브라우저(메일 앱 안 브라우저 등)에서 열어도 그 자리가 새 계정에 연결되게 한다.
-   */
-  redirectPath?: string
 }
 
 /** 프로필 저장(04). 멤버 화면의 이름/계좌는 매번 User에서 읽으므로 모든 그룹에 바로 반영된다. */

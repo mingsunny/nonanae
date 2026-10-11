@@ -4,6 +4,7 @@ export const paths = {
   welcome: '/welcome',
   login: '/login',
   signup: '/signup',
+  signupConfirm: '/signup/confirm',
   signupAccount: '/signup/account',
   groups: '/groups',
   profile: '/profile',

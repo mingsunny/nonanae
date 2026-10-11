@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     signInAnonymously: vi.fn(),
     getSession: vi.fn(),
     resetPasswordForEmail: vi.fn(),
+    resend: vi.fn(),
     updateUser: vi.fn(),
     refreshSession: vi.fn(),
   },
@@ -35,10 +36,12 @@ vi.mock('../lib/captcha', async (importOriginal) => ({
   getCaptchaToken: mocks.getCaptchaToken,
 }))
 
-import { SignUpConfirmationRequired } from './errors'
+import { ProfileIncomplete, SignUpConfirmationRequired } from './errors'
 import {
   addPendingMember,
   authErrorMessage,
+  completeProfile,
+  resendSignupEmail,
   renameGuestMember,
   createExpense,
   createGroup,
@@ -237,6 +240,13 @@ describe('signIn', () => {
     await expect(signIn('me@example.com', 'pw-12345')).rejects.toThrow('보안 확인을 하지 못했어요')
   })
 
+  it('로그인은 됐지만 이름·계좌(프로필)를 아직 등록하지 않은 계정이면 ProfileIncomplete로 알린다', async () => {
+    mocks.auth.signInWithPassword.mockResolvedValue({ error: null })
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockMyProfile(null)
+    await expect(signIn('me@example.com', 'pw-12345')).rejects.toBeInstanceOf(ProfileIncomplete)
+  })
+
   it('잘못된 비밀번호면 한국어 에러로 던진다', async () => {
     mocks.auth.signInWithPassword.mockResolvedValue({ error: authError('invalid_credentials') })
     await expect(signIn('me@example.com', 'wrong')).rejects.toThrow('이메일 또는 비밀번호가 일치하지 않아요.')
@@ -257,20 +267,47 @@ describe('isEmailRegistered (가입 1단계 중복 확인)', () => {
   })
 })
 
-describe('signUp', () => {
-  const input = { email: 'new@example.com', password: 'pw-12345', name: ' 신규 ', bank: '토스뱅크', account: ' 1000-1 ' }
+describe('signUp (가입 1단계: 이메일·비밀번호만)', () => {
+  const input = { email: ' new@example.com ', password: 'pw-12345' }
 
-  it('봇 확인 토큰이 있으면 메타데이터와 함께 captchaToken을 보낸다', async () => {
-    mocks.getCaptchaToken.mockResolvedValue('tok-2')
+  it('이름·계좌 없이 이메일·비밀번호만 보내고, 확인 메일 링크는 계좌 등록 화면으로 돌아오게 한다', async () => {
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
+    await expect(signUp(input)).rejects.toBeInstanceOf(SignUpConfirmationRequired)
+    expect(mocks.auth.signUp).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      password: 'pw-12345',
+      options: { emailRedirectTo: `${window.location.origin}/signup/account` },
+    })
+    // 계좌 정보를 로그인 정보(메타데이터)에 실어 보내지 않는다
+    expect(mocks.auth.signUp.mock.calls[0][0].options.data).toBeUndefined()
+  })
+
+  it('세션이 없으면(이메일 확인 대기) 확인 메일 안내로 던진다', async () => {
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
+    await expect(signUp(input)).rejects.toThrow('가입 확인 메일을 보냈어요')
+  })
+
+  it('이메일 확인이 꺼져 있어 세션이 바로 생기면 에러 없이 끝난다 (화면이 계좌 등록으로 이어간다)', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
-    mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockMyProfile(profileRow)
-    await signUp(input)
+    await expect(signUp(input)).resolves.toBeUndefined()
+  })
+
+  it('봇 확인 토큰이 있으면 captchaToken을 함께 보낸다', async () => {
+    mocks.getCaptchaToken.mockResolvedValue('tok-2')
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
+    await expect(signUp(input)).rejects.toThrow()
     expect(mocks.auth.signUp.mock.calls[0][0].options).toEqual({
-      data: { name: '신규', bank: '토스뱅크', account: '1000-1' },
-      emailRedirectTo: `${window.location.origin}/groups`,
+      emailRedirectTo: `${window.location.origin}/signup/account`,
       captchaToken: 'tok-2',
     })
+  })
+
+  it('돌아올 경로를 넘기면 계좌 등록 화면의 next로 실어 보낸다 (다른 브라우저에서 열어도 초대 그룹으로 이어짐)', async () => {
+    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
+    await expect(signUp({ ...input, redirectPath: '/join?code=ABCDEF-m1' })).rejects.toThrow()
+    expect(mocks.auth.signUp.mock.calls[0][0].options.emailRedirectTo).toBe(
+      `${window.location.origin}/signup/account?next=${encodeURIComponent('/join?code=ABCDEF-m1')}`,
+    )
   })
 
   it('가입 확인 전인 이메일로 다시 가입해 발송 한도에 걸리면, 이미 가입 요청된 이메일일 수 있다고 안내한다', async () => {
@@ -278,72 +315,64 @@ describe('signUp', () => {
     await expect(signUp(input)).rejects.toThrow(SIGNUP_RATE_LIMIT_MESSAGE)
   })
 
-  it('돌아올 경로를 넘기면 가입 확인 메일 링크가 그 경로로 돌아온다 (게스트 자리 연결)', async () => {
-    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
-    await expect(signUp({ ...input, redirectPath: '/join?code=ABCDEF-m1' })).rejects.toThrow()
-    expect(mocks.auth.signUp.mock.calls[0][0].options.emailRedirectTo).toBe(`${window.location.origin}/join?code=ABCDEF-m1`)
-  })
-
-  it('이름·은행·계좌를 auth 메타데이터로 보내고, 가입 후 User를 돌려준다', async () => {
-    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
-    mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockMyProfile({ ...profileRow, name: '신규' })
-
-    const user = await signUp(input)
-
-    expect(mocks.auth.signUp).toHaveBeenCalledWith({
-      email: 'new@example.com',
-      password: 'pw-12345',
-      options: {
-        data: { name: '신규', bank: '토스뱅크', account: '1000-1' },
-        emailRedirectTo: `${window.location.origin}/groups`,
-      },
-    })
-    expect(user.name).toBe('신규')
-  })
-
-  it('가입이 끝나면 로그인 정보(메타데이터)에 남은 은행·계좌번호 사본을 지우고 토큰을 새로 받는다', async () => {
-    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
-    mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockMyProfile({ ...profileRow, name: '신규' })
-
-    await signUp(input)
-
-    expect(mocks.auth.updateUser).toHaveBeenCalledWith({ data: { bank: null, account: null } })
-    expect(mocks.auth.refreshSession).toHaveBeenCalled()
-    // 사본을 지운 "뒤"에 프로필을 읽는다 (순서가 바뀌면 옛 토큰으로 읽게 됨)
-    expect(mocks.auth.updateUser.mock.invocationCallOrder[0]).toBeLessThan(mocks.auth.refreshSession.mock.invocationCallOrder[0])
-  })
-
-  it('사본을 못 지워도 가입은 성공한다 (콘솔에는 값 없이 코드만 남김)', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: {} }, error: null })
-    mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mocks.auth.updateUser.mockResolvedValue({ error: { code: 'unexpected_failure', message: 'boom' } })
-    mockMyProfile({ ...profileRow, name: '신규' })
-
-    await expect(signUp(input)).resolves.toMatchObject({ name: '신규' })
-
-    expect(mocks.auth.refreshSession).not.toHaveBeenCalled()
-    const logged = JSON.stringify(spy.mock.calls)
-    expect(logged).not.toContain(input.account.trim())
-    spy.mockRestore()
-  })
-
   it('이메일 확인이 켜져 있을 때 이미 가입된 이메일은 identities가 비어서 온다', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [] }, session: null }, error: null })
     await expect(signUp(input)).rejects.toThrow('이미 가입된 이메일이에요. 로그인해주세요.')
   })
+})
 
-  it('세션이 없으면(이메일 확인 대기) 확인 메일 안내로 던진다', async () => {
-    mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
-    await expect(signUp(input)).rejects.toThrow('가입 확인 메일을 보냈어요')
-    await expect(signUp(input)).rejects.toBeInstanceOf(SignUpConfirmationRequired)
+describe('resendSignupEmail', () => {
+  it('같은 이메일·돌아올 곳으로 확인 메일을 다시 보낸다', async () => {
+    mocks.auth.resend.mockResolvedValue({ error: null })
+    await resendSignupEmail(' new@example.com ', '/join?code=ABCDEF')
+    expect(mocks.auth.resend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'new@example.com',
+      options: {
+        emailRedirectTo: `${window.location.origin}/signup/account?next=${encodeURIComponent('/join?code=ABCDEF')}`,
+      },
+    })
   })
 
-  it('이름·은행·계좌가 비어 있으면 서버를 부르기 전에 막는다', async () => {
-    await expect(signUp({ ...input, bank: '' })).rejects.toThrow('이름, 은행, 계좌번호를 모두 입력해주세요')
-    expect(mocks.auth.signUp).not.toHaveBeenCalled()
+  it('한도에 걸리면 잠시 후 다시 시도하라고 알린다', async () => {
+    mocks.auth.resend.mockResolvedValue({ error: authError('over_email_send_rate_limit') })
+    await expect(resendSignupEmail('new@example.com')).rejects.toThrow('요청이 너무 많아요')
+  })
+})
+
+describe('completeProfile (이메일 확인 뒤 이름·계좌 등록)', () => {
+  const input = { name: ' 신규 ', bank: '토스뱅크', account: ' 1000-1 ' }
+
+  it('공백을 다듬어 DB 함수 complete_profile로 보내고, 만들어진 프로필의 User를 돌려준다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ complete_profile: () => ok(null), get_my_profile: () => ok([{ ...profileRow, name: '신규' }]) })
+
+    const user = await completeProfile(input)
+
+    expect(mocks.rpc).toHaveBeenCalledWith('complete_profile', { p_name: '신규', p_bank: '토스뱅크', p_account: '1000-1' })
+    expect(user.name).toBe('신규')
+  })
+
+  it('이미 프로필이 있으면(두 번 눌렀거나 다른 탭에서 마침) 에러로 보지 않고 그 프로필을 돌려준다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({
+      complete_profile: () => ({ data: null, error: { code: 'P0001', message: 'profile already exists' } }),
+      get_my_profile: () => ok([profileRow]),
+    })
+    await expect(completeProfile(input)).resolves.toMatchObject({ name: '민선' })
+  })
+
+  it('비어 있는 칸이 있으면 서버를 부르기 전에 막는다', async () => {
+    await expect(completeProfile({ ...input, bank: '' })).rejects.toThrow('이름, 은행, 계좌번호를 모두 입력해주세요')
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  it('로그인하지 않았거나 게스트면 등록할 수 없다', async () => {
+    mocks.auth.getSession.mockResolvedValue(noSession)
+    await expect(completeProfile(input)).rejects.toThrow('로그인이 필요해요')
+    mocks.auth.getSession.mockResolvedValue(guestSession)
+    await expect(completeProfile(input)).rejects.toThrow('로그인이 필요해요')
+    expect(mocks.rpc).not.toHaveBeenCalledWith('complete_profile', expect.anything())
   })
 })
 
@@ -360,6 +389,16 @@ const memberRow = (over: Record<string, unknown>) => ({
 })
 
 describe('fetchSnapshot', () => {
+  it('로그인은 됐지만 프로필이 없으면(이메일 확인만 마친 상태) 회원이 아니라 needsProfile로 알린다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockTables({ profiles: ok([]) })
+    mockMyProfile(null)
+    const snapshot = await fetchSnapshot()
+    expect(snapshot.session).toEqual({ userId: null, viewAsMemberId: null, needsProfile: true })
+    expect(snapshot.users).toEqual([])
+    expect(snapshot.groups).toEqual([])
+  })
+
   it('로그인하지 않았으면 세션이 비어 있다', async () => {
     mocks.auth.getSession.mockResolvedValue(noSession)
     const snapshot = await fetchSnapshot()

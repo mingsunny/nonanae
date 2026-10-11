@@ -109,3 +109,30 @@
   color: var(--ink-soft);
   text-decoration: underline;
 }
+
+.stepHint {
+  margin: var(--space-md) 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+/* 이메일 확인 화면 */
+.confirmEmail {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.confirmActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: var(--space-md);
+}
+
+.confirmLinks {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: var(--space-lg);
+}
