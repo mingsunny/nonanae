@@ -3,6 +3,7 @@
 // 게스트는 Supabase 익명 로그인 세션으로 표현한다 — User(프로필)는 없고, members.guest_uid로 자기 자리를 가리킨다.
 import type { AuthError, PostgrestError, User as AuthUser } from '@supabase/supabase-js'
 import { parseInviteCode } from '../domain/inviteCode'
+import { NAME_TOO_LONG_MESSAGE, assertNameLength } from '../domain/name'
 import { PASSWORD_RULE_HINT } from '../domain/password'
 import type {
   Category,
@@ -472,6 +473,7 @@ export async function completeProfile(input: ProfileInput): Promise<User> {
   const name = input.name.trim()
   const account = input.account.trim()
   if (!name || !input.bank || !account) throw new Error('이름, 은행, 계좌번호를 모두 입력해주세요')
+  assertNameLength(name)
   await requireAuthUserId()
 
   const { error } = await getSupabase().rpc('complete_profile', { p_name: name, p_bank: input.bank, p_account: account })
@@ -526,12 +528,14 @@ export async function updateProfile(input: ProfileInput): Promise<User> {
   const name = input.name.trim()
   const account = input.account.trim()
   if (!name || !input.bank || !account) throw new Error('이름, 은행, 계좌번호를 모두 입력해주세요')
+  assertNameLength(name)
 
   const userId = await requireAuthUserId()
   const { error } = await getSupabase()
     .from('profiles')
     .update({ name, bank: input.bank, account })
     .eq('id', userId)
+  if (isNameLengthViolation(error)) throw new Error(NAME_TOO_LONG_MESSAGE)
   if (error) throw new Error(`저장하지 못했어요: ${error.message}`)
 
   const user = await loadSessionUser()
@@ -554,6 +558,7 @@ export async function markGroupCreateCoachSeen(): Promise<void> {
 /** DB 함수(RPC)가 raise한 영어 메시지를 화면 문구로 바꾼다. 모르는 메시지는 콘솔에만 남기고 일반 문구를 보여준다. */
 function rpcErrorMessage(error: PostgrestError): string {
   const message = error.message
+  if (isNameLengthViolation(error)) return NAME_TOO_LONG_MESSAGE
   if (message.includes('group name required')) return '그룹 이름을 입력해주세요'
   if (message.includes('guests cannot create groups')) return '로그인한 회원만 그룹을 만들 수 있어요'
   if (message.includes('invalid invite code')) return '존재하지 않는 그룹이에요'
@@ -757,6 +762,7 @@ export async function joinAsExistingMember(groupId: string, memberId: string): P
 export async function joinAsNewGuest(groupId: string, name: string): Promise<void> {
   const trimmed = name.trim()
   if (!trimmed) throw new Error('이름을 입력해주세요')
+  assertNameLength(trimmed)
   const authUser = await ensureSession()
   if (!authUser.is_anonymous) throw new Error('로그인한 상태에서는 이름만으로 참여할 수 없어요')
 
@@ -814,6 +820,7 @@ export async function rejectJoinRequest(requestId: string): Promise<void> {
  * 다른 사람의 멤버 행은 memberId를 안다고 해도 바꿀 수 없다.
  */
 export async function renameGuestMember(memberId: string, name: string): Promise<Member> {
+  assertNameLength(name)
   const { error } = await getSupabase().rpc('rename_guest_member', { p_member_id: memberId, p_name: name })
   if (error) throw new Error(rpcErrorMessage(error))
 
@@ -829,7 +836,13 @@ export async function renameGuestMember(memberId: string, name: string): Promise
 // --- 08~11 지출 · 12 멤버 추가 · 13 알림 ---
 
 /** 조회·쓰기 실패(PostgREST 에러)를 화면 문구로 바꾼다. 모르는 에러는 콘솔에만 남긴다. */
+/** 이름이 DB의 길이 제한(profiles_name_len, members_name_len, join_requests_name_len)에 걸렸는지 */
+function isNameLengthViolation(error: PostgrestError | null): boolean {
+  return error !== null && error.code === '23514' && error.message.includes('_name_len')
+}
+
 function dbErrorMessage(error: PostgrestError, foreignKeyMessage = '그룹 멤버가 아닌 사람이 포함돼 있어요'): string {
+  if (isNameLengthViolation(error)) return NAME_TOO_LONG_MESSAGE
   if (error.code === '23503') return foreignKeyMessage // 존재하지 않는 그룹/멤버를 가리킴
   if (error.code === '42501') return '이 작업을 할 권한이 없어요' // RLS: 내 그룹이 아님
   console.error('[supabase db]', error)
@@ -962,6 +975,7 @@ export async function deleteExpense(expenseId: string): Promise<void> {
 export async function addPendingMember(groupId: string, name: string): Promise<Member> {
   const trimmed = name.trim()
   if (!trimmed) throw new Error('이름을 입력해주세요')
+  assertNameLength(trimmed)
   const { data, error } = await getSupabase()
     .from('members')
     .insert({ group_id: groupId, name: trimmed })

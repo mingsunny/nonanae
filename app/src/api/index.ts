@@ -3,6 +3,7 @@
 // Supabase가 붙으면 함수 안쪽만 supabase-js 호출로 바꾸면 되고 호출하는 쪽은 그대로다.
 import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
+import { assertNameLength } from '../domain/name'
 import { expenseAddedTitle, expenseDeletedTitle, joinRequestTitle } from '../domain/notifications'
 import { ProfileIncomplete } from './errors'
 import type {
@@ -206,6 +207,7 @@ export async function deleteExpense(expenseId: string): Promise<void> {
 
 /** 앱 미가입 친구를 이름만으로 추가(12). userId는 null. 대기 중 유저 추가는 알림을 만들지 않는다(13 알림2). */
 export async function addPendingMember(groupId: string, name: string): Promise<Member> {
+  assertNameLength(name)
   if (USE_SUPABASE) return remote.addPendingMember(groupId, name)
   const d = getDb()
   if (!d.groups.some((g) => g.id === groupId)) throw new Error('존재하지 않는 그룹이에요')
@@ -232,6 +234,7 @@ export async function addPendingMember(groupId: string, name: string): Promise<M
 export async function renameGuestMember(memberId: string, name: string): Promise<Member> {
   const trimmed = name.trim()
   if (!trimmed) throw new Error('이름을 입력해주세요')
+  assertNameLength(trimmed)
   if (USE_SUPABASE) return remote.renameGuestMember(memberId, trimmed)
   const d = getDb()
   if (d.session.viewAsMemberId !== memberId) throw new Error('본인의 이름만 수정할 수 있어요')
@@ -355,6 +358,7 @@ export async function resendSignupEmail(email: string, redirectPath?: string): P
 
 /** 이메일 확인 뒤 이름·은행·계좌(프로필)를 처음 등록한다 (02). 로그인한 상태여야 한다. */
 export async function completeProfile(input: ProfileInput): Promise<User> {
+  assertNameLength(input.name)
   if (USE_SUPABASE) return remote.completeProfile(input)
   const d = getDb()
   const user = requireSessionUser(d)
@@ -403,6 +407,7 @@ export interface ProfileInput {
 
 /** 프로필 저장(04). 멤버 화면의 이름/계좌는 매번 User에서 읽으므로 모든 그룹에 바로 반영된다. */
 export async function updateProfile(input: ProfileInput): Promise<User> {
+  assertNameLength(input.name)
   if (USE_SUPABASE) return remote.updateProfile(input)
   const d = getDb()
   const user = requireSessionUser(d)
@@ -654,6 +659,7 @@ export async function joinAsExistingMember(groupId: string, memberId: string): P
 
 /** 07(로그인 안 함): 목록에 없으면 이름만으로 새로 참여 요청. 승인되면 계정 없는 멤버(게스트)가 만들어진다. */
 export async function joinAsNewGuest(groupId: string, name: string): Promise<void> {
+  assertNameLength(name)
   if (USE_SUPABASE) return remote.joinAsNewGuest(groupId, name)
   const d = getDb()
   const group = requireGroup(d, groupId)

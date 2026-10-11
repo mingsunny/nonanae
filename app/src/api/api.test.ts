@@ -16,6 +16,7 @@ import {
   notifyMemberJoined,
   resetMockData,
   updateExpense,
+  updateProfile,
 } from './index'
 import type { ExpenseInput } from '../domain/types'
 
@@ -155,6 +156,25 @@ describe('updateExpense', () => {
   it('없는 지출이거나 다른 그룹으로 옮기려 하면 거절', async () => {
     await expect(updateExpense('e_none', newExpense())).rejects.toThrow()
     await expect(updateExpense('e_6', newExpense({ groupId: 'g_test42', paidBy: 'm_owner42' }))).rejects.toThrow()
+  })
+})
+
+describe('이름 길이 한도 (20자)', () => {
+  const long = '가'.repeat(21)
+
+  it('대기 중 멤버 이름이 20자를 넘으면 거절하고, 20자까지는 된다', async () => {
+    await expect(addPendingMember('g_jeju', long)).rejects.toThrow('이름은 20자 이하로 입력해주세요.')
+    await expect(addPendingMember('g_jeju', '가'.repeat(20))).resolves.toMatchObject({ name: '가'.repeat(20) })
+  })
+
+  it('프로필 이름도 마찬가지다', async () => {
+    await expect(updateProfile({ name: long, bank: '카카오뱅크', account: '1' })).rejects.toThrow('20자 이하')
+  })
+
+  it('게스트 이름(새로 참여·이름 수정)도 마찬가지다', async () => {
+    await signOut()
+    await expect(joinAsNewGuest('g_test42', long)).rejects.toThrow('20자 이하')
+    await expect(renameGuestMember('m_minji', long)).rejects.toThrow('20자 이하')
   })
 })
 

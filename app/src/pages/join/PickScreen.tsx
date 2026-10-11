@@ -7,6 +7,7 @@ import Callout from '../../components/common/Callout'
 import PrivacyLink from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
+import { NAME_MAX_LENGTH } from '../../domain/name'
 import AuthLinks from './AuthLinks'
 import { useAppStore } from '../../store/appStore'
 import { showToast } from '../../store/toastStore'
@@ -106,6 +107,7 @@ export default function PickScreen({ pick, code, onBack, onRequested }: Props) {
               id="jp-new-name"
               className={fields.input}
               type="text"
+              maxLength={NAME_MAX_LENGTH}
               placeholder="예) 김민지"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}

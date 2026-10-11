@@ -5,6 +5,7 @@ import Avatar from '../components/common/Avatar'
 import Button from '../components/common/Button'
 import fields from '../components/common/Field.module.css'
 import { BackIcon } from '../components/common/icons'
+import { NAME_MAX_LENGTH } from '../domain/name'
 import type { GroupDetail, JoinRequest } from '../domain/types'
 import { copyText } from '../lib/clipboard'
 import { paths } from '../routes/paths'
@@ -168,6 +169,7 @@ function MemberInvite({ group }: { group: GroupDetail }) {
                   <input
                     className={`${fields.input} ${styles.editInput}`}
                     type="text"
+                    maxLength={NAME_MAX_LENGTH}
                     autoFocus
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
@@ -226,6 +228,7 @@ function MemberInvite({ group }: { group: GroupDetail }) {
               id="add-name"
               className={fields.input}
               type="text"
+              maxLength={NAME_MAX_LENGTH}
               placeholder="이름 입력"
               value={name}
               onChange={(e) => setName(e.target.value)}
