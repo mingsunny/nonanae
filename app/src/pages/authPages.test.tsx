@@ -364,6 +364,13 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(pathOf(router)).toBe('/signup')
   })
 
+  it('이름 입력칸은 20자까지만 받는다 (계좌 등록 / 게스트 참여)', async () => {
+    const router = await goToSignup()
+    await submitStep1()
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
+    expect((await screen.findByLabelText('이름') as HTMLInputElement).maxLength).toBe(20)
+  })
+
   it('계좌 등록: 이름·은행·계좌번호를 모두 채워야 "가입 완료"가 활성화된다', async () => {
     const router = await goToSignup()
     await submitStep1()

@@ -879,6 +879,12 @@ describe('참여 요청 (07)', () => {
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
+  it('이름이 20자를 넘으면 서버를 부르지 않는다', async () => {
+    await afterLookup(guestSession)
+    await expect(joinAsNewGuest(groupId, '가'.repeat(21))).rejects.toThrow('이름은 20자 이하로 입력해주세요.')
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
   it('목록에서 기존 자리를 골라 그 자리로 요청한다. 이미 멤버였다면(DB가 멤버 id를 돌려줌) 게스트는 그 자리를 기억한다', async () => {
     await afterLookup(guestSession)
     mockRpc({ request_join: () => ok('m-target') })
@@ -975,6 +981,19 @@ describe('updateProfile', () => {
     expect(update).toHaveBeenCalledWith({ name: '새이름', bank: '국민은행', account: '123-456' })
     expect(eq).toHaveBeenCalledWith('id', 'user-1')
     expect(user.name).toBe('새이름')
+  })
+
+  it('이름이 20자를 넘으면 저장하지 않고, 서버가 거절해도 같은 문구로 알려준다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    await expect(updateProfile({ name: '가'.repeat(21), bank: '국민은행', account: '1' })).rejects.toThrow(
+      '이름은 20자 이하로 입력해주세요.',
+    )
+    expect(mocks.from).not.toHaveBeenCalled()
+
+    mockProfileUpdate({ error: { code: '23514', message: 'violates check constraint "profiles_name_len"' } })
+    await expect(updateProfile({ name: '정상 이름', bank: '국민은행', account: '1' })).rejects.toThrow(
+      '이름은 20자 이하로 입력해주세요.',
+    )
   })
 
   it('로그인하지 않았으면 저장하지 않는다', async () => {
@@ -1180,6 +1199,16 @@ describe('멤버 추가·알림 읽음', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
+  it('이름이 20자를 넘으면 서버를 부르기 전에 막고, 서버(DB 제한)가 거절해도 같은 문구로 알려준다', async () => {
+    await expect(addPendingMember('g-1', '가'.repeat(21))).rejects.toThrow('이름은 20자 이하로 입력해주세요.')
+    expect(mocks.from).not.toHaveBeenCalled()
+
+    mockTables({
+      members: { data: null, error: { code: '23514', message: 'new row for relation "members" violates check constraint "members_name_len"' } },
+    })
+    await expect(addPendingMember('g-1', '정상 이름')).rejects.toThrow('이름은 20자 이하로 입력해주세요.')
+  })
+
   it('없는 그룹이면 그렇게 알려주고, 내 그룹이 아니면 권한이 없다고 알려준다', async () => {
     mockTables({ members: { data: null, error: { code: '23503', message: 'fk' } } })
     await expect(addPendingMember('g-x', '이름')).rejects.toThrow('존재하지 않는 그룹이에요')
@@ -1205,6 +1234,17 @@ describe('renameGuestMember (12)', () => {
     name: '고친이름',
     joined_at: '2026-09-21T01:00:00Z',
   }
+
+  it('이름이 20자를 넘으면 서버를 부르지 않고, DB 제한이 걸려도 같은 문구로 알려준다', async () => {
+    await expect(renameGuestMember('m-a', '가'.repeat(21))).rejects.toThrow('이름은 20자 이하로 입력해주세요.')
+    expect(mocks.rpc).not.toHaveBeenCalled()
+
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: '23514', message: 'new row for relation "members" violates check constraint "members_name_len"' },
+    })
+    await expect(renameGuestMember('m-a', '정상 이름')).rejects.toThrow('이름은 20자 이하로 입력해주세요.')
+  })
 
   it('DB 함수로 이름을 바꾸고, 바뀐 멤버 행을 읽어서 돌려준다', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: null })

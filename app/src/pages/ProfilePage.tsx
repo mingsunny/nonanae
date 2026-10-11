@@ -6,6 +6,7 @@ import Button from '../components/common/Button'
 import fields from '../components/common/Field.module.css'
 import PrivacyLink from '../components/common/PrivacyLink'
 import { BANKS } from '../domain/constants'
+import { NAME_MAX_LENGTH } from '../domain/name'
 import type { User } from '../domain/types'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
@@ -75,7 +76,14 @@ function Profile({ user }: { user: User }) {
       <label className={fields.label} htmlFor="pf-name">
         이름
       </label>
-      <input id="pf-name" className={fields.input} type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      <input
+        id="pf-name"
+        className={fields.input}
+        type="text"
+        maxLength={NAME_MAX_LENGTH}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
       <label className={fields.label} htmlFor="pf-bank">
         은행
       </label>

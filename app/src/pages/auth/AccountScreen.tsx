@@ -6,6 +6,7 @@ import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { BANKS } from '../../domain/constants'
+import { NAME_MAX_LENGTH } from '../../domain/name'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
@@ -83,6 +84,7 @@ export default function AccountScreen() {
           id="signup-name"
           className={fields.input}
           type="text"
+          maxLength={NAME_MAX_LENGTH}
           placeholder="예) 김민지"
           value={name}
           onChange={(e) => {
