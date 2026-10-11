@@ -690,23 +690,23 @@ describe('06·07 초대코드로 참여', () => {
     await boot({ loggedIn: false })
     renderApp('/join')
     await screen.findByLabelText('초대코드')
-    expect(screen.queryByText(/계정이 있으면 로그인하고 참여할 수 있어요/)).toBeNull()
+    expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
     await fill('초대코드', 'TEST42')
     await click('다음')
-    expect(await screen.findByText(/계정이 있으면 로그인하고 참여할 수 있어요/)).toBeTruthy()
+    expect(await screen.findByText('계정으로 더 편리하게 이용하세요')).toBeTruthy()
   })
 
   it('로그인 상태에서는 참여 화면에 로그인 / 회원가입 안내가 없다', async () => {
     renderApp('/join')
     await screen.findByLabelText('초대코드')
-    expect(screen.queryByText(/계정이 있으면 로그인하고 참여할 수 있어요/)).toBeNull()
+    expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
   })
 
   it('게스트로 참여한 뒤 그룹 화면에서 "로그인"하면 게스트 자리가 내 계정에 연결된다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
     await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
-    expect(await screen.findByText(/게스트로 참여 중이에요/)).toBeTruthy()
+    expect(await screen.findByText('계정으로 더 편리하게 이용하세요')).toBeTruthy()
 
     await click('로그인')
     expect(pathOf(router)).toBe('/login')
@@ -717,14 +717,14 @@ describe('06·07 초대코드로 참여', () => {
     await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
     const minji = state().groups.find((g) => g.id === 'g_test42')!.members.find((m) => m.id === 'm_minji')!
     expect(minji.userId).toBe('u_test')
-    expect(screen.queryByText(/게스트로 참여 중이에요/)).toBeNull()
+    expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
   })
 
   it('게스트로 참여한 뒤 그룹 화면에서 "회원가입"하면 게스트 자리가 새 계정에 연결되고 그 그룹으로 돌아온다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
     await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
-    await screen.findByText(/게스트로 참여 중이에요/)
+    await screen.findByText('계정으로 더 편리하게 이용하세요')
     await click('회원가입')
     expect(pathOf(router)).toBe('/signup')
     await fill('이메일', 'guest@example.com')
@@ -755,7 +755,7 @@ describe('06·07 초대코드로 참여', () => {
   it('로그인한 회원에게는 그룹 화면에 게스트 연결 안내가 없다', async () => {
     renderApp('/groups/g_jeju/expenses')
     await screen.findByRole('link', { name: '그룹 목록으로' })
-    expect(screen.queryByText(/게스트로 참여 중이에요/)).toBeNull()
+    expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
   })
 
   it('게스트가 그룹에서 뒤로가기를 누르면 세션을 끝내고 인트로로 나간다', async () => {

@@ -1,5 +1,6 @@
 import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { BackIcon, BarsIcon, KakaoIcon, ReceiptIcon, TransferIcon } from '../components/common/icons'
+import AccountPromoCard from '../components/common/AccountPromoCard'
 import Avatar from '../components/common/Avatar'
 import { groupTotal } from '../domain/settlement'
 import type { GroupDetail } from '../domain/types'
@@ -106,21 +107,13 @@ function GroupShell({ group }: { group: GroupDetail }) {
           </button>
         </div>
 
-        {guestMemberId && (
-          <p className={styles.guestLink}>
-            게스트로 참여 중이에요. 계정에 연결하면 다른 기기에서도 볼 수 있어요.{' '}
-            <button type="button" onClick={() => connectAccount('login')}>
-              로그인
-            </button>
-            {' · '}
-            <button type="button" onClick={() => connectAccount('signup')}>
-              회원가입
-            </button>
-          </p>
-        )}
       </header>
 
       <main className={styles.content} style={{ paddingTop: headerHeight + 18 }}>
+        {/* 게스트에게만: 로그인 / 회원가입으로 내 자리를 계정에 연결하면 다른 기기에서도 볼 수 있다 */}
+        {guestMemberId && (
+          <AccountPromoCard onLogin={() => connectAccount('login')} onSignup={() => connectAccount('signup')} />
+        )}
         <Outlet />
       </main>
 
