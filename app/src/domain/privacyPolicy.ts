@@ -3,9 +3,9 @@
 // (근거: docs/spec/schema.md, app/src/api/supabaseApi.ts).
 
 /** 시행일. 문구를 바꿀 때 함께 바꾼다. */
-export const PRIVACY_EFFECTIVE_DATE = '2026년 10월 4일'
+export const PRIVACY_EFFECTIVE_DATE = '2026년 10월 12일'
 export const PRIVACY_OPERATOR = '노나내 운영팀'
-export const PRIVACY_CONTACT_EMAIL = 'alstjsol8292@gmail.com'
+export const PRIVACY_CONTACT_EMAIL = 'nonanae.info@gmail.com'
 
 export interface PolicySection {
   title: string

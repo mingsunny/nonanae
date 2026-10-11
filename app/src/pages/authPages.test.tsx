@@ -415,7 +415,7 @@ describe('01·02 회원가입 (2단계)', () => {
     const router = renderApp('/privacy')
     expect(await screen.findByRole('heading', { name: '개인정보 처리방침' })).toBeTruthy()
     expect(screen.getByText('1. 수집하는 개인정보')).toBeTruthy()
-    expect(screen.getByText(/alstjsol8292@gmail.com/)).toBeTruthy()
+    expect(screen.getByText(/nonanae.info@gmail.com/)).toBeTruthy()
     expect(pathOf(router)).toBe('/privacy') // 로그아웃 상태여도 인트로로 튕기지 않는다
   })
 
