@@ -68,7 +68,8 @@ export default function AccountScreen() {
 
   return (
     <div>
-      <Topbar title="계좌 등록" />
+      {/* 가입 확인 메일의 링크로 바로 들어오는 화면이라 노나내 로고를 보여준다 */}
+      <Topbar title="계좌 등록" brand />
       <form className={styles.body} onSubmit={submit}>
         <Callout>
           이메일 확인이 끝났어요. 정산할 때 보낼 계좌를
