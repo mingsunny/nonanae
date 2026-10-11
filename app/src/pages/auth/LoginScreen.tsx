@@ -37,6 +37,11 @@ export default function LoginScreen() {
     setBusy(true)
     try {
       await signIn(email, password)
+      // 이메일 확인은 했지만 이름·계좌 등록을 마치지 않은 계정이면 계좌 등록으로 이어간다 (돌아갈 주소는 그대로 남겨 둔다)
+      if (useAppStore.getState().needsProfile) {
+        navigate(paths.signupAccount, { replace: true })
+        return
+      }
       resetAuthFlow()
       navigate(returnTo ?? paths.groups, { replace: true })
     } catch (err) {

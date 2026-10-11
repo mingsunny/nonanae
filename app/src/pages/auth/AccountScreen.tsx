@@ -1,76 +1,79 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
-import { SignUpConfirmationRequired } from '../../api/errors'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
-import PrivacyLink from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { BANKS } from '../../domain/constants'
-import { PRIVACY_SUMMARY } from '../../domain/privacyPolicy'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
 import styles from './auth.module.css'
 
+/** 앱 안의 경로만 허용한다 (`/`로 시작하고 `//`로 시작하지 않는 것). 메일 링크의 `next`가 다른 사이트로 보내지 못하게 막는다. */
+function safeInternalPath(value: string | null): string | null {
+  return value && value.startsWith('/') && !value.startsWith('//') ? value : null
+}
+
 /**
- * 02 회원가입 2단계(`/signup/account`, 계좌 등록). 제출하면 계정이 만들어지고 바로 로그인 상태로 그룹 목록에 들어간다.
- * 1단계 입력값을 넘겨받아야 하므로, 그 값 없이 URL로 바로 들어오면 1단계(`/signup`)로 되돌린다.
+ * 02 이름·계좌 등록(`/signup/account`) — 회원가입의 마지막 단계. 이메일 확인 메일의 링크로 로그인된 사람(또는 이메일 확인이
+ * 꺼져 있어 바로 로그인된 사람)이 이름·은행·계좌를 한 번 등록하면 프로필이 만들어지고 그룹 목록으로 들어간다.
+ * 로그인되어 있지만 프로필이 없는 사람만 이 화면을 쓴다: 이미 프로필이 있으면 바로 다음 화면으로, 로그인 자체가 안 돼 있으면 가입 1단계로 보낸다.
+ * 마친 뒤 돌아갈 곳은 메일 링크의 `next`(다른 브라우저에서 열어도 유지) → 이 기기에 남겨 둔 값 → 그룹 목록 순이다.
  */
 export default function AccountScreen() {
   const navigate = useNavigate()
-  const signUp = useAppStore((s) => s.signUp)
-  const draft = useAuthFlowStore((s) => s.draft)
+  const [params] = useSearchParams()
+  const completeProfile = useAppStore((s) => s.completeProfile)
+  const signOut = useAppStore((s) => s.signOut)
+  const currentUserId = useAppStore((s) => s.currentUserId)
+  const needsProfile = useAppStore((s) => s.needsProfile)
   const resetAuthFlow = useAuthFlowStore((s) => s.reset)
-  const returnTo = useAuthFlowStore((s) => s.returnTo)
-  const setReturnTo = useAuthFlowStore((s) => s.setReturnTo)
-  // 가입을 마치며 입력값을 비워도 이 화면이 1단계로 되돌려 보내지 않도록, 들어올 때 한 번만 확인한다
-  const [hasDraft] = useState(() => draft.email.trim() !== '' && draft.password !== '')
+  // 마친 직후 입력값을 비워도 도착지가 바뀌지 않도록, 들어올 때 한 번만 정한다
+  const [nextPath] = useState(
+    () => safeInternalPath(params.get('next')) ?? useAuthFlowStore.getState().returnTo ?? paths.groups,
+  )
   const [name, setName] = useState('')
   const [bank, setBank] = useState('')
   const [account, setAccount] = useState('')
-  const [consent, setConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   // 세 필드가 모두 채워져야 진행 가능 (필드별 에러 메시지는 없음). 계좌번호 형식 검증은 하지 않는다(02 예외처리).
-  // 개인정보 수집·이용 동의(필수)도 체크해야 한다.
-  const canSubmit = name.trim() !== '' && bank !== '' && account.trim() !== '' && consent
+  const canSubmit = name.trim() !== '' && bank !== '' && account.trim() !== ''
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!canSubmit || busy) return
     setBusy(true)
     try {
-      await signUp({ email: draft.email, password: draft.password, name, bank, account, redirectPath: returnTo ?? undefined })
+      await completeProfile({ name, bank, account })
       resetAuthFlow()
-      navigate(returnTo ?? paths.groups, { replace: true })
+      // 프로필이 생기면 이 화면이 아래의 <Navigate>로 도착지로 이동한다
     } catch (err) {
-      // 이메일 확인이 필요한 가입: 에러가 아니라 "메일을 확인하세요" 안내와 함께 로그인 화면으로 보낸다
-      if (err instanceof SignUpConfirmationRequired) {
-        resetAuthFlow()
-        // 메일 링크로 로그인된 뒤에도 초대 링크(게스트 자리 연결)로 이어가도록 돌아갈 주소는 남긴다
-        setReturnTo(returnTo)
-        navigate(paths.login, { replace: true, state: { notice: err.message } })
-        return
-      }
-      // 1단계 이후 다른 곳에서 같은 이메일이 가입된 경우도 여기서 잡힘 — 이메일을 고치려면 1단계로 돌아가야 함
-      setError(err instanceof Error ? err.message : '가입하지 못했어요')
+      setError(err instanceof Error ? err.message : '등록하지 못했어요')
       setBusy(false)
     }
   }
 
-  if (!hasDraft) return <Navigate to={paths.signup} replace />
+  /** 계좌 등록을 하지 않고 나가려는 경우. 계정은 남아 있어서 나중에 로그인하면 이 화면으로 다시 온다. */
+  async function leave() {
+    await signOut()
+    navigate(paths.welcome, { replace: true })
+  }
+
+  if (currentUserId) return <Navigate to={nextPath} replace />
+  if (!needsProfile) return <Navigate to={paths.signup} replace />
 
   return (
     <div>
-      <Topbar title="계좌 등록" onBack={() => navigate(paths.signup)} />
+      <Topbar title="계좌 등록" />
       <form className={styles.body} onSubmit={submit}>
         <Callout>
-          정산할 때 보낼 계좌를 바로 안내할 수 있도록
+          이메일 확인이 끝났어요. 정산할 때 보낼 계좌를
           <br />
-          이름과 계좌 정보를 등록해주세요.
+          바로 안내할 수 있도록 이름과 계좌 정보를 등록해주세요.
         </Callout>
         <label className={fields.label} htmlFor="signup-name">
           이름
@@ -120,21 +123,6 @@ export default function AccountScreen() {
             setError(null)
           }}
         />
-        <div className={styles.consent}>
-          <label className={styles.consentRow}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span>[필수] 개인정보 수집·이용에 동의합니다</span>
-          </label>
-          <p className={styles.consentDetail}>
-            수집 항목: {PRIVACY_SUMMARY.items}
-            <br />
-            이용 목적: {PRIVACY_SUMMARY.purpose}
-            <br />
-            보유 기간: {PRIVACY_SUMMARY.period}
-            <br />
-            동의하지 않으면 가입할 수 없어요. <PrivacyLink className={styles.consentLink}>전체 보기</PrivacyLink>
-          </p>
-        </div>
         {error && (
           <p className={fields.error} role="alert">
             {error}
@@ -142,9 +130,14 @@ export default function AccountScreen() {
         )}
         <div className={styles.submit}>
           <Button type="submit" disabled={!canSubmit || busy}>
-            회원가입
+            가입 완료
           </Button>
         </div>
+        <p className={styles.switch}>
+          <button type="button" className={fields.textLink} onClick={leave}>
+            나중에 하기 (로그아웃)
+          </button>
+        </p>
       </form>
     </div>
   )

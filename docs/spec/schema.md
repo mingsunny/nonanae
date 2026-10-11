@@ -147,6 +147,7 @@ erDiagram
 > - [`supabase/migrations/20261005000000_expense_deleted_notification.sql`](../../supabase/migrations/20261005000000_expense_deleted_notification.sql) — 지출을 삭제하면 같은 그룹에 알림이 가도록 하는 트리거(`notify_expense_deleted`). **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261003000100_restrict_profile_columns.sql`](../../supabase/migrations/20261003000100_restrict_profile_columns.sql) — `profiles`의 은행·계좌 컬럼을 API로 직접 못 읽게 막음. **바로 위 파일을 적용하고 앱이 새 버전으로 배포된 뒤에만 적용** (먼저 적용하면 옛 앱이 프로필을 못 읽음)
 > - [`supabase/migrations/20261010000000_email_registered_check.sql`](../../supabase/migrations/20261010000000_email_registered_check.sql) — 회원가입 1단계 이메일 중복 확인 함수(`is_email_registered`). **추가만 하는 안전한 단계** (앱은 함수가 없으면 확인을 건너뜀)
+> - [`supabase/migrations/20261011000000_profile_after_confirmation.sql`](../../supabase/migrations/20261011000000_profile_after_confirmation.sql) — 가입 순서 변경("이메일 확인 → 이름·계좌 등록")용: 가입 트리거가 이름·계좌가 있을 때만 프로필을 만들고, 로그인한 본인이 프로필을 만드는 `complete_profile()` 추가. **추가만 하는 안전한 단계 — 새 앱을 배포하기 전에 먼저 적용**
 > - [`supabase/migrations/20261004000000_expense_notification_trigger.sql`](../../supabase/migrations/20261004000000_expense_notification_trigger.sql) — 지출 등록 알림을 서버 트리거가 만들게 함 + 지출이 있는 그룹을 못 지우던 FK 검사 시점 수정. **추가만 하는 안전한 단계**
 > - [`supabase/migrations/20261004000100_lock_notification_writes.sql`](../../supabase/migrations/20261004000100_lock_notification_writes.sql) — 클라이언트의 알림 직접 추가를 막고 수정은 `read`만 허용. **바로 위 파일을 적용하고, 앱이 알림을 직접 만들지 않는 새 버전으로 배포된 뒤에만 적용**
 >
@@ -274,7 +275,8 @@ erDiagram
 
 | 이름 | 용도 |
 |---|---|
-| `on_auth_user_created` (트리거) | 회원가입 시 `raw_user_meta_data`의 name/bank/account로 `profiles` 생성. 익명 로그인은 건너뜀 |
+| `on_auth_user_created` (트리거) | 회원가입 시 계정(auth)이 만들어지면 호출. 가입 요청의 `raw_user_meta_data`에 name/bank/account가 **모두 있을 때만** `profiles`를 만들고(예전 앱 호환), 없으면 프로필 없이 계정만 만든다. 익명 로그인은 건너뜀 |
+| `complete_profile(p_name, p_bank, p_account)` | [02](02-onboarding.md) 이메일 확인 뒤 로그인한 본인의 프로필을 **한 번** 만든다. 게스트는 거절, 이미 있으면 거절(앱은 이를 성공으로 취급). 프로필이 없는 계정은 `members.user_id`의 FK 때문에 그룹을 만들거나 참여할 수 없다 |
 | `before_profile_delete` (트리거) | 탈퇴 시 멤버 행에 이름 보존 |
 | `expenses_notify_deleted` (트리거) | 지출이 삭제되면 "[그룹]에서 '항목' 내역(₩금액, 결제: OO)을 XX님이 삭제했어요" 알림을 서버가 만든다. XX는 지금 요청한 사람의 멤버 이름. 지운 사람을 알 수 없거나(대시보드·관리용 SQL), 그룹이 통째로 지워지는 중이면 알림을 만들지 않는다 |
 | `expenses_notify_added` (트리거) | 지출이 등록되면 "[그룹]에 OO님이 결제한 내역이 추가됐어요" 알림을 서버가 직접 만든다. OO는 등록자가 아니라 결제자 이름([13](13-notifications.md) 알림1). 문구를 클라이언트가 정하지 못하므로 가짜 알림을 만들 수 없다 |
@@ -290,7 +292,7 @@ erDiagram
 
 ### 앱 연동 규칙
 
-- **회원가입**: `signUp({ email, password, options: { data: { name, bank, account } } })` — 회원가입 1단계([01](01-login.md))·2단계([02](02-onboarding.md)) 입력값을 2단계 완료 시점에 한 번에 전달
+- **회원가입**: 1단계([01](01-login.md))는 `signUp({ email, password, options: { emailRedirectTo } })` — 이메일·비밀번호만 보낸다. 이메일 확인이 켜져 있으면 세션 없이 끝나고, 확인 메일 링크는 앱의 `/signup/account`(필요하면 `?next=`)로 돌아온다. 링크로 로그인된 뒤 2단계([02](02-onboarding.md))에서 `rpc('complete_profile', { p_name, p_bank, p_account })`로 프로필을 만든다. 계좌를 가입 요청의 메타데이터에 싣지 않으므로 로그인 정보에 사본이 남지 않는다
 - **게스트 참여**: `signInAnonymously()` → `join_group(code, null, 이름)` (새 참여) 또는 `join_group(code, memberId)` (기존 자리 선택·재입장)
 - **개인화 초대코드** `코드-멤버ID`: 앱이 `-`로 잘라 코드는 `join_group`의 첫 인자, 멤버ID는 두 번째 인자로 전달
 - **이메일 중복 확인·오류 메시지**: 1단계에서 DB 함수 `is_email_registered`로 미리 확인하고(함수가 없으면 건너뜀), 최종 제출 때는 `signUp` 결과로 한 번 더 판단한다(이메일 확인이 켜져 있으면 중복 가입은 에러 없이 `identities`가 빈 배열로 돌아옴). 로그인 실패는 미가입/비밀번호 불일치를 구분하지 않고 한 가지 문구로 통일 — 구현은 `app/src/api/supabaseApi.ts`
@@ -328,3 +330,4 @@ erDiagram
 - 2026-10-04(추가): 이메일 확인(Confirm email)을 켤 수 있도록 앱을 맞춤 — 가입 요청에 `emailRedirectTo`(현재 주소의 `/groups`)를 실어 확인 링크가 돌아올 곳을 정하고, 확인이 필요한 가입은 에러가 아니라 안내와 함께 로그인 화면으로 보냄. 확인 메일을 켜면 가입 요청이 세션 없이 끝나 계좌 사본 정리(`dropAccountFromLoginInfo`)를 건너뛰므로, 확인 링크로 처음 로그인된 세션에서 메타데이터에 사본이 보이면 그 자리에서 지움 (민선)
 - 2026-10-04(추가): 이메일 링크(재설정·가입 확인)로 처음 들어올 때 화면이 빈 채로 멈추던 문제 수정 — 방금 발급된 토큰을 데이터 서버가 `JWT issued at future`로 잠깐 거절하는 일시적 오류(서버 시계 차이)가 원인이었고, 첫 데이터 로딩 실패가 처리되지 않아 빈 화면에서 멈췄다. 이 오류는 잠깐 기다려 최대 4번 다시 시도하고, 그래도 실패하면 빈 화면 대신 "다시 시도" 화면을 보여준다 (민선)
 - 2026-10-05: 지출 삭제 알림 추가 — 남이 등록한 지출도 수정·삭제할 수 있게 두기로 하면서, 삭제는 흔적을 남기도록 DB 트리거(`expenses_notify_deleted`)가 "누가 어떤 내역(금액·결제자)을 지웠는지" 알림을 만든다. `notifications.type`에 `expense_deleted` 추가. 그룹이 통째로 지워질 때는 알림을 만들지 않는다 (민선)
+- 2026-10-11: 회원가입 순서를 "이메일·비밀번호 → 이메일 확인 → 이름·계좌 등록"으로 변경 — 가입 요청에는 이메일·비밀번호만 보내고, `handle_new_user`는 name/bank/account가 모두 있을 때만 프로필을 만들며, 확인 뒤 `complete_profile()`로 프로필을 만든다. 프로필이 없는 로그인 상태(`needsProfile`)를 앱이 따로 다뤄 계좌 등록으로 보낸다 (민선)

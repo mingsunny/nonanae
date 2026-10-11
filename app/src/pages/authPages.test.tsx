@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 // 01~07, 14 화면 테스트: 실제 라우트 정의(routes)를 메모리 라우터에 올려서, 화면 이동과 로그인 가드까지 함께 확인한다.
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
+  completeProfile,
   createGroup,
   joinAsNewAccountMember,
   requestPasswordReset,
@@ -163,19 +164,25 @@ describe('01·02 회원가입 (2단계)', () => {
     await fill('비밀번호 확인', password)
   }
 
-  it('1단계 → 2단계를 마치면 계정이 만들어지고 로그인된 채로 그룹 목록에 들어간다. 첫 그룹 안내가 뜬다', async () => {
+  /** 가입 1단계 입력 + 개인정보 동의 + "다음" */
+  async function submitStep1(email = 'new@example.com', password = 'pw-12345') {
+    await fillStep1(email, password)
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await click('다음')
+  }
+
+  it('1단계(이메일·비밀번호) → 이름·계좌 등록을 마치면 정식 회원이 되어 그룹 목록에 들어간다. 첫 그룹 안내가 뜬다', async () => {
     const router = await goToSignup()
     expect(pathOf(router)).toBe('/signup')
-    await fillStep1()
-    await click('다음')
-    expect(pathOf(router)).toBe('/signup/account')
+    await submitStep1()
+    // 목업은 이메일 확인이 없어 바로 계좌 등록으로 넘어간다 (실서버는 확인 메일 링크를 눌러 들어온 뒤 같은 화면)
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
 
     expect(await screen.findByText(/이름과 계좌 정보를 등록해주세요/)).toBeTruthy()
     await fill('이름', '신규')
     await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
     await fill('계좌번호', '1000-1234-5678')
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
-    await click('회원가입')
+    await click('가입 완료')
 
     expect(await screen.findByText('신규님의 그룹')).toBeTruthy()
     expect(pathOf(router)).toBe('/groups')
@@ -185,11 +192,17 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(useAuthFlowStore.getState().draft).toEqual({ email: '', password: '', passwordConfirm: '' })
   })
 
-  it('1단계 입력값 없이 /signup/account로 바로 들어오면 1단계로 되돌린다', async () => {
+  it('로그인하지 않은 채 /signup/account로 바로 들어오면 1단계로 되돌린다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/signup/account')
     expect(await screen.findByLabelText('비밀번호 확인')).toBeTruthy()
     expect(pathOf(router)).toBe('/signup')
+  })
+
+  it('이미 이름·계좌까지 등록한 회원이 /signup/account로 들어오면 그룹 목록으로 보낸다', async () => {
+    const router = renderApp('/signup/account')
+    expect(await screen.findByText('테스트님의 그룹')).toBeTruthy()
+    expect(pathOf(router)).toBe('/groups')
   })
 
   it('1단계 뒤로가기는 인트로로, "이미 계정이 있으신가요? 로그인"은 로그인 화면으로 간다', async () => {
@@ -214,6 +227,7 @@ describe('01·02 회원가입 (2단계)', () => {
     await userEvent.clear(screen.getByLabelText('비밀번호 확인'))
     await fill('비밀번호 확인', 'pw-12345')
     expect(screen.getByText('비밀번호가 일치해요.')).toBeTruthy()
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
     expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -250,67 +264,138 @@ describe('01·02 회원가입 (2단계)', () => {
 
   it('이미 가입된 이메일이면 1단계에서 막는다', async () => {
     await goToSignup()
-    await fillStep1('a@naver.com')
-    await click('다음')
+    await submitStep1('a@naver.com')
     expect((await screen.findByRole('alert')).textContent).toBe('이미 가입된 이메일이에요. 로그인해주세요.')
     expect(screen.queryByText(/이름과 계좌 정보를 등록해주세요/)).toBeNull()
   })
 
-  it('2단계에서 뒤로 가면 1단계 입력값이 남아 있다', async () => {
-    const router = await goToSignup()
-    await fillStep1()
-    await click('다음')
-    await screen.findByText(/이름과 계좌 정보를 등록해주세요/)
-    await click('뒤로가기')
-    expect(pathOf(router)).toBe('/signup')
-    expect((screen.getByLabelText('이메일') as HTMLInputElement).value).toBe('new@example.com')
-    expect((screen.getByLabelText('비밀번호') as HTMLInputElement).value).toBe('pw-12345')
-  })
-
-  it('2단계는 이름·은행·계좌번호를 채우고 개인정보 수집·이용에 동의해야 "회원가입"이 활성화된다', async () => {
+  it('1단계는 개인정보 수집·이용에 동의해야 "다음"이 활성화되고, 수집 항목 요약과 처리방침 링크(새 탭)가 보인다', async () => {
     await goToSignup()
     await fillStep1()
-    await click('다음')
-    const submit = (await screen.findByRole('button', { name: '회원가입' })) as HTMLButtonElement
+    const next = screen.getByRole('button', { name: '다음' }) as HTMLButtonElement
+    expect(next.disabled).toBe(true) // 동의 전
+    expect(screen.getByText(/수집 항목: 이메일, 비밀번호, 이름, 은행·계좌번호/)).toBeTruthy()
+    const link = screen.getByRole('link', { name: '전체 보기' })
+    expect(link.getAttribute('href')).toBe('/privacy')
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toContain('noopener')
+
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    expect(next.disabled).toBe(false)
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    expect(next.disabled).toBe(true) // 동의를 거두면 다시 막힌다
+  })
+
+  it('이메일 확인이 필요한 가입이면 "메일을 확인하세요" 화면으로 가고, 비밀번호는 메모리에서 비운다', async () => {
+    const originalSignUp = useAppStore.getState().signUp
+    useAppStore.setState({ signUp: vi.fn().mockRejectedValue(new SignUpConfirmationRequired()) })
+    onTestFinished(() => useAppStore.setState({ signUp: originalSignUp }))
+    const router = await goToSignup()
+    await submitStep1()
+
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/confirm'))
+    expect(await screen.findByText('new@example.com')).toBeTruthy()
+    expect(screen.getByText(/메일의 링크를 누르면/)).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(useAuthFlowStore.getState().draft).toMatchObject({ email: 'new@example.com', password: '', passwordConfirm: '' })
+  })
+
+  it('확인 화면: 메일 다시 보내기는 잠깐 기다려야 하고, 이메일 바꾸기는 1단계로 돌아간다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+    useAuthFlowStore.getState().patchDraft({ email: 'new@example.com' })
+    const router = renderApp('/signup/confirm')
+    const resend = (await screen.findByRole('button', { name: /메일 다시 보내기/ })) as HTMLButtonElement
+    expect(resend.disabled).toBe(true)
+    expect(resend.textContent).toContain('60초')
+
+    // 1초마다 한 번씩 다시 그려지므로 1초씩 나눠서 흘린다
+    for (let i = 0; i < 61; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+    }
+    expect((screen.getByRole('button', { name: '메일 다시 보내기' }) as HTMLButtonElement).disabled).toBe(false)
+
+    await click('이메일 바꾸기')
+    expect(pathOf(router)).toBe('/signup')
+  })
+
+  it('이메일 없이 /signup/confirm으로 들어오면 1단계로 돌려보낸다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/signup/confirm')
+    expect(await screen.findByLabelText('비밀번호 확인')).toBeTruthy()
+    expect(pathOf(router)).toBe('/signup')
+  })
+
+  it('계좌 등록: 이름·은행·계좌번호를 모두 채워야 "가입 완료"가 활성화된다', async () => {
+    const router = await goToSignup()
+    await submitStep1()
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
+    const submit = (await screen.findByRole('button', { name: '가입 완료' })) as HTMLButtonElement
     expect(submit.disabled).toBe(true)
     await fill('이름', '신규')
     await fill('계좌번호', '1000')
     expect(submit.disabled).toBe(true)
     await userEvent.selectOptions(screen.getByLabelText('은행'), '카카오뱅크')
-    expect(submit.disabled).toBe(true) // 동의 전
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
     expect(submit.disabled).toBe(false)
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
-    expect(submit.disabled).toBe(true) // 동의를 거두면 다시 막힌다
   })
 
-  it('이메일 확인이 필요한 가입이면 에러가 아니라 안내와 함께 로그인 화면으로 간다', async () => {
-    const originalSignUp = useAppStore.getState().signUp
-    useAppStore.setState({ signUp: vi.fn().mockRejectedValue(new SignUpConfirmationRequired()) })
-    onTestFinished(() => useAppStore.setState({ signUp: originalSignUp }))
-    const router = await goToSignup()
-    await fillStep1()
-    await click('다음')
+  it('계좌 등록 후 돌아갈 곳: 메일 링크의 next(앱 안 경로)를 따르고, 다른 사이트 주소는 무시한다', async () => {
+    await resetMockData()
+    await signOut()
+    await signUp({ email: 'next@example.com', password: 'pw-12345' })
+    useAppStore.setState({ status: 'idle' })
+    await state().init()
+
+    const router = renderApp('/signup/account?next=%2Fjoin%3Fcode%3DTEST42')
     await fill('이름', '신규')
-    await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
-    await fill('계좌번호', '1000-1234-5678')
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
-    await click('회원가입')
+    await userEvent.selectOptions(await screen.findByLabelText('은행'), '토스뱅크')
+    await fill('계좌번호', '1000-1')
+    await click('가입 완료')
+    await waitFor(() => expect(pathOf(router)).toBe('/join'))
+    cleanup()
 
-    expect(await screen.findByText(/가입 확인 메일을 보냈어요/)).toBeTruthy()
-    expect(pathOf(router)).toBe('/login')
-    expect(screen.queryByRole('alert')).toBeNull()
+    await resetMockData()
+    await signOut()
+    await signUp({ email: 'evil@example.com', password: 'pw-12345' })
+    useAppStore.setState({ status: 'idle', needsProfile: false })
+    await state().init()
+    const router2 = renderApp('/signup/account?next=%2F%2Fevil.example.com')
+    await fill('이름', '신규')
+    await userEvent.selectOptions(await screen.findByLabelText('은행'), '토스뱅크')
+    await fill('계좌번호', '1000-1')
+    await click('가입 완료')
+    await waitFor(() => expect(pathOf(router2)).toBe('/groups'))
   })
 
-  it('2단계에 수집 항목 요약과 처리방침 링크(새 탭)가 보인다', async () => {
-    await goToSignup()
-    await fillStep1()
-    await click('다음')
-    expect(await screen.findByText(/수집 항목: 이메일, 비밀번호, 이름, 은행·계좌번호/)).toBeTruthy()
-    const link = screen.getByRole('link', { name: '전체 보기' })
-    expect(link.getAttribute('href')).toBe('/privacy')
-    expect(link.getAttribute('target')).toBe('_blank')
-    expect(link.getAttribute('rel')).toContain('noopener')
+  it('이름·계좌를 등록하지 않고 로그아웃했다가 다시 로그인하면 계좌 등록으로 이어진다', async () => {
+    await resetMockData()
+    await signOut()
+    await signUp({ email: 'half@example.com', password: 'pw-12345' })
+    await signOut()
+    useAppStore.setState({ status: 'idle', needsProfile: false })
+    await state().init()
+
+    const router = renderApp('/login')
+    await fill('이메일', 'half@example.com')
+    await fill('비밀번호', 'pw-12345')
+    await click('로그인')
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
+    expect(await screen.findByRole('button', { name: '가입 완료' })).toBeTruthy()
+  })
+
+  it('프로필이 없는 로그인 상태에서 로그인이 필요한 화면(/groups)에 가면 계좌 등록으로 보낸다', async () => {
+    await resetMockData()
+    await signOut()
+    await signUp({ email: 'guard@example.com', password: 'pw-12345' })
+    useAppStore.setState({ status: 'idle', needsProfile: false })
+    await state().init()
+
+    const router = renderApp('/groups')
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
   })
 
   it('개인정보 처리방침은 로그인 없이 볼 수 있다 (인트로에도 링크가 있다)', async () => {
@@ -374,7 +459,8 @@ describe('03 그룹 목록', () => {
   it('그룹이 없는 신규 회원에게 안내가 뜨고, "새 그룹 만들기"를 누르면 다시는 안 뜬다', async () => {
     await resetMockData()
     await signOut()
-    await signUp({ email: 'new@example.com', password: 'pw', name: '신규', bank: '토스뱅크', account: '1' })
+    await signUp({ email: 'new@example.com', password: 'pw' })
+    await completeProfile({ name: '신규', bank: '토스뱅크', account: '1' })
     useAppStore.setState({ status: 'idle' })
     await state().init()
 
@@ -635,12 +721,14 @@ describe('06·07 초대코드로 참여', () => {
     await fill('이메일', 'guest@example.com')
     await fill('비밀번호', 'pw-12345')
     await fill('비밀번호 확인', 'pw-12345')
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
     await click('다음')
+    // 가입 → (이메일 확인) → 이름·계좌 등록 → 자기 자리의 초대 링크로 돌아와 그 자리가 새 계정에 연결된다
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
     await fill('이름', '김민지')
     await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
     await fill('계좌번호', '1000-1234-5678')
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
-    await click('회원가입')
+    await click('가입 완료')
 
     await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
     expect(await screen.findByText('초대코드 테스트방')).toBeTruthy()

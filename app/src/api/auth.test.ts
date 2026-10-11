@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ProfileIncomplete } from './errors'
 import {
+  completeProfile,
   createGroup,
   deleteAccount,
   fetchSnapshot,
@@ -19,7 +21,14 @@ import {
   updateProfile,
 } from './index'
 
-const newUser = { email: 'new@example.com', password: 'pw-1234', name: '신규', bank: '토스뱅크', account: '1000-1' }
+const newAccount = { email: 'new@example.com', password: 'pw-1234' }
+const newProfile = { name: '신규', bank: '토스뱅크', account: '1000-1' }
+
+/** 가입 1단계(이메일·비밀번호) + 이름·계좌 등록까지 마친 신규 회원 */
+async function signUpAndComplete() {
+  await signUp(newAccount)
+  return completeProfile(newProfile)
+}
 
 beforeEach(async () => {
   await resetMockData()
@@ -74,19 +83,36 @@ describe('signIn', () => {
   })
 })
 
-describe('signUp / isEmailTaken', () => {
-  it('가입하면 바로 로그인 상태가 되고, 그룹은 없고, 안내(coach)는 아직 안 본 상태다', async () => {
-    const user = await signUp(newUser)
+describe('signUp / completeProfile / isEmailTaken', () => {
+  it('가입 1단계만 마치면 로그인은 됐지만 이름·계좌가 없어 "프로필 미완성"으로 다룬다 (그룹·유저는 비어 있다)', async () => {
+    await signUp(newAccount)
+    const snapshot = await fetchSnapshot()
+    expect(snapshot.session).toEqual({ userId: null, viewAsMemberId: null, needsProfile: true })
+    expect(snapshot.groups).toEqual([])
+    expect(snapshot.users).toEqual([])
+  })
+
+  it('이름·은행·계좌를 등록하면 정식 회원이 되고, 그룹은 없고, 안내(coach)는 아직 안 본 상태다', async () => {
+    const user = await signUpAndComplete()
     expect(user).toMatchObject({ email: 'new@example.com', name: '신규', authProvider: 'email', seenGroupCreateCoach: false })
     const snapshot = await fetchSnapshot()
-    expect(snapshot.session.userId).toBe(user.id)
+    expect(snapshot.session).toEqual({ userId: user.id, viewAsMemberId: null })
     expect(snapshot.groups).toEqual([])
     // 그룹이 없어도 내 정보는 읽을 수 있어야 함 (03 인사말, 04 프로필)
     expect(snapshot.users.map((u) => u.id)).toEqual([user.id])
   })
 
-  it('가입한 계정으로 다시 로그인할 수 있다', async () => {
-    await signUp(newUser)
+  it('이름·계좌를 등록하기 전에 로그아웃했다가 다시 로그인하면 ProfileIncomplete로 알리고, 로그인 상태는 유지한다', async () => {
+    await signUp(newAccount)
+    await signOut()
+    await expect(signIn('new@example.com', 'pw-1234')).rejects.toBeInstanceOf(ProfileIncomplete)
+    expect((await fetchSnapshot()).session.needsProfile).toBe(true)
+    await completeProfile(newProfile)
+    expect((await fetchSnapshot()).session.needsProfile).toBeUndefined()
+  })
+
+  it('등록을 마친 계정으로 다시 로그인할 수 있다', async () => {
+    await signUpAndComplete()
     await signOut()
     await expect(signIn('new@example.com', 'pw-1234')).resolves.toMatchObject({ name: '신규' })
   })
@@ -94,14 +120,25 @@ describe('signUp / isEmailTaken', () => {
   it('이미 가입된 이메일이면 실패하고, isEmailTaken도 true를 돌려준다', async () => {
     expect(await isEmailTaken('A@naver.com')).toBe(true)
     expect(await isEmailTaken('new@example.com')).toBe(false)
-    await expect(signUp({ ...newUser, email: 'a@naver.com' })).rejects.toThrow('이미 가입된 이메일이에요')
+    await expect(signUp({ ...newAccount, email: 'a@naver.com' })).rejects.toThrow('이미 가입된 이메일이에요')
   })
 
-  it('이름·은행·계좌 중 하나라도 비면 실패한다', async () => {
-    await expect(signUp({ ...newUser, name: '  ' })).rejects.toThrow('모두 입력')
-    await expect(signUp({ ...newUser, bank: '' })).rejects.toThrow('모두 입력')
-    await expect(signUp({ ...newUser, account: '' })).rejects.toThrow('모두 입력')
-    expect(await isEmailTaken('new@example.com')).toBe(false)
+  it('가입 1단계를 마친 이메일은 바로 중복으로 잡힌다', async () => {
+    await signUp(newAccount)
+    expect(await isEmailTaken('new@example.com')).toBe(true)
+  })
+
+  it('이름·은행·계좌 중 하나라도 비면 등록에 실패한다', async () => {
+    await signUp(newAccount)
+    await expect(completeProfile({ ...newProfile, name: '  ' })).rejects.toThrow('모두 입력')
+    await expect(completeProfile({ ...newProfile, bank: '' })).rejects.toThrow('모두 입력')
+    await expect(completeProfile({ ...newProfile, account: '' })).rejects.toThrow('모두 입력')
+    expect((await fetchSnapshot()).session.needsProfile).toBe(true)
+  })
+
+  it('로그인하지 않은 상태에서는 등록할 수 없다', async () => {
+    await signOut()
+    await expect(completeProfile(newProfile)).rejects.toThrow('로그인이 필요해요')
   })
 })
 
@@ -128,7 +165,7 @@ describe('signOut / deleteAccount', () => {
 
     await deleteAccount()
     // 탈퇴하면 세션이 비어 내 그룹이 안 보인다. 새 계정으로 그 자리를 다시 고르면 지출 기록이 그대로 이어진다
-    await signUp(newUser)
+    await signUpAndComplete()
     await joinAsExistingMember('g_jeju', 'm_me')
     const g = (await fetchSnapshot()).groups.find((x) => x.id === 'g_jeju')!
     expect(g.expenses.filter((e) => e.paidBy === 'm_me')).toHaveLength(paidByMe)

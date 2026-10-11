@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import { showToast } from '../store/toastStore'
@@ -13,6 +13,13 @@ import type { PickResolution } from './join/PickScreen'
  * 코드를 채우고 바로 확인한다. 로그인 여부와 무관하게 누구나 들어올 수 있다.
  */
 export default function JoinPage() {
+  // 이메일 확인은 마쳤지만 이름·계좌를 아직 등록하지 않은 계정은 참여할 수 없다 — 먼저 계좌 등록으로 (마친 뒤 이 주소로 돌아온다)
+  const needsProfile = useAppStore((s) => s.needsProfile)
+  if (needsProfile) return <Navigate to={paths.signupAccount} replace />
+  return <JoinFlow />
+}
+
+function JoinFlow() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const codeFromLink = params.get('code') ?? ''

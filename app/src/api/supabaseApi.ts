@@ -17,7 +17,7 @@ import type {
   SplitType,
   User,
 } from '../domain/types'
-import { SignUpConfirmationRequired } from './errors'
+import { ProfileIncomplete, SignUpConfirmationRequired } from './errors'
 import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
@@ -329,7 +329,10 @@ async function readSnapshot(): Promise<Snapshot> {
   const profiles = rowsOrThrow<PublicProfileRow>(profilesRes, '프로필')
   if (myProfileRes.error) throw new Error(`프로필을 불러오지 못했어요: ${myProfileRes.error.message}`)
   const payees = rowsOrThrow<PayeeAccountRow>(payeesRes, '받을 사람 계좌')
-  if (userId && !profiles.some((p) => p.id === userId)) return empty
+  // 로그인은 됐는데 프로필이 없다: 가입 확인만 마치고 이름·계좌를 아직 등록하지 않았거나(또는 탈퇴 직후). 화면이 계좌 등록으로 보낸다.
+  if (userId && !profiles.some((p) => p.id === userId)) {
+    return { ...empty, session: { userId: null, viewAsMemberId: null, needsProfile: true } }
+  }
 
   const payeeAccounts = new Map(payees.map((r) => [r.user_id, { bank: r.bank, account: r.account }]))
   const myProfile = myProfileRes.data
@@ -373,16 +376,13 @@ export async function signIn(email: string, password: string): Promise<User> {
   })
   if (error) throw new Error(authErrorMessage(error))
   const user = await loadSessionUser()
-  if (!user) throw new Error('프로필을 찾지 못했어요')
+  // 가입 확인은 했지만 이름·계좌 등록을 마치지 않은 계정: 로그인은 되었으니 계좌 등록으로 이어가게 한다
+  if (!user) throw new ProfileIncomplete()
   return user
 }
 
 /**
- * 회원가입 2단계 제출. 이름·은행·계좌는 auth 메타데이터로 함께 보내고,
- * DB 트리거(handle_new_user)가 그 값으로 profiles 행을 만든다.
- */
-/**
- * 회원가입 1단계의 이메일 중복 확인. 2단계(이름·계좌)를 입력하기 전에 알려주려고 쓴다.
+ * 회원가입 1단계의 이메일 중복 확인. 이메일을 확인하고 이름·계좌를 입력하기 전에 알려주려고 쓴다.
  * DB 함수(20261010000000_email_registered_check.sql)가 아직 적용되지 않았거나 실패하면 false로 넘긴다 —
  * 그래도 가입 제출(signUp) 때 한 번 더 걸러지므로 가입이 막히지는 않는다.
  */
@@ -398,20 +398,29 @@ export async function isEmailRegistered(email: string): Promise<boolean> {
 export const SIGNUP_RATE_LIMIT_MESSAGE =
   '이미 가입했거나 가입 확인 메일을 보낸 이메일일 수 있어요. 메일함을 확인하거나 로그인해주세요.'
 
-export async function signUp(input: SignUpInput): Promise<User> {
-  const name = input.name.trim()
-  const account = input.account.trim()
-  if (!name || !input.bank || !account) throw new Error('이름, 은행, 계좌번호를 모두 입력해주세요')
+/**
+ * 확인 메일의 링크가 돌아올 곳. 항상 계좌 등록 화면이다 — 가입은 "이메일 확인 → 이름·계좌 등록" 순서라서
+ * 링크로 로그인되면 이어서 이름과 계좌를 받는다. 초대 링크로 가입한 게스트는 마친 뒤 돌아갈 곳(`next`)을 주소에 실어 보낸다.
+ * (메일을 다른 브라우저에서 열어도 이 기기의 저장값 없이 이어지도록 주소에 담는다. 대시보드 Redirect URLs에 등록된 주소여야 한다.)
+ */
+function signupConfirmRedirect(redirectPath?: string): string {
+  const base = `${window.location.origin}${paths.signupAccount}`
+  return redirectPath ? `${base}?next=${encodeURIComponent(redirectPath)}` : base
+}
 
+/**
+ * 회원가입 1단계 제출. 이메일·비밀번호로 계정만 만들고, 이름·계좌는 이메일 확인 뒤 `completeProfile`로 받는다.
+ * - 이메일 확인이 켜져 있으면(운영) 세션이 없어 SignUpConfirmationRequired로 던진다 — 화면은 "메일을 확인하세요"를 보여준다.
+ * - 꺼져 있으면 바로 로그인 상태가 되어 그대로 돌아온다(화면이 계좌 등록으로 이어간다).
+ */
+export async function signUp(input: SignUpInput): Promise<void> {
   const supabase = getSupabase()
   const captchaToken = await getCaptchaToken()
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
     password: input.password,
     options: {
-      data: { name, bank: input.bank, account },
-      // 확인 메일의 링크가 돌아올 곳. 대시보드 Redirect URLs에 등록된 주소여야 한다(로컬·운영·프리뷰 모두 등록되어 있음).
-      emailRedirectTo: `${window.location.origin}${input.redirectPath ?? paths.groups}`,
+      emailRedirectTo: signupConfirmRedirect(input.redirectPath),
       ...captchaOptions(captchaToken),
     },
   })
@@ -427,13 +436,41 @@ export async function signUp(input: SignUpInput): Promise<User> {
   if (data.user?.identities?.length === 0) throw new Error('이미 가입된 이메일이에요. 로그인해주세요.')
   // 세션이 없다 = Supabase에서 "이메일 확인"이 켜져 있어 확인 메일을 눌러야 로그인됨
   if (!data.session) throw new SignUpConfirmationRequired()
+}
 
-  await dropAccountFromLoginInfo()
+/** 확인 메일을 못 받았을 때 다시 보낸다. 가입 요청과 같은 한도·봇 확인을 따른다. */
+export async function resendSignupEmail(email: string, redirectPath?: string): Promise<void> {
+  const captchaToken = await getCaptchaToken()
+  const { error } = await getSupabase().auth.resend({
+    type: 'signup',
+    email: email.trim(),
+    options: { emailRedirectTo: signupConfirmRedirect(redirectPath), ...captchaOptions(captchaToken) },
+  })
+  if (!error) return
+  if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
+    throw new Error('요청이 너무 많아요. 잠시 후 다시 시도해주세요.')
+  }
+  throw new Error(authErrorMessage(error))
+}
+
+/**
+ * 이메일 확인 뒤 이름·은행·계좌(프로필)를 처음 등록한다. DB 함수 complete_profile이 본인 프로필을 한 번만 만든다.
+ * 이미 있으면(두 번 눌렀거나 다른 탭에서 마친 경우) 에러로 보지 않고 그 프로필을 돌려준다.
+ */
+export async function completeProfile(input: ProfileInput): Promise<User> {
+  const name = input.name.trim()
+  const account = input.account.trim()
+  if (!name || !input.bank || !account) throw new Error('이름, 은행, 계좌번호를 모두 입력해주세요')
+  await requireAuthUserId()
+
+  const { error } = await getSupabase().rpc('complete_profile', { p_name: name, p_bank: input.bank, p_account: account })
+  if (error && !/profile already exists/.test(error.message)) throw new Error(rpcErrorMessage(error))
 
   const user = await loadSessionUser()
   if (!user) throw new Error('프로필을 만들지 못했어요')
   return user
 }
+
 
 /**
  * 가입 요청에 실어 보낸 은행·계좌번호의 사본을 로그인 정보(메타데이터)와 토큰에서 지운다.

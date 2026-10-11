@@ -17,6 +17,9 @@ import { paths } from './paths'
 export default function RequireUser() {
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   const leavingToLogin = useAppStore((s) => s.leavingToLogin)
+  const needsProfile = useAppStore((s) => s.needsProfile)
   if (isLoggedIn) return <Outlet />
+  // 이메일 확인은 마쳤지만 이름·계좌를 아직 등록하지 않았다: 로그인 화면이 아니라 계좌 등록으로 (로그아웃·탈퇴 중이면 제외)
+  if (needsProfile && !leavingToLogin) return <Navigate to={paths.signupAccount} replace />
   return <Navigate to={leavingToLogin ? paths.login : paths.welcome} replace />
 }

@@ -4,20 +4,31 @@ import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import fields from '../../components/common/Field.module.css'
 import PasswordInput from '../../components/common/PasswordInput'
+import PrivacyLink from '../../components/common/PrivacyLink'
 import Topbar from '../../components/common/Topbar'
 import { isEmailTaken } from '../../api'
+import { SignUpConfirmationRequired } from '../../api/errors'
 import { PASSWORD_RULE_HINT, passwordProblem } from '../../domain/password'
+import { PRIVACY_SUMMARY } from '../../domain/privacyPolicy'
 import { paths } from '../../routes/paths'
+import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
 import type { SignupDraft } from '../../store/authFlowStore'
 import styles from './auth.module.css'
 
-/** 01 회원가입 1단계 (`/signup`, 이메일 / 비밀번호). 이 단계에서는 계정을 만들지 않고, 2단계(02) 제출 때 한 번에 만든다. */
+/**
+ * 01 회원가입 1단계 (`/signup`, 이메일 / 비밀번호 / 개인정보 수집·이용 동의).
+ * 순서는 "이메일·비밀번호 → 이메일 확인 → 이름·계좌 등록(02)"이다. 여기서 "다음"을 누르면 이메일·비밀번호로 계정만 만들고
+ * 확인 메일을 보낸다(`/signup/confirm`). 메일의 링크를 누르면 로그인된 채로 계좌 등록 화면으로 돌아온다.
+ * 이메일 확인이 꺼져 있으면(목업 포함) 바로 계좌 등록으로 넘어간다.
+ */
 export default function SignupScreen() {
   const navigate = useNavigate()
   const draft = useAuthFlowStore((s) => s.draft)
   const patchDraft = useAuthFlowStore((s) => s.patchDraft)
   const returnTo = useAuthFlowStore((s) => s.returnTo)
+  const signUp = useAppStore((s) => s.signUp)
+  const [consent, setConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -26,7 +37,12 @@ export default function SignupScreen() {
   // 규칙 안내는 입력을 시작한 뒤에만 에러로 보여준다
   const ruleProblem = draft.password.length > 0 ? passwordProblem(draft.password) : null
   const canSubmit =
-    draft.email.trim().includes('@') && draft.password.length > 0 && ruleProblem === null && confirmed && matches
+    draft.email.trim().includes('@') &&
+    draft.password.length > 0 &&
+    ruleProblem === null &&
+    confirmed &&
+    matches &&
+    consent
 
   function edit(patch: Partial<SignupDraft>) {
     patchDraft(patch)
@@ -42,7 +58,17 @@ export default function SignupScreen() {
         setError('이미 가입된 이메일이에요. 로그인해주세요.')
         return
       }
-      navigate(paths.signupAccount)
+      await signUp({ email: draft.email, password: draft.password, redirectPath: returnTo ?? undefined })
+      // 계정이 만들어졌으니 비밀번호는 메모리에서 비운다 (이메일은 확인 화면에서 쓴다)
+      patchDraft({ password: '', passwordConfirm: '' })
+      navigate(paths.signupAccount, { replace: true })
+    } catch (err) {
+      if (err instanceof SignUpConfirmationRequired) {
+        patchDraft({ password: '', passwordConfirm: '' })
+        navigate(paths.signupConfirm, { replace: true })
+        return
+      }
+      setError(err instanceof Error ? err.message : '가입하지 못했어요')
     } finally {
       setBusy(false)
     }
@@ -90,11 +116,27 @@ export default function SignupScreen() {
             {matches ? '비밀번호가 일치해요.' : '비밀번호가 일치하지 않아요.'}
           </p>
         )}
+        <div className={styles.consent}>
+          <label className={styles.consentRow}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>[필수] 개인정보 수집·이용에 동의합니다</span>
+          </label>
+          <p className={styles.consentDetail}>
+            수집 항목: {PRIVACY_SUMMARY.items}
+            <br />
+            이용 목적: {PRIVACY_SUMMARY.purpose}
+            <br />
+            보유 기간: {PRIVACY_SUMMARY.period}
+            <br />
+            동의하지 않으면 가입할 수 없어요. <PrivacyLink className={styles.consentLink}>전체 보기</PrivacyLink>
+          </p>
+        </div>
         {error && (
           <p className={fields.error} role="alert">
             {error}
           </p>
         )}
+        <p className={styles.stepHint}>다음을 누르면 입력한 이메일로 확인 메일을 보내드려요.</p>
         <div className={styles.submit}>
           <Button type="submit" disabled={!canSubmit || busy}>
             다음
