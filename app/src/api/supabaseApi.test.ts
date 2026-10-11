@@ -39,7 +39,10 @@ vi.mock('../lib/captcha', async (importOriginal) => ({
 import { ProfileIncomplete, SignUpConfirmationRequired } from './errors'
 import {
   addPendingMember,
+  approveJoinRequest,
   authErrorMessage,
+  cancelJoinRequest,
+  checkJoinRequest,
   completeProfile,
   resendSignupEmail,
   renameGuestMember,
@@ -54,6 +57,7 @@ import {
   markGroupCreateCoachSeen,
   isPasswordResetTokenValid,
   markNotificationRead,
+  rejectJoinRequest,
   requestPasswordReset,
   resetPassword,
   resolveInviteCode,
@@ -129,7 +133,7 @@ function mockTables(fixtures: Record<string, Fixture | Fixture[]>): Record<strin
 
 const ok = (data: unknown): Fixture => ({ data, error: null })
 
-/** DB 함수(RPC)별 결과. 테스트마다 비우고, 계좌를 읽는 함수 2개는 기본으로 "없음"을 돌려준다. */
+/** DB 함수(RPC)별 결과. 테스트마다 비우고, 계좌를 읽는 함수 2개와 참여 요청 목록은 기본으로 "없음"을 돌려준다. */
 type RpcHandler = (args: Record<string, unknown>) => Fixture
 const rpcHandlers: Record<string, RpcHandler> = {}
 
@@ -149,6 +153,7 @@ function installRpc() {
   for (const key of Object.keys(rpcHandlers)) delete rpcHandlers[key]
   rpcHandlers.get_my_profile = () => ok([])
   rpcHandlers.get_payee_accounts = () => ok([])
+  rpcHandlers.list_join_requests = () => ok([])
   mocks.rpc.mockImplementation((fn: string, args: Record<string, unknown> = {}) => {
     const handler = rpcHandlers[fn]
     if (!handler) throw new Error(`unexpected rpc ${fn}`)
@@ -747,30 +752,47 @@ describe('resolveInviteCode', () => {
         { id: '22222222-2222-2222-2222-222222222222', name: '박서연', hasAccount: true },
       ],
     })
-    expect(mocks.rpc).not.toHaveBeenCalledWith('join_group', expect.anything())
+    expect(mocks.rpc).not.toHaveBeenCalledWith('request_join', expect.anything())
   })
 
-  it('이미 이 그룹의 멤버면 참여 처리 없이 바로 들어간다 (게스트면 그 자리를 기억)', async () => {
+  it('이미 이 그룹의 멤버면 요청 없이 바로 들어간다 (게스트면 그 자리를 기억)', async () => {
     mocks.auth.getSession.mockResolvedValue(guestSession)
     mockRpc({ lookup_group_by_code: () => ok(lookupResult) })
     mockTables({ members: ok([{ id: 'm-mine' }]) })
 
-    expect(await resolveInviteCode('JEJU26')).toEqual({ kind: 'joined', groupId: 'g-join', matchedName: null })
+    expect(await resolveInviteCode('JEJU26')).toEqual({ kind: 'joined', groupId: 'g-join' })
     expect(localStorage.getItem('nonanae:guest-member')).toBe('m-mine')
-    expect(mocks.rpc).not.toHaveBeenCalledWith('join_group', expect.anything())
+    expect(mocks.rpc).not.toHaveBeenCalledWith('request_join', expect.anything())
   })
 
-  it('개인 초대 링크로 비어 있는 자리를 가리키면 바로 그 자리에 연결한다', async () => {
+  it('이미 보낸 참여 요청이 있으면 다시 요청하지 않고 대기(requested)로 이어진다', async () => {
     mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockRpc({ lookup_group_by_code: () => ok(lookupResult), join_group: () => ok(memberUuid) })
+    mockRpc({
+      lookup_group_by_code: () => ok(lookupResult),
+      list_join_requests: () => ok([joinRequestRow({ group_id: 'g-join', mine: true })]),
+    })
     mockTables({ members: ok([]) })
 
     expect(await resolveInviteCode(`JEJU26-${memberUuid}`)).toEqual({
-      kind: 'joined',
+      kind: 'requested',
       groupId: 'g-join',
-      matchedName: '김민지',
+      groupName: '제주도 여행',
     })
-    expect(mocks.rpc).toHaveBeenCalledWith('join_group', { p_code: 'JEJU26', p_member_id: memberUuid, p_name: null })
+    expect(mocks.rpc).not.toHaveBeenCalledWith('request_join', expect.anything())
+  })
+
+  it('개인 초대 링크로 비어 있는 자리를 가리키면 바로 들어가지 않고 그 자리로 참여 요청을 보낸다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ lookup_group_by_code: () => ok(lookupResult), request_join: () => ok(null) })
+    mockTables({ members: ok([]) })
+
+    expect(await resolveInviteCode(`JEJU26-${memberUuid}`)).toEqual({
+      kind: 'requested',
+      groupId: 'g-join',
+      groupName: '제주도 여행',
+    })
+    expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: memberUuid, p_name: null })
+    expect(mocks.rpc).not.toHaveBeenCalledWith('join_group', expect.anything())
   })
 
   it('개인 초대 링크의 자리를 이미 다른 사람이 차지했으면 공용 코드처럼 07로 넘긴다', async () => {
@@ -780,7 +802,7 @@ describe('resolveInviteCode', () => {
     mockTables({ members: ok([]) })
 
     expect((await resolveInviteCode(`JEJU26-${claimed}`)).kind).toBe('pick')
-    expect(mocks.rpc).not.toHaveBeenCalledWith('join_group', expect.anything())
+    expect(mocks.rpc).not.toHaveBeenCalledWith('request_join', expect.anything())
   })
 
   it('개인 초대 링크의 멤버 id가 uuid 모양이 아니면 공용 코드로 취급한다', async () => {
@@ -791,7 +813,23 @@ describe('resolveInviteCode', () => {
   })
 })
 
-describe('참여 (07)', () => {
+/** list_join_requests()가 돌려주는 행 하나 */
+function joinRequestRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'jr-1',
+    group_id: 'g-1',
+    group_name: '제주도 여행',
+    name: '이서준',
+    member_id: null,
+    member_name: null,
+    is_guest: true,
+    mine: false,
+    created_at: '2026-10-11T00:00:00Z',
+    ...overrides,
+  }
+}
+
+describe('참여 요청 (07)', () => {
   const groupId = 'g-join'
   const lookup = { id: groupId, name: '제주도 여행', members: [{ id: 'm-target', name: '김민지', claimed: false }] }
 
@@ -800,21 +838,20 @@ describe('참여 (07)', () => {
     mocks.auth.getSession.mockResolvedValue(session)
     mockRpc({
       lookup_group_by_code: () => ok(lookup),
-      join_group: (args) => ok(args.p_member_id ?? 'm-new'),
+      request_join: () => ok(null),
     })
     mockTables({ members: ok([]) })
     await resolveInviteCode('JEJU26')
     mocks.rpc.mockClear()
   }
 
-  it('게스트가 이름만으로 새로 참여한다', async () => {
+  it('게스트가 이름만으로 새로 참여를 요청한다 (승인 전이라 자리를 기억하지 않는다)', async () => {
     await afterLookup(guestSession)
 
-    const member = await joinAsNewGuest(groupId, ' 새게스트 ')
+    await joinAsNewGuest(groupId, ' 새게스트 ')
 
-    expect(mocks.rpc).toHaveBeenCalledWith('join_group', { p_code: 'JEJU26', p_member_id: null, p_name: '새게스트' })
-    expect(member).toMatchObject({ id: 'm-new', userId: null, groupId, role: 'member', name: '새게스트' })
-    expect(localStorage.getItem('nonanae:guest-member')).toBe('m-new')
+    expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: null, p_name: '새게스트' })
+    expect(localStorage.getItem('nonanae:guest-member')).toBeNull()
   })
 
   it('로그인한 상태에서는 이름만으로 참여할 수 없다', async () => {
@@ -829,29 +866,88 @@ describe('참여 (07)', () => {
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('목록에서 기존 자리를 고른다 (게스트면 그 자리를 기억)', async () => {
+  it('목록에서 기존 자리를 골라 그 자리로 요청한다. 이미 멤버였다면(DB가 멤버 id를 돌려줌) 게스트는 그 자리를 기억한다', async () => {
     await afterLookup(guestSession)
+    mockRpc({ request_join: () => ok('m-target') })
     await joinAsExistingMember(groupId, 'm-target')
-    expect(mocks.rpc).toHaveBeenCalledWith('join_group', { p_code: 'JEJU26', p_member_id: 'm-target', p_name: null })
+    expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: 'm-target', p_name: null })
     expect(localStorage.getItem('nonanae:guest-member')).toBe('m-target')
   })
 
   it('이미 가입된 자리를 고르면 서버 에러를 한국어로 바꿔서 던진다', async () => {
     await afterLookup(signedInSession)
-    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'member not available' } })
+    mockRpc({ request_join: () => ({ data: null, error: { message: 'member not available' } }) })
     await expect(joinAsExistingMember(groupId, 'm-target')).rejects.toThrow('이미 가입된 멤버예요')
   })
 
-  it('로그인한 회원이 목록에 없는 새 멤버로 참여한다', async () => {
+  it('로그인한 회원이 목록에 없는 새 멤버로 참여를 요청한다', async () => {
     await afterLookup(signedInSession)
-    const member = await joinAsNewAccountMember(groupId)
-    expect(mocks.rpc).toHaveBeenCalledWith('join_group', { p_code: 'JEJU26', p_member_id: null, p_name: null })
-    expect(member).toMatchObject({ id: 'm-new', userId: 'user-1', groupId, role: 'member', name: null })
+    await joinAsNewAccountMember(groupId)
+    expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: null, p_name: null })
   })
 
   it('06을 거치지 않아 코드를 모르는 그룹이면 코드를 다시 입력하라고 안내한다', async () => {
     mocks.auth.getSession.mockResolvedValue(signedInSession)
     await expect(joinAsNewAccountMember('g-unknown')).rejects.toThrow('초대코드를 다시 입력해주세요')
+  })
+
+  describe('checkJoinRequest (승인 대기 화면)', () => {
+    it('멤버가 됐으면 joined — 게스트는 그 자리를 기억한다', async () => {
+      mocks.auth.getSession.mockResolvedValue(guestSession)
+      mockTables({ members: ok([{ id: 'm-approved' }]) })
+      expect(await checkJoinRequest(groupId)).toBe('joined')
+      expect(localStorage.getItem('nonanae:guest-member')).toBe('m-approved')
+    })
+
+    it('아직 내 요청이 남아 있으면 pending, 없으면(거절·취소) none', async () => {
+      mocks.auth.getSession.mockResolvedValue(signedInSession)
+      mockTables({ members: ok([]) })
+      mockRpc({ list_join_requests: () => ok([joinRequestRow({ group_id: groupId, mine: true })]) })
+      expect(await checkJoinRequest(groupId)).toBe('pending')
+
+      mockRpc({ list_join_requests: () => ok([joinRequestRow({ group_id: groupId, mine: false })]) })
+      expect(await checkJoinRequest(groupId)).toBe('none')
+    })
+
+    it('세션이 없으면 none', async () => {
+      mocks.auth.getSession.mockResolvedValue(noSession)
+      expect(await checkJoinRequest(groupId)).toBe('none')
+    })
+  })
+
+  it('요청한 사람이 취소한다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ cancel_join_request: () => ok(null) })
+    await cancelJoinRequest(groupId)
+    expect(mocks.rpc).toHaveBeenCalledWith('cancel_join_request', { p_group_id: groupId })
+  })
+})
+
+describe('참여 요청 승인 / 거절 (12, 방장)', () => {
+  it('승인·거절은 DB 함수에 요청 id를 넘긴다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ approve_join_request: () => ok('m-new'), reject_join_request: () => ok(null) })
+    await approveJoinRequest('jr-1')
+    await rejectJoinRequest('jr-2')
+    expect(mocks.rpc).toHaveBeenCalledWith('approve_join_request', { p_request_id: 'jr-1' })
+    expect(mocks.rpc).toHaveBeenCalledWith('reject_join_request', { p_request_id: 'jr-2' })
+  })
+
+  it('서버 거부를 한국어로 바꾼다 — 방장이 아님 / 이미 처리됨 / 자리가 그 사이 찼음', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    const fail = (message: string) => () => ({ data: null, error: { message } })
+    mockRpc({ approve_join_request: fail('only the owner can review join requests') })
+    await expect(approveJoinRequest('jr-1')).rejects.toThrow('방장만 참여 요청을 처리할 수 있어요')
+    mockRpc({ approve_join_request: fail('request not found') })
+    await expect(approveJoinRequest('jr-1')).rejects.toThrow('이미 처리된 요청이에요')
+    mockRpc({ approve_join_request: fail('member not available') })
+    await expect(approveJoinRequest('jr-1')).rejects.toThrow('이미 다른 사람이 차지했어요')
+  })
+
+  it('게스트(익명 세션)는 승인할 수 없다', async () => {
+    mocks.auth.getSession.mockResolvedValue(guestSession)
+    await expect(approveJoinRequest('jr-1')).rejects.toThrow('로그인이 필요해요')
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 })
 

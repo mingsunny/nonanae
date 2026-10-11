@@ -8,7 +8,7 @@ export type Category = (typeof CATEGORIES)[number]
 export const SPLIT_TYPES = ['equal', 'ratio', 'amount'] as const
 export type SplitType = (typeof SPLIT_TYPES)[number]
 
-export type NotificationType = 'expense' | 'member_joined' | 'expense_deleted'
+export type NotificationType = 'expense' | 'member_joined' | 'expense_deleted' | 'join_request'
 
 /** 이메일로 가입한 정식 회원. 게스트는 User가 아니라 Member로만 존재함. */
 export interface User {
@@ -83,6 +83,28 @@ export interface Notification {
   /** ISO 8601 */
   createdAt: string
   read: boolean
+}
+
+/**
+ * 초대코드 참여 요청(06/07). 방장이 승인해야 실제 Member가 된다.
+ * 내가 보낸 요청(mine)과 내가 방장인 그룹에 들어온 요청이 함께 온다.
+ */
+export interface JoinRequest {
+  id: string
+  groupId: string
+  groupName: string
+  /** 요청한 사람 이름 (요청 시점에 고정) */
+  name: string
+  /** "이게 나예요"로 고른 자리. 새 멤버로 참여하는 요청이면 null */
+  memberId: string | null
+  /** 고른 자리의 이름 */
+  memberName: string | null
+  /** 로그인 없이(게스트로) 보낸 요청인지 */
+  isGuest: boolean
+  /** 내가 보낸 요청이면 true, 내가 방장인 그룹에 들어온 요청이면 false */
+  mine: boolean
+  /** ISO 8601 */
+  createdAt: string
 }
 
 /** memberId → 금액(원) */

@@ -18,6 +18,9 @@ export default function GroupListPage() {
   const groups = useAppStore((s) => s.groups)
   const currentUserId = useAppStore((s) => s.currentUserId)
   const viewAsMemberId = useAppStore((s) => s.viewAsMemberId)
+  const allJoinRequests = useAppStore((s) => s.joinRequests)
+  // 내가 보낸, 그룹장 승인을 기다리는 참여 요청
+  const myRequests = allJoinRequests.filter((r) => r.mine)
   const seenCoach = useAppStore((s) =>
     s.currentUserId ? (s.usersById[s.currentUserId]?.seenGroupCreateCoach ?? true) : true,
   )
@@ -48,6 +51,16 @@ export default function GroupListPage() {
         </Button>
       </div>
       {showHint && <p className={styles.hint}>그룹을 만들고 정산을 시작해요</p>}
+
+      {myRequests.map((r) => (
+        <div key={r.id} className={styles.row}>
+          <span className={`${styles.thumb} ${styles.thumbPending}`}>{r.groupName.slice(0, 1)}</span>
+          <span className={styles.meta}>
+            <span className={styles.name}>{r.groupName}</span>
+            <span className={styles.sum}>그룹장 승인을 기다리고 있어요</span>
+          </span>
+        </div>
+      ))}
 
       {/* 가장 최근에 만들거나 참여한 그룹이 위 */}
       {sortGroupsNewestFirst(groups, currentUserId, viewAsMemberId).map((group) => (

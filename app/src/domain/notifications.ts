@@ -8,6 +8,11 @@ export function expenseAddedTitle(groupName: string, payerName: string): string 
   return `[${groupName}]에 ${payerName || '누군가'}님이 결제한 내역이 추가됐어요`
 }
 
+/** 참여 요청 알림 문구 — 방장이 승인할 수 있게 그룹에 알린다. DB 함수(`request_join`)가 만드는 문구와 같아야 한다. */
+export function joinRequestTitle(groupName: string, requesterName: string): string {
+  return `${requesterName}님이 [${groupName}] 그룹에 참여를 요청했어요`
+}
+
 const ITEM_TITLE_MAX = 30
 
 /**

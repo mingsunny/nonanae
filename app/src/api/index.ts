@@ -3,13 +3,14 @@
 // Supabase가 붙으면 함수 안쪽만 supabase-js 호출로 바꾸면 되고 호출하는 쪽은 그대로다.
 import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
-import { expenseAddedTitle, expenseDeletedTitle } from '../domain/notifications'
+import { expenseAddedTitle, expenseDeletedTitle, joinRequestTitle } from '../domain/notifications'
 import { ProfileIncomplete } from './errors'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
   Group,
   GroupDetail,
+  JoinRequest,
   Member,
   Notification,
   User,
@@ -17,7 +18,7 @@ import type {
 import { USE_SUPABASE, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
 import { clearStoredDb, loadDb, saveDb, uid } from './mockDb'
-import type { MockDb, MockSession } from './mockDb'
+import type { MockDb, MockJoinRequest, MockSession } from './mockDb'
 import { createSeed } from './mockSeed'
 import * as remote from './supabaseApi'
 
@@ -41,6 +42,8 @@ export interface Snapshot {
   groups: GroupDetail[]
   /** 최신순 */
   notifications: Notification[]
+  /** 내가 보낸 참여 요청 + 내가 방장인 그룹에 들어온 참여 요청, 오래된 순 */
+  joinRequests: JoinRequest[]
 }
 
 /** 내가 속한 그룹만, 그 그룹의 멤버·지출(+참여자)·알림과 멤버가 가리키는 User를 묶어서 반환 */
@@ -85,10 +88,11 @@ export async function fetchSnapshot(): Promise<Snapshot> {
       users: [],
       groups: [],
       notifications: [],
+      joinRequests: [],
     })
   }
 
-  return structuredClone({ session: d.session, users, groups, notifications })
+  return structuredClone({ session: d.session, users, groups, notifications, joinRequests: visibleJoinRequests(d) })
 }
 
 function usersById(d: MockDb): Record<string, User> {
@@ -386,6 +390,7 @@ export async function deleteAccount(): Promise<void> {
   d.users = d.users.filter((u) => u.id !== user.id)
   delete d.credentials[user.id]
   d.passwordResets = d.passwordResets.filter((r) => r.userId !== user.id)
+  d.joinRequests = d.joinRequests.filter((r) => r.userId !== user.id)
   d.session = { userId: null, viewAsMemberId: null }
   commit()
 }
@@ -466,8 +471,10 @@ export async function rotateInviteCode(groupId: string): Promise<string> {
   return inviteCode
 }
 
-// --- 06/07 초대코드로 참여 ---
+// --- 06/07 초대코드로 참여 (방장 승인) ---
 // fetchSnapshot은 "내가 속한 그룹"만 돌려주므로, 아직 멤버가 아닌 그룹은 이 함수들로만 다룬다.
+// 참여는 바로 멤버가 되지 않고 "참여 요청"만 남긴다. 방장이 승인(approveJoinRequest)해야 실제 멤버가 된다 —
+// 로그인·가입·게스트·개인 초대 링크 모두 같다. 이미 그 그룹 멤버인 계정(게스트는 이 브라우저)의 재입장만 승인 없이 들어간다.
 
 /** 07 "나 고르기" 목록의 한 줄. hasAccount가 true면(이미 가입됨) 고를 수 없다. */
 export interface JoinCandidate {
@@ -478,10 +485,108 @@ export interface JoinCandidate {
 
 export type JoinResolution =
   | { kind: 'not-found' }
-  /** 이미 그 그룹 멤버(재입장)이거나 개인 초대 링크로 그 자리에 바로 연결됨 → 그룹 안으로. 후자면 matchedName이 채워짐 */
-  | { kind: 'joined'; groupId: string; matchedName: string | null }
+  /** 이미 그 그룹 멤버(재입장) → 그룹 안으로 */
+  | { kind: 'joined'; groupId: string }
+  /** 참여 요청을 보냈고 방장 승인을 기다리는 중 (개인 초대 링크로 들어오면 그 자리로 바로 요청한다) */
+  | { kind: 'requested'; groupId: string; groupName: string }
   /** 공용 코드 → 07 화면에서 본인을 고르거나 새로 참여 */
   | { kind: 'pick'; groupId: string; groupName: string; candidates: JoinCandidate[] }
+
+/** 승인 대기 화면이 확인하는 내 요청 상태. none: 요청이 없음(거절됐거나 취소됨) */
+export type JoinRequestStatus = 'joined' | 'pending' | 'none'
+
+/** 이 그룹에서 내 자리 — 정식 회원은 계정으로, 게스트는 지금 보는 자리 또는 이 브라우저가 승인받은 자리로 찾는다 */
+function findMyMember(d: MockDb, groupId: string): Member | undefined {
+  const { userId, viewAsMemberId } = d.session
+  return d.members.find(
+    (m) =>
+      m.groupId === groupId &&
+      (userId !== null
+        ? m.userId === userId
+        : m.id === viewAsMemberId || (d.guestKey !== null && d.guestSeats[m.id] === d.guestKey)),
+  )
+}
+
+function isMyRequest(d: MockDb, r: MockJoinRequest): boolean {
+  const { userId } = d.session
+  return userId !== null ? r.userId === userId : d.guestKey !== null && r.guestKey === d.guestKey
+}
+
+function findMyRequest(d: MockDb, groupId: string): MockJoinRequest | undefined {
+  return d.joinRequests.find((r) => r.groupId === groupId && isMyRequest(d, r))
+}
+
+function isGroupOwner(d: MockDb, groupId: string): boolean {
+  const { userId } = d.session
+  return userId !== null && d.members.some((m) => m.groupId === groupId && m.userId === userId && m.role === 'owner')
+}
+
+/** 내가 보낸 요청 + 내가 방장인 그룹에 들어온 요청 (DB의 list_join_requests와 같은 범위) */
+function visibleJoinRequests(d: MockDb): JoinRequest[] {
+  const users = usersById(d)
+  return d.joinRequests
+    .filter((r) => isMyRequest(d, r) || isGroupOwner(d, r.groupId))
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+    .map((r) => {
+      const slot = r.memberId ? d.members.find((m) => m.id === r.memberId) : undefined
+      return {
+        id: r.id,
+        groupId: r.groupId,
+        groupName: d.groups.find((g) => g.id === r.groupId)?.name ?? '',
+        name: r.name,
+        memberId: r.memberId,
+        memberName: slot ? memberDisplayName(slot, users) : null,
+        isGuest: r.guestKey !== null,
+        mine: isMyRequest(d, r),
+        createdAt: r.createdAt,
+      }
+    })
+}
+
+/**
+ * 참여 요청을 남긴다. 같은 사람이 다시 요청하면 이전 요청을 새 내용으로 바꾸고, 방장 알림은 처음 요청할 때만 만든다.
+ * memberId가 있으면 그 자리(아직 계정이 연결되지 않은 자리)로 들어가겠다는 요청이다.
+ */
+function addJoinRequest(d: MockDb, group: Group, memberId: string | null, guestName: string | null): void {
+  // 이미 이 그룹 멤버면 요청할 것이 없다 (DB의 request_join도 재입장은 요청 없이 끝낸다)
+  if (findMyMember(d, group.id)) return
+  const slot = memberId ? d.members.find((m) => m.id === memberId && m.groupId === group.id) : undefined
+  if (memberId && !slot) throw new Error('존재하지 않는 멤버예요')
+  if (slot && slot.userId !== null) throw new Error('이미 가입된 멤버예요')
+
+  const { userId } = d.session
+  let name: string
+  if (userId !== null) {
+    name = requireSessionUser(d).name
+  } else {
+    name = slot?.name ?? (guestName ?? '').trim()
+    if (!name) throw new Error('이름을 입력해주세요')
+    d.guestKey ??= uid('guest')
+  }
+
+  const hadRequest = findMyRequest(d, group.id) !== undefined
+  d.joinRequests = d.joinRequests.filter((r) => !(r.groupId === group.id && isMyRequest(d, r)))
+  d.joinRequests.push({
+    id: uid('jr'),
+    groupId: group.id,
+    userId,
+    guestKey: userId !== null ? null : d.guestKey,
+    memberId,
+    name,
+    createdAt: nowIso(),
+  })
+  if (!hadRequest) {
+    d.notifications.push({
+      id: uid('n'),
+      groupId: group.id,
+      memberId: null,
+      type: 'join_request',
+      title: joinRequestTitle(group.name, name),
+      createdAt: nowIso(),
+      read: false,
+    })
+  }
+}
 
 /** 대기 중 멤버 자리를 실제 계정으로 교체. id는 그대로라 그 자리를 가리키던 지출이 자동으로 이어진다. */
 function claimMember(d: MockDb, group: Group, member: Member, userId: string): void {
@@ -491,7 +596,7 @@ function claimMember(d: MockDb, group: Group, member: Member, userId: string): v
   addMemberJoinedNotification(d, group, member)
 }
 
-/** 06: 코드 확인. 존재 여부·재입장·개인 초대 링크 여부에 따라 바로 들어가거나 07로 넘긴다. */
+/** 06: 코드 확인. 재입장이면 바로 들어가고, 이미 보낸 요청이 있으면 대기, 개인 초대 링크면 그 자리로 요청, 아니면 07로 넘긴다. */
 export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
   if (USE_SUPABASE) return remote.resolveInviteCode(raw)
   const d = getDb()
@@ -499,20 +604,25 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
   const group = d.groups.find((g) => g.inviteCode === code)
   if (!group) return { kind: 'not-found' }
 
-  const members = d.members.filter((m) => m.groupId === group.id)
-  const { userId, viewAsMemberId } = d.session
-  if (members.some((m) => (userId !== null ? m.userId === userId : m.id === viewAsMemberId))) {
-    return { kind: 'joined', groupId: group.id, matchedName: null }
+  const mine = findMyMember(d, group.id)
+  if (mine) {
+    // 게스트가 승인받은 자리로 처음 들어오는 경우 그 자리를 "지금 보는 자리"로
+    if (d.session.userId === null && d.session.viewAsMemberId !== mine.id) {
+      d.session.viewAsMemberId = mine.id
+      commit()
+    }
+    return { kind: 'joined', groupId: group.id }
   }
 
-  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 바로 연결. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
+  if (findMyRequest(d, group.id)) return { kind: 'requested', groupId: group.id, groupName: group.name }
+
+  const members = d.members.filter((m) => m.groupId === group.id)
+  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 바로 요청. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
   const target = targetMemberId ? members.find((m) => m.id === targetMemberId && m.userId === null) : undefined
   if (target) {
-    const matchedName = target.name ?? ''
-    if (userId !== null) claimMember(d, group, target, userId)
-    else d.session.viewAsMemberId = target.id
+    addJoinRequest(d, group, target.id, null)
     commit()
-    return { kind: 'joined', groupId: group.id, matchedName }
+    return { kind: 'requested', groupId: group.id, groupName: group.name }
   }
 
   const users = usersById(d)
@@ -528,65 +638,144 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
   }
 }
 
-/** 07: 목록에서 "이게 나예요". 로그인 상태면 그 자리를 내 계정에 연결(+알림), 아니면 그 자리로 세션만 지정(데이터·알림 변화 없음). */
+function requireGroup(d: MockDb, groupId: string): Group {
+  const group = d.groups.find((g) => g.id === groupId)
+  if (!group) throw new Error('존재하지 않는 그룹이에요')
+  return group
+}
+
+/** 07: 목록에서 "이게 나예요" → 그 자리로 참여 요청. */
 export async function joinAsExistingMember(groupId: string, memberId: string): Promise<void> {
   if (USE_SUPABASE) return remote.joinAsExistingMember(groupId, memberId)
   const d = getDb()
-  const group = d.groups.find((g) => g.id === groupId)
-  const member = d.members.find((m) => m.id === memberId && m.groupId === groupId)
-  if (!group || !member) throw new Error('존재하지 않는 멤버예요')
-  if (member.userId !== null) throw new Error('이미 가입된 멤버예요')
-
-  if (d.session.userId !== null) claimMember(d, group, member, d.session.userId)
-  else d.session.viewAsMemberId = member.id
+  addJoinRequest(d, requireGroup(d, groupId), memberId, null)
   commit()
 }
 
-/** 07(로그인 안 함): 목록에 없으면 이름만으로 새로 참여. 계정 없는 멤버(게스트)가 만들어진다. */
-export async function joinAsNewGuest(groupId: string, name: string): Promise<Member> {
+/** 07(로그인 안 함): 목록에 없으면 이름만으로 새로 참여 요청. 승인되면 계정 없는 멤버(게스트)가 만들어진다. */
+export async function joinAsNewGuest(groupId: string, name: string): Promise<void> {
   if (USE_SUPABASE) return remote.joinAsNewGuest(groupId, name)
   const d = getDb()
-  const group = d.groups.find((g) => g.id === groupId)
-  if (!group) throw new Error('존재하지 않는 그룹이에요')
+  const group = requireGroup(d, groupId)
   if (d.session.userId !== null) throw new Error('로그인한 상태에서는 이름만으로 참여할 수 없어요')
-  const trimmed = name.trim()
-  if (!trimmed) throw new Error('이름을 입력해주세요')
-
-  const member: Member = {
-    id: uid('m'),
-    userId: null,
-    groupId,
-    role: 'member',
-    name: trimmed,
-    joinedAt: nowIso(),
-  }
-  d.members.push(member)
-  addMemberJoinedNotification(d, group, member)
-  d.session.viewAsMemberId = member.id
+  if (!name.trim()) throw new Error('이름을 입력해주세요')
+  addJoinRequest(d, group, null, name)
   commit()
-  return structuredClone(member)
 }
 
-/** 07(로그인 함): 목록에 없으면 내 계정으로 새 멤버 추가 (이름은 계정 이름 그대로). */
-export async function joinAsNewAccountMember(groupId: string): Promise<Member> {
+/** 07(로그인 함): 목록에 없으면 내 계정으로 새 멤버 참여 요청 (이름은 계정 이름 그대로). */
+export async function joinAsNewAccountMember(groupId: string): Promise<void> {
   if (USE_SUPABASE) return remote.joinAsNewAccountMember(groupId)
   const d = getDb()
-  const group = d.groups.find((g) => g.id === groupId)
-  if (!group) throw new Error('존재하지 않는 그룹이에요')
-  const user = requireSessionUser(d)
-
-  const member: Member = {
-    id: uid('m'),
-    userId: user.id,
-    groupId,
-    role: 'member',
-    name: null,
-    joinedAt: nowIso(),
-  }
-  d.members.push(member)
-  addMemberJoinedNotification(d, group, member)
+  const group = requireGroup(d, groupId)
+  requireSessionUser(d)
+  addJoinRequest(d, group, null, null)
   commit()
-  return structuredClone(member)
+}
+
+/** 승인 대기 화면에서 주기적으로 확인: 승인돼 멤버가 됐는지, 아직 대기 중인지, 요청이 없어졌는지(거절·취소). */
+export async function checkJoinRequest(groupId: string): Promise<JoinRequestStatus> {
+  if (USE_SUPABASE) return remote.checkJoinRequest(groupId)
+  const d = getDb()
+  const mine = findMyMember(d, groupId)
+  if (mine) {
+    if (d.session.userId === null && d.session.viewAsMemberId !== mine.id) {
+      d.session.viewAsMemberId = mine.id
+      commit()
+    }
+    return 'joined'
+  }
+  return findMyRequest(d, groupId) ? 'pending' : 'none'
+}
+
+/** 요청한 사람이 참여 요청을 취소 */
+export async function cancelJoinRequest(groupId: string): Promise<void> {
+  if (USE_SUPABASE) return remote.cancelJoinRequest(groupId)
+  const d = getDb()
+  d.joinRequests = d.joinRequests.filter((r) => !(r.groupId === groupId && isMyRequest(d, r)))
+  commit()
+}
+
+function requireReviewableRequest(d: MockDb, requestId: string): MockJoinRequest {
+  const request = d.joinRequests.find((r) => r.id === requestId)
+  if (!request) throw new Error('이미 처리된 요청이에요')
+  requireSessionUser(d)
+  if (!isGroupOwner(d, request.groupId)) throw new Error('방장만 참여 요청을 처리할 수 있어요')
+  return request
+}
+
+const SLOT_TAKEN_MESSAGE = '그 자리는 이미 다른 사람이 차지했어요. 거절한 뒤 다시 요청해달라고 해주세요.'
+
+/**
+ * 방장 승인 → 이때 실제 멤버가 된다(DB의 approve_join_request). 참여 알림 규칙은 예전과 같다:
+ * 새 멤버가 생기거나 정식 회원이 자리를 채우면 알림, 게스트가 기존 자리를 다시 고른 재입장은 알림 없음.
+ */
+export async function approveJoinRequest(requestId: string): Promise<void> {
+  if (USE_SUPABASE) return remote.approveJoinRequest(requestId)
+  const d = getDb()
+  const request = requireReviewableRequest(d, requestId)
+  const group = requireGroup(d, request.groupId)
+  const members = d.members.filter((m) => m.groupId === group.id)
+  const removeRequest = () => {
+    d.joinRequests = d.joinRequests.filter((r) => r.id !== requestId)
+  }
+
+  // 요청한 뒤 이미 멤버가 됐으면 요청만 정리
+  const already = members.find((m) =>
+    request.userId !== null ? m.userId === request.userId : d.guestSeats[m.id] === request.guestKey,
+  )
+  if (already) {
+    removeRequest()
+    commit()
+    return
+  }
+
+  const slot = request.memberId ? members.find((m) => m.id === request.memberId && m.userId === null) : undefined
+  if (request.memberId && !slot) throw new Error(SLOT_TAKEN_MESSAGE)
+
+  if (request.guestKey !== null) {
+    if (slot) {
+      d.guestSeats[slot.id] = request.guestKey
+    } else {
+      const member: Member = {
+        id: uid('m'),
+        userId: null,
+        groupId: group.id,
+        role: 'member',
+        name: request.name,
+        joinedAt: nowIso(),
+      }
+      d.members.push(member)
+      d.guestSeats[member.id] = request.guestKey
+      addMemberJoinedNotification(d, group, member)
+    }
+  } else if (request.userId !== null) {
+    if (slot) {
+      claimMember(d, group, slot, request.userId)
+    } else {
+      const member: Member = {
+        id: uid('m'),
+        userId: request.userId,
+        groupId: group.id,
+        role: 'member',
+        name: null,
+        joinedAt: nowIso(),
+      }
+      d.members.push(member)
+      addMemberJoinedNotification(d, group, member)
+    }
+  }
+  removeRequest()
+  commit()
+}
+
+/** 방장 거절 → 요청 삭제. 요청한 사람의 대기 화면은 "거절됐어요"로 바뀐다. */
+export async function rejectJoinRequest(requestId: string): Promise<void> {
+  if (USE_SUPABASE) return remote.rejectJoinRequest(requestId)
+  const d = getDb()
+  requireReviewableRequest(d, requestId)
+  d.joinRequests = d.joinRequests.filter((r) => r.id !== requestId)
+  commit()
 }
 
 // --- 14 비밀번호 재설정 ---

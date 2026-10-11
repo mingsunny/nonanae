@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   addPendingMember,
+  approveJoinRequest,
   createExpense,
   deleteExpense,
   joinAsNewAccountMember,
@@ -17,6 +18,17 @@ import {
   updateExpense,
 } from './index'
 import type { ExpenseInput } from '../domain/types'
+
+/** 로그인 없이 이름만으로 제주도 여행(g_jeju)에 참여 요청 → 방장(테스트 계정)이 승인 → 게스트로 다시 들어온 상태. 게스트 자리 id를 돌려준다 */
+async function joinJejuAsGuest(name: string): Promise<string> {
+  await signOut()
+  await joinAsNewGuest('g_jeju', name)
+  await signIn('a@naver.com', 'aaaaaaaa')
+  await approveJoinRequest((await fetchSnapshot()).joinRequests[0].id)
+  await signOut()
+  await resolveInviteCode('JEJU26')
+  return (await fetchSnapshot()).session.viewAsMemberId!
+}
 
 const newExpense = (overrides: Partial<ExpenseInput> = {}): ExpenseInput => ({
   groupId: 'g_jeju',
@@ -201,25 +213,22 @@ describe('addPendingMember', () => {
 
 describe('renameGuestMember', () => {
   it('게스트가 참여할 때 입력한 이름을 나중에 고칠 수 있다', async () => {
-    await signOut()
-    const guest = await joinAsNewGuest('g_jeju', '오타난이름')
-    const renamed = await renameGuestMember(guest.id, ' 고친이름 ')
-    expect(renamed).toMatchObject({ id: guest.id, name: '고친이름', userId: null })
+    const guestId = await joinJejuAsGuest('오타난이름')
+    const renamed = await renameGuestMember(guestId, ' 고친이름 ')
+    expect(renamed).toMatchObject({ id: guestId, name: '고친이름', userId: null })
     const { groups } = await fetchSnapshot()
-    expect(groups[0].members.find((m) => m.id === guest.id)?.name).toBe('고친이름')
+    expect(groups[0].members.find((m) => m.id === guestId)?.name).toBe('고친이름')
   })
 
   it('본인이 아닌 다른 멤버의 이름은 고칠 수 없다', async () => {
-    await signOut()
-    await joinAsNewGuest('g_jeju', '게스트1')
+    await joinJejuAsGuest('게스트1')
     // g_jeju의 방장(m_me)은 내 자리가 아니다
     await expect(renameGuestMember('m_me', '해킹시도')).rejects.toThrow('본인의 이름만 수정할 수 있어요')
   })
 
   it('이름이 비어 있으면 서버를 부르지 않는다', async () => {
-    await signOut()
-    const guest = await joinAsNewGuest('g_jeju', '게스트1')
-    await expect(renameGuestMember(guest.id, '   ')).rejects.toThrow('이름을 입력해주세요')
+    const guestId = await joinJejuAsGuest('게스트1')
+    await expect(renameGuestMember(guestId, '   ')).rejects.toThrow('이름을 입력해주세요')
   })
 
   it('로그인한 정식 회원은 자기 멤버 자리를 이 함수로 고칠 수 없다(프로필에서 고쳐야 함)', async () => {
@@ -246,7 +255,11 @@ describe('rotateInviteCode', () => {
   })
 
   it('방장이 아닌 멤버는 만들 수 없다', async () => {
-    await joinAsNewAccountMember('g_test42') // 테스트 계정이 방장이 아닌 일반 멤버로 참여
+    // 테스트 계정이 방장이 아닌 일반 멤버로 참여 (방장데모가 승인)
+    await joinAsNewAccountMember('g_test42')
+    await signIn('owner.demo@example.com', 'owner1234')
+    await approveJoinRequest((await fetchSnapshot()).joinRequests[0].id)
+    await signIn('a@naver.com', 'aaaaaaaa')
     await expect(rotateInviteCode('g_test42')).rejects.toThrow('방장만 초대코드를 새로 만들 수 있어요')
   })
 
