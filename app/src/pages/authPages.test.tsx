@@ -243,13 +243,22 @@ describe('01·02 회원가입 (2단계)', () => {
     expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('로고는 링크로 바로 들어오는 화면(로그인)에만 있고, 이어지는 가입 단계에는 없다', async () => {
+  it('로고는 링크로 바로 들어오는 화면(로그인, 가입 확인 메일 뒤의 계좌 등록)에만 있고, 이어지는 가입 1단계에는 없다', async () => {
     await boot({ loggedIn: false })
     renderApp('/login')
     expect(await screen.findByAltText('노나내')).toBeTruthy()
     cleanup()
     await goToSignup()
     expect(screen.queryByAltText('노나내')).toBeNull()
+    cleanup()
+
+    await signOut()
+    await signUp({ email: 'logo@example.com', password: 'pw-12345' })
+    useAppStore.setState({ status: 'idle', needsProfile: false })
+    await state().init()
+    renderApp('/signup/account')
+    expect(await screen.findByRole('button', { name: '가입 완료' })).toBeTruthy()
+    expect(screen.getByAltText('노나내')).toBeTruthy()
   })
 
   it('눈 버튼으로 입력한 비밀번호를 보였다 숨길 수 있다', async () => {
