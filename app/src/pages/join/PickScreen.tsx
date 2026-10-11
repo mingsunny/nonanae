@@ -57,6 +57,7 @@ export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
       <Topbar title="참여하기" onBack={onBack} brand />
       <div className={styles.body}>
         <Callout>[{pick.groupName}] 그룹에 참여해요. 본인이 누구인지 골라주세요.</Callout>
+        <AuthLinks code={code} />
 
         <div className={styles.list}>
           {pick.candidates.map((c) =>
@@ -112,7 +113,6 @@ export default function PickScreen({ pick, code, onBack, onJoined }: Props) {
             <p className={styles.notice}>
               참여하면 입력한 이름이 이 그룹 멤버로 저장돼요. <PrivacyLink className={styles.noticeLink} />
             </p>
-            <AuthLinks code={code} />
           </form>
         )}
       </div>
