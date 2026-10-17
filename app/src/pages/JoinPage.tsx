@@ -145,14 +145,6 @@ function JoinFlow() {
         code={code}
         onBack={backToLookup}
         onRequested={() => startWaiting(invite, code)}
-        onNotMe={() => {
-          // 개인 링크 꼬리를 떼고 공용 코드로 다시 확인 → 07에서 다른 자리를 고르거나 새 이름으로 참여
-          const groupCode = parseInviteCode(code).code
-          setInvite(null)
-          setCode(groupCode)
-          setParams({ code: groupCode }, { replace: true })
-          void lookup(groupCode)
-        }}
       />
     )
   }
