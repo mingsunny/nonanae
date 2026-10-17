@@ -10,13 +10,13 @@ import InviteScreen from './join/InviteScreen'
 import type { InviteResolution } from './join/InviteScreen'
 import styles from './join/join.module.css'
 import LookupScreen from './join/LookupScreen'
-import PickScreen from './join/PickScreen'
+import GroupJoinScreen from './join/GroupJoinScreen'
 import RejectedScreen from './join/RejectedScreen'
-import type { PickResolution } from './join/PickScreen'
+import type { PickResolution } from './join/GroupJoinScreen'
 import WaitingScreen from './join/WaitingScreen'
 
 /**
- * 06 초대코드로 참여 → 07 참여하기(멤버 매칭) 또는 개인 초대(그룹 이름 + 참여하기) → 그룹장 승인 대기.
+ * 06 초대코드로 참여 → 그룹 이름 + 참여하기(공용 코드, 또는 개인 초대 링크의 그 자리로) → 그룹장 승인 대기.
  * 모두 `/join` 한 경로 안의 단계다. 카카오톡 공유 링크(`/join?code=ABCDEF`)나 개인 초대 링크
  * (`/join?code=ABCDEF-{memberId}`)로 들어오면 코드 입력 화면 없이 바로 확인한다. 로그인 여부와 무관하게 누구나
  * 들어올 수 있지만, 그룹에 들어가려면 그룹장 승인이 필요하다 (이미 그 그룹 멤버인 재입장만 바로 들어간다).
@@ -145,21 +145,13 @@ function JoinFlow() {
         code={code}
         onBack={backToLookup}
         onRequested={() => startWaiting(invite, code)}
-        onNotMe={() => {
-          // 개인 링크 꼬리를 떼고 공용 코드로 다시 확인 → 07에서 다른 자리를 고르거나 새 이름으로 참여
-          const groupCode = parseInviteCode(code).code
-          setInvite(null)
-          setCode(groupCode)
-          setParams({ code: groupCode }, { replace: true })
-          void lookup(groupCode)
-        }}
       />
     )
   }
 
   if (pick) {
     return (
-      <PickScreen
+      <GroupJoinScreen
         pick={pick}
         code={code}
         onBack={() => setPick(null)}
