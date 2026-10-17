@@ -267,12 +267,20 @@ describe('resolveInviteCode', () => {
     })
   })
 
-  it('개인 초대 링크(로그인)는 바로 연결하지 않고 그 자리로 참여 요청을 보낸다. 방장에게 알림이 간다', async () => {
+  it('개인 초대 링크는 열기만 해서는 요청하지 않고 그룹 이름과 그 자리를 알려준다 (invite)', async () => {
     expect(await resolveInviteCode('TEST42-m_minji')).toEqual({
-      kind: 'requested',
+      kind: 'invite',
       groupId: 'g_test42',
       groupName: '초대코드 테스트방',
+      memberId: 'm_minji',
+      memberName: '김민지',
     })
+    expect((await fetchSnapshot()).joinRequests).toEqual([])
+  })
+
+  it('개인 초대 링크(로그인)에서 참여하면 그 자리로 참여 요청을 보낸다. 방장에게 알림이 간다', async () => {
+    await resolveInviteCode('TEST42-m_minji')
+    await joinAsExistingMember('g_test42', 'm_minji')
     const snapshot = await fetchSnapshot()
     expect(snapshot.groups.map((g) => g.id)).toEqual(['g_jeju']) // 아직 멤버가 아니다
     expect(snapshot.joinRequests).toEqual([
@@ -292,6 +300,7 @@ describe('resolveInviteCode', () => {
 
   it('승인되면 그 자리에 내 계정이 연결된다. 멤버 id는 그대로라 기존 기록이 이어진다', async () => {
     await resolveInviteCode('TEST42-m_minji')
+    await joinAsExistingMember('g_test42', 'm_minji')
     await approveAsOwner42()
     await signIn('a@naver.com', 'aaaaaaaa')
     expect(await resolveInviteCode('TEST42')).toEqual({ kind: 'joined', groupId: 'g_test42' })
@@ -301,6 +310,8 @@ describe('resolveInviteCode', () => {
 
   it('요청을 보낸 뒤 다시 들어오면 새로 요청하지 않고 대기(requested)로 이어진다', async () => {
     await resolveInviteCode('TEST42-m_minji')
+    await joinAsExistingMember('g_test42', 'm_minji')
+    expect((await resolveInviteCode('TEST42-m_minji')).kind).toBe('requested')
     expect((await resolveInviteCode('TEST42')).kind).toBe('requested')
     expect((await fetchSnapshot()).joinRequests).toHaveLength(1)
   })

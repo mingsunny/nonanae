@@ -211,8 +211,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   resolveInviteCode: async (raw) => {
     const resolution = await api.resolveInviteCode(raw)
-    // 재입장(승인 뒤 처음 들어오는 경우 포함)이면 그 그룹을, 개인 초대 링크로 요청을 보냈으면 내 요청을 다시 불러옴
-    if (resolution.kind !== 'not-found' && resolution.kind !== 'pick') await get().refresh()
+    // 재입장(승인 뒤 처음 들어오는 경우 포함)이면 그 그룹을, 요청을 기다리는 중이면 내 요청을 다시 불러옴
+    if (resolution.kind === 'joined' || resolution.kind === 'requested') await get().refresh()
     return resolution
   },
 
