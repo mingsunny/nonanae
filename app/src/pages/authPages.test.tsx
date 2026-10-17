@@ -640,7 +640,7 @@ describe('06·07 초대코드로 참여', () => {
     await userEvent.click(screen.getByRole('button', { name: /김민지/ }))
     expect(await screen.findByText(/그룹장에게 참여를 요청했어요/)).toBeTruthy()
     expect(screen.getByRole('status').textContent).toBe('승인 요청중')
-    expect(screen.getByText(/승인돼도 따로 알림이 가지 않아요/)).toBeTruthy()
+    expect(screen.getByText('승인이 완료되면 같은 초대 링크로 그룹에 참여할 수 있어요')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '승인됐는지 확인하기' })).toBeNull()
     // 새로고침해도 이어서 확인할 수 있게 주소에 코드가 남는다
     expect(urlOf(router)).toBe('/join?code=test42')

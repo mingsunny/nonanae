@@ -98,10 +98,7 @@ export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: 
           <span className={styles.statusDot} aria-hidden="true" />
           승인 요청중
         </div>
-        <p className={styles.plain}>
-          승인돼도 따로 알림이 가지 않아요. 그룹장에게 승인을 부탁한 뒤, 이 화면을 새로고침하거나 같은 초대 링크를
-          다시 열면 바로 들어갈 수 있어요.
-        </p>
+        <p className={styles.plain}>승인이 완료되면 같은 초대 링크로 그룹에 참여할 수 있어요</p>
         {isLoggedIn && (
           <div className={styles.addButton}>
             <Button variant="outline" onClick={() => navigate(paths.groups)}>

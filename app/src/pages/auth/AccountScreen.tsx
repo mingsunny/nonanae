@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
@@ -24,10 +24,8 @@ function safeInternalPath(value: string | null): string | null {
  * 마친 뒤 돌아갈 곳은 메일 링크의 `next`(다른 브라우저에서 열어도 유지) → 이 기기에 남겨 둔 값 → 그룹 목록 순이다.
  */
 export default function AccountScreen() {
-  const navigate = useNavigate()
   const [params] = useSearchParams()
   const completeProfile = useAppStore((s) => s.completeProfile)
-  const signOut = useAppStore((s) => s.signOut)
   const currentUserId = useAppStore((s) => s.currentUserId)
   const needsProfile = useAppStore((s) => s.needsProfile)
   const resetAuthFlow = useAuthFlowStore((s) => s.reset)
@@ -56,12 +54,6 @@ export default function AccountScreen() {
       setError(err instanceof Error ? err.message : '등록하지 못했어요')
       setBusy(false)
     }
-  }
-
-  /** 계좌 등록을 하지 않고 나가려는 경우. 계정은 남아 있어서 나중에 로그인하면 이 화면으로 다시 온다. */
-  async function leave() {
-    await signOut()
-    navigate(paths.welcome, { replace: true })
   }
 
   if (currentUserId) return <Navigate to={nextPath} replace />
@@ -136,11 +128,6 @@ export default function AccountScreen() {
             가입 완료
           </Button>
         </div>
-        <p className={styles.switch}>
-          <button type="button" className={fields.textLink} onClick={leave}>
-            나중에 하기 (로그아웃)
-          </button>
-        </p>
       </form>
     </div>
   )
