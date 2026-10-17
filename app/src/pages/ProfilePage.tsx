@@ -13,7 +13,7 @@ import { useAppStore } from '../store/appStore'
 import { showToast } from '../store/toastStore'
 import styles from './ProfilePage.module.css'
 
-/** 04. 프로필 (홈 레이아웃의 두 번째 탭) — 내 이름/은행/계좌 수정, 로그아웃, 회원 탈퇴. 정식 회원 전용. */
+/** 04. 프로필 (홈 레이아웃의 두 번째 탭) — 내 이름/은행/계좌 수정, 비밀번호 변경, 로그아웃, 회원 탈퇴. 정식 회원 전용. */
 export default function ProfilePage() {
   const user = useAppStore((s) => (s.currentUserId ? s.usersById[s.currentUserId] : undefined))
   if (!user) return null
@@ -113,6 +113,9 @@ function Profile({ user }: { user: User }) {
       </div>
 
       <div className={styles.links}>
+        <button type="button" className={fields.textLink} onClick={() => navigate(paths.profilePassword)}>
+          비밀번호 변경
+        </button>
         <button type="button" className={fields.textLink} onClick={logout}>
           로그아웃
         </button>

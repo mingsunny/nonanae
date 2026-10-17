@@ -21,6 +21,8 @@ export default function GroupListPage() {
   const allJoinRequests = useAppStore((s) => s.joinRequests)
   // 내가 보낸, 그룹장 승인을 기다리는 참여 요청
   const myRequests = allJoinRequests.filter((r) => r.mine)
+  // 내가 방장인 그룹에 들어온 참여 요청 수 (그룹 카드에 배지로)
+  const incomingCount = (groupId: string) => allJoinRequests.filter((r) => r.groupId === groupId && !r.mine).length
   const seenCoach = useAppStore((s) =>
     s.currentUserId ? (s.usersById[s.currentUserId]?.seenGroupCreateCoach ?? true) : true,
   )
@@ -63,20 +65,26 @@ export default function GroupListPage() {
       ))}
 
       {/* 가장 최근에 만들거나 참여한 그룹이 위 */}
-      {sortGroupsNewestFirst(groups, currentUserId, viewAsMemberId).map((group) => (
-        <Link key={group.id} to={paths.group(group.id)} className={styles.row}>
-          <span className={styles.thumb}>{group.name.slice(0, 1)}</span>
-          <span className={styles.meta}>
-            <span className={styles.name}>{group.name}</span>
-            <span className={`${styles.sum} num`}>
-              멤버 {group.members.length}명 · 총 {won(groupTotal(group.expenses))}
+      {sortGroupsNewestFirst(groups, currentUserId, viewAsMemberId).map((group) => {
+        const requests = incomingCount(group.id)
+        return (
+          <Link key={group.id} to={paths.group(group.id)} className={styles.row}>
+            <span className={styles.thumb}>{group.name.slice(0, 1)}</span>
+            <span className={styles.meta}>
+              <span className={styles.nameLine}>
+                <span className={styles.name}>{group.name}</span>
+                {requests > 0 && <span className={styles.requestBadge}>참여 요청 {requests}</span>}
+              </span>
+              <span className={`${styles.sum} num`}>
+                멤버 {group.members.length}명 · 총 {won(groupTotal(group.expenses))}
+              </span>
             </span>
-          </span>
-          <span className={styles.arrow} aria-hidden="true">
-            ›
-          </span>
-        </Link>
-      ))}
+            <span className={styles.arrow} aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        )
+      })}
     </>
   )
 }

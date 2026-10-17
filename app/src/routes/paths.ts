@@ -8,6 +8,7 @@ export const paths = {
   signupAccount: '/signup/account',
   groups: '/groups',
   profile: '/profile',
+  profilePassword: '/profile/password',
   groupNew: '/groups/new',
   join: '/join',
   passwordReset: '/password-reset',

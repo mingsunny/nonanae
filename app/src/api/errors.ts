@@ -13,3 +13,6 @@ export class ProfileIncomplete extends Error {
     this.name = 'ProfileIncomplete'
   }
 }
+
+/** 비밀번호 변경(04)에서 현재 비밀번호가 틀렸을 때 */
+export const CURRENT_PASSWORD_MISMATCH = '현재 비밀번호가 일치하지 않아요.'

@@ -640,7 +640,7 @@ describe('06·07 초대코드로 참여', () => {
     await userEvent.click(screen.getByRole('button', { name: /김민지/ }))
     expect(await screen.findByText(/그룹장에게 참여를 요청했어요/)).toBeTruthy()
     expect(screen.getByRole('status').textContent).toBe('승인 요청중')
-    expect(screen.getByText(/승인돼도 따로 알림이 가지 않아요/)).toBeTruthy()
+    expect(screen.getByText('승인이 완료되면 같은 초대 링크로 그룹에 참여할 수 있어요')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '승인됐는지 확인하기' })).toBeNull()
     // 새로고침해도 이어서 확인할 수 있게 주소에 코드가 남는다
     expect(urlOf(router)).toBe('/join?code=test42')
@@ -762,9 +762,11 @@ describe('06·07 초대코드로 참여', () => {
     await fill('비밀번호', 'aaaaaaaa')
     await userEvent.click(screen.getByRole('button', { name: '로그인' }))
 
-    expect(await screen.findByRole('button', { name: '김민지님으로 참여하기' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '회원가입' })).toBeNull() // 로그인했으니 로그인 / 회원가입은 사라짐
-    await click('김민지님으로 참여하기')
+    // 로그인했으면 그 자리를 내 계정 이름으로 이어받는다. 로그인 / 회원가입과 다른 이름으로 참여하기는 사라짐
+    expect(await screen.findByRole('button', { name: '테스트님으로 참여하기' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '회원가입' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '다른 이름으로 참여하기' })).toBeNull()
+    await click('테스트님으로 참여하기')
     expect(await screen.findByText('승인 요청중')).toBeTruthy()
     expect(urlOf(router)).toBe('/join?code=TEST42-m_minji')
     expect((await fetchSnapshot()).joinRequests).toEqual([
@@ -882,7 +884,7 @@ describe('06·07 초대코드로 참여', () => {
     await userEvent.click(screen.getByRole('button', { name: '로그인' }))
 
     // 로그인한 계정은 아직 이 그룹 멤버가 아니므로 그 자리로 다시 승인을 받는다
-    await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
+    await userEvent.click(await screen.findByRole('button', { name: '테스트님으로 참여하기' }))
     expect(await screen.findByText(/그룹장에게 참여를 요청했어요/)).toBeTruthy()
     await approveAsOwner42(testAccount)
     const reloaded = reload(router)
@@ -906,7 +908,8 @@ describe('06·07 초대코드로 참여', () => {
     await click('다음')
     // 가입 → (이메일 확인) → 이름·계좌 등록 → 자기 자리의 초대 링크로 돌아와 그 자리로 참여를 요청한다
     await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
-    await fill('이름', '김민지')
+    // 초대받은 자리의 이름이 기본값으로 들어가 있다
+    await waitFor(() => expect((screen.getByLabelText('이름') as HTMLInputElement).value).toBe('김민지'))
     await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
     await fill('계좌번호', '1000-1234-5678')
     await click('가입 완료')
@@ -920,10 +923,39 @@ describe('06·07 초대코드로 참여', () => {
     expect(minji.userId).toBe(state().currentUserId)
   })
 
+  it('개인 초대 링크에서 회원가입하면 이름에 초대받은 이름이 기본으로 들어가고, 바꾸면 그 이름으로 참여한다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/join?code=TEST42-m_minji')
+    await screen.findByText('초대코드 테스트방')
+    await click('회원가입')
+    await fill('이메일', 'new@example.com')
+    await fill('비밀번호', 'pw-12345')
+    await fill('비밀번호 확인', 'pw-12345')
+    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await click('다음')
+
+    await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
+    const nameInput = screen.getByLabelText('이름') as HTMLInputElement
+    await waitFor(() => expect(nameInput.value).toBe('김민지'))
+    await userEvent.clear(nameInput)
+    await fill('이름', '민지킴')
+    await userEvent.selectOptions(screen.getByLabelText('은행'), '토스뱅크')
+    await fill('계좌번호', '1000-1234-5678')
+    await click('가입 완료')
+
+    // 같은 초대 링크로 돌아와, 바꾼 이름으로 그 자리에 참여한다 (다른 이름으로 참여하기는 없음)
+    await userEvent.click(await screen.findByRole('button', { name: '민지킴님으로 참여하기' }))
+    expect(screen.queryByRole('button', { name: '다른 이름으로 참여하기' })).toBeNull()
+    expect(await screen.findByText('승인 요청중')).toBeTruthy()
+    expect((await fetchSnapshot()).joinRequests).toEqual([
+      expect.objectContaining({ name: '민지킴', memberId: 'm_minji', isGuest: false, mine: true }),
+    ])
+  })
+
   it('가입 확인 메일을 거쳐 그룹 목록으로 들어와도, 저장해 둔 초대 링크로 이어간다', async () => {
     useAuthFlowStore.getState().setReturnTo('/join?code=TEST42-m_minji')
     const router = renderApp('/groups')
-    expect(await screen.findByRole('button', { name: '김민지님으로 참여하기' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '테스트님으로 참여하기' })).toBeTruthy()
     expect(pathOf(router)).toBe('/join')
     expect(useAuthFlowStore.getState().returnTo).toBeNull()
   })
@@ -977,6 +1009,27 @@ describe('12 참여 요청 승인 (방장)', () => {
     expect(state().groups.find((g) => g.id === 'g_jeju')!.members).toHaveLength(4)
   })
 
+  it('그룹장은 그룹 목록의 카드에서 "참여 요청 N" 배지를 본다', async () => {
+    await bootWithGuestRequest()
+    renderApp('/groups')
+    const card = (await screen.findByText('제주도 여행')).closest('a')!
+    expect(card.textContent).toContain('참여 요청 1')
+  })
+
+  it('그룹 화면 맨 위에 참여 요청 안내가 뜨고, "확인하기"를 누르면 승인할 수 있는 멤버 화면으로 간다. 승인하면 사라진다', async () => {
+    await bootWithGuestRequest()
+    const router = renderApp('/groups/g_jeju/expenses')
+    await userEvent.click(await screen.findByRole('link', { name: /이서준님이 참여를 요청했어요/ }))
+    expect(pathOf(router)).toBe('/groups/g_jeju/members')
+    await click('승인')
+    await screen.findByText('이서준님의 참여를 승인했어요')
+    cleanup()
+
+    renderApp('/groups/g_jeju/expenses')
+    await screen.findByRole('link', { name: '그룹 목록으로' })
+    expect(screen.queryByText(/참여를 요청했어요/)).toBeNull()
+  })
+
   it('참여 요청 알림을 누르면 승인할 수 있는 멤버 화면으로 간다', async () => {
     await bootWithGuestRequest()
     const router = renderApp('/groups')
@@ -999,7 +1052,55 @@ describe('12 참여 요청 승인 (방장)', () => {
     await screen.findByText('멤버 목록')
     expect(screen.getByText('테스트 (나)')).toBeTruthy()
     expect(screen.queryByText(/참여 요청/)).toBeNull()
+    cleanup()
+    // 그룹 화면의 안내와 그룹 목록의 배지도 없다
+    renderApp('/groups/g_test42/expenses')
+    await screen.findByRole('link', { name: '그룹 목록으로' })
+    expect(screen.queryByText(/참여를 요청했어요/)).toBeNull()
+    cleanup()
+    renderApp('/groups')
+    await screen.findByText('초대코드 테스트방')
+    expect(screen.queryByText(/참여 요청 \d/)).toBeNull()
     expect(state().joinRequests).toEqual([])
+  })
+})
+
+describe('04 비밀번호 변경', () => {
+  it('프로필의 "비밀번호 변경"에서 현재 비밀번호를 확인하고 바꾼다. 로그인 상태는 그대로이고 새 비밀번호로 로그인된다', async () => {
+    const router = renderApp('/profile')
+    await userEvent.click(await screen.findByRole('button', { name: '비밀번호 변경' }))
+    expect(pathOf(router)).toBe('/profile/password')
+
+    const submit = screen.getByRole('button', { name: '비밀번호 변경' }) as HTMLButtonElement
+    await fill('현재 비밀번호', 'wrong-pw1')
+    await fill('새 비밀번호', 'short')
+    expect(submit.disabled).toBe(true) // 규칙에 안 맞음
+    await userEvent.clear(screen.getByLabelText('새 비밀번호'))
+    await fill('새 비밀번호', 'newpass12')
+    await fill('새 비밀번호 확인', 'newpass12')
+    expect(submit.disabled).toBe(false)
+
+    await userEvent.click(submit)
+    expect((await screen.findByRole('alert')).textContent).toBe('현재 비밀번호가 일치하지 않아요.')
+    expect(pathOf(router)).toBe('/profile/password')
+
+    await userEvent.clear(screen.getByLabelText('현재 비밀번호'))
+    await fill('현재 비밀번호', 'aaaaaaaa')
+    await userEvent.click(submit)
+    expect(await screen.findByText('비밀번호가 변경되었습니다')).toBeTruthy()
+    expect(pathOf(router)).toBe('/profile')
+    expect(state().currentUserId).toBe('u_test')
+
+    await signOut()
+    await expect(signIn('a@naver.com', 'aaaaaaaa')).rejects.toThrow()
+    await signIn('a@naver.com', 'newpass12')
+  })
+
+  it('로그아웃 상태로 들어오면 인트로로 보낸다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/profile/password')
+    expect(await screen.findByAltText('노나내')).toBeTruthy()
+    expect(pathOf(router)).toBe('/welcome')
   })
 })
 

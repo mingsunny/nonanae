@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
+import { resolveInviteCode } from '../../api'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { BANKS } from '../../domain/constants'
+import { parseInviteCode } from '../../domain/inviteCode'
 import { NAME_MAX_LENGTH } from '../../domain/name'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
@@ -17,6 +19,13 @@ function safeInternalPath(value: string | null): string | null {
   return value && value.startsWith('/') && !value.startsWith('//') ? value : null
 }
 
+/** 마친 뒤 갈 곳이 개인 초대 링크(`/join?code=코드-멤버ID`)면 그 초대코드 */
+function personalInviteCode(path: string): string | null {
+  const url = new URL(path, window.location.origin)
+  const code = url.searchParams.get('code')
+  return url.pathname === paths.join && code && parseInviteCode(code).targetMemberId ? code : null
+}
+
 /**
  * 02 이름·계좌 등록(`/signup/account`) — 회원가입의 마지막 단계. 이메일 확인 메일의 링크로 로그인된 사람(또는 이메일 확인이
  * 꺼져 있어 바로 로그인된 사람)이 이름·은행·계좌를 한 번 등록하면 프로필이 만들어지고 그룹 목록으로 들어간다.
@@ -24,10 +33,8 @@ function safeInternalPath(value: string | null): string | null {
  * 마친 뒤 돌아갈 곳은 메일 링크의 `next`(다른 브라우저에서 열어도 유지) → 이 기기에 남겨 둔 값 → 그룹 목록 순이다.
  */
 export default function AccountScreen() {
-  const navigate = useNavigate()
   const [params] = useSearchParams()
   const completeProfile = useAppStore((s) => s.completeProfile)
-  const signOut = useAppStore((s) => s.signOut)
   const currentUserId = useAppStore((s) => s.currentUserId)
   const needsProfile = useAppStore((s) => s.needsProfile)
   const resetAuthFlow = useAuthFlowStore((s) => s.reset)
@@ -40,6 +47,23 @@ export default function AccountScreen() {
   const [account, setAccount] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // 개인 초대 링크에서 가입하러 왔으면 초대받은 자리의 이름을 기본값으로 채운다. 바꾸면 그 이름으로 참여한다.
+  useEffect(() => {
+    const code = personalInviteCode(nextPath)
+    if (!code) return
+    let cancelled = false
+    resolveInviteCode(code)
+      .then((result) => {
+        if (!cancelled && result.kind === 'invite') setName((prev) => (prev === '' ? result.memberName : prev))
+      })
+      .catch(() => {
+        // 기본값을 못 채워도 직접 입력하면 된다
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [nextPath])
 
   // 세 필드가 모두 채워져야 진행 가능 (필드별 에러 메시지는 없음). 계좌번호 형식 검증은 하지 않는다(02 예외처리).
   const canSubmit = name.trim() !== '' && bank !== '' && account.trim() !== ''
@@ -56,12 +80,6 @@ export default function AccountScreen() {
       setError(err instanceof Error ? err.message : '등록하지 못했어요')
       setBusy(false)
     }
-  }
-
-  /** 계좌 등록을 하지 않고 나가려는 경우. 계정은 남아 있어서 나중에 로그인하면 이 화면으로 다시 온다. */
-  async function leave() {
-    await signOut()
-    navigate(paths.welcome, { replace: true })
   }
 
   if (currentUserId) return <Navigate to={nextPath} replace />
@@ -136,11 +154,6 @@ export default function AccountScreen() {
             가입 완료
           </Button>
         </div>
-        <p className={styles.switch}>
-          <button type="button" className={fields.textLink} onClick={leave}>
-            나중에 하기 (로그아웃)
-          </button>
-        </p>
       </form>
     </div>
   )

@@ -75,3 +75,21 @@
   font-size: 20px;
   color: #b7b2a2;
 }
+
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 그룹장에게만: 승인을 기다리는 참여 요청 수 */
+.requestBadge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--amber);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
