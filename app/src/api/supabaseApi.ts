@@ -20,7 +20,7 @@ import type {
   SplitType,
   User,
 } from '../domain/types'
-import { ProfileIncomplete, SignUpConfirmationRequired } from './errors'
+import { CURRENT_PASSWORD_MISMATCH, ProfileIncomplete, SignUpConfirmationRequired } from './errors'
 import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
@@ -1033,6 +1033,31 @@ export async function isPasswordResetTokenValid(): Promise<boolean> {
 }
 
 /** 새 비밀번호 저장. 끝나면 재설정용 세션을 정리해서, 새 비밀번호로 다시 로그인하게 한다. */
+/**
+ * 04: 로그인한 회원의 비밀번호 변경. 현재 비밀번호로 한 번 더 로그인해 본인인지 확인한 뒤 바꾼다
+ * (잠금이 풀린 폰을 남이 집어 들어도 바꾸지 못하게). 로그인 상태는 그대로 유지된다.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  if (!newPassword) throw new Error('새 비밀번호를 입력해주세요')
+  await requireAuthUserId()
+  const supabase = getSupabase()
+  const { data } = await supabase.auth.getSession()
+  const email = data.session?.user.email
+  if (!email) throw new Error('로그인이 필요해요')
+
+  const captchaToken = await getCaptchaToken()
+  const { error: checkError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+    options: captchaOptions(captchaToken),
+  })
+  if (checkError) {
+    throw new Error(checkError.code === 'invalid_credentials' ? CURRENT_PASSWORD_MISMATCH : authErrorMessage(checkError))
+  }
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw new Error(authErrorMessage(error))
+}
+
 export async function resetPassword(newPassword: string): Promise<void> {
   if (!newPassword) throw new Error('새 비밀번호를 입력해주세요')
   if (!(await isPasswordResetTokenValid())) throw new Error(RESET_LINK_EXPIRED)

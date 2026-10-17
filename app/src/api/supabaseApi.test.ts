@@ -60,6 +60,7 @@ import {
   rejectJoinRequest,
   requestPasswordReset,
   resetPassword,
+  changePassword,
   resolveInviteCode,
   rotateInviteCode,
   signIn,
@@ -1299,6 +1300,37 @@ describe('회원 탈퇴 (04)', () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'guests cannot delete accounts' } })
     await expect(deleteAccount()).rejects.toThrow('로그인한 회원만 탈퇴할 수 있어요')
     expect(mocks.auth.signOut).not.toHaveBeenCalled()
+  })
+})
+
+describe('비밀번호 변경 (04)', () => {
+  it('현재 비밀번호로 한 번 더 로그인해 확인한 뒤 새 비밀번호로 바꾼다 (로그아웃하지 않음)', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mocks.auth.signInWithPassword.mockResolvedValue({ error: null })
+    await changePassword('old-pw-1', 'new-pw-12')
+    expect(mocks.auth.signInWithPassword).toHaveBeenCalledWith({ email: authUser.email, password: 'old-pw-1', options: {} })
+    expect(mocks.auth.updateUser).toHaveBeenCalledWith({ password: 'new-pw-12' })
+    expect(mocks.auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it('현재 비밀번호가 틀리면 바꾸지 않고 알려준다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mocks.auth.signInWithPassword.mockResolvedValue({ error: authError('invalid_credentials') })
+    await expect(changePassword('wrong', 'new-pw-12')).rejects.toThrow('현재 비밀번호가 일치하지 않아요.')
+    expect(mocks.auth.updateUser).not.toHaveBeenCalled()
+  })
+
+  it('서버가 약한 비밀번호나 같은 비밀번호를 거절하면 한국어로 알려준다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mocks.auth.signInWithPassword.mockResolvedValue({ error: null })
+    mocks.auth.updateUser.mockResolvedValue({ error: authError('same_password') })
+    await expect(changePassword('old-pw-1', 'old-pw-1')).rejects.toThrow('이전과 다른 비밀번호를 입력해주세요.')
+  })
+
+  it('게스트(익명)나 로그아웃 상태면 서버를 부르지 않는다', async () => {
+    mocks.auth.getSession.mockResolvedValue(noSession)
+    await expect(changePassword('a', 'new-pw-12')).rejects.toThrow('로그인이 필요해요')
+    expect(mocks.auth.signInWithPassword).not.toHaveBeenCalled()
   })
 })
 

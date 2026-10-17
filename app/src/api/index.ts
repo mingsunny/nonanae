@@ -5,7 +5,7 @@ import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
 import { assertNameLength } from '../domain/name'
 import { expenseAddedTitle, expenseDeletedTitle, joinRequestTitle } from '../domain/notifications'
-import { ProfileIncomplete } from './errors'
+import { CURRENT_PASSWORD_MISMATCH, ProfileIncomplete } from './errors'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -848,6 +848,20 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
   d.credentials[reset.userId] = newPassword
   for (const r of d.passwordResets) if (r.userId === reset.userId) r.used = true
+  commit()
+}
+
+/**
+ * 04: 로그인한 회원이 프로필에서 비밀번호를 바꾼다. 현재 비밀번호가 맞아야 하고, 바꾼 뒤에도 로그인 상태는 그대로다.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  if (USE_SUPABASE) return remote.changePassword(currentPassword, newPassword)
+  const d = getDb()
+  const user = requireSessionUser(d)
+  if (d.credentials[user.id] !== currentPassword) throw new Error(CURRENT_PASSWORD_MISMATCH)
+  if (!newPassword) throw new Error('새 비밀번호를 입력해주세요')
+  if (newPassword === currentPassword) throw new Error('이전과 다른 비밀번호를 입력해주세요.')
+  d.credentials[user.id] = newPassword
   commit()
 }
 

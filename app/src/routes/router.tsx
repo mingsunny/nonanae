@@ -12,6 +12,7 @@ import NotFoundPage from '../pages/NotFoundPage'
 import PasswordResetPage from '../pages/PasswordResetPage'
 import PrivacyPage from '../pages/PrivacyPage'
 import ProfilePage from '../pages/ProfilePage'
+import ChangePasswordPage from '../pages/ChangePasswordPage'
 import SettlePage from '../pages/SettlePage'
 import SummaryPage from '../pages/SummaryPage'
 import AccountScreen from '../pages/auth/AccountScreen'
@@ -50,6 +51,7 @@ export const routes: RouteObject[] = [
         ],
       },
       { path: 'groups/new', element: <CreateGroupPage /> },
+      { path: 'profile/password', element: <ChangePasswordPage /> },
     ],
   },
 

@@ -1035,6 +1035,45 @@ describe('12 참여 요청 승인 (방장)', () => {
   })
 })
 
+describe('04 비밀번호 변경', () => {
+  it('프로필의 "비밀번호 변경"에서 현재 비밀번호를 확인하고 바꾼다. 로그인 상태는 그대로이고 새 비밀번호로 로그인된다', async () => {
+    const router = renderApp('/profile')
+    await userEvent.click(await screen.findByRole('button', { name: '비밀번호 변경' }))
+    expect(pathOf(router)).toBe('/profile/password')
+
+    const submit = screen.getByRole('button', { name: '비밀번호 변경' }) as HTMLButtonElement
+    await fill('현재 비밀번호', 'wrong-pw1')
+    await fill('새 비밀번호', 'short')
+    expect(submit.disabled).toBe(true) // 규칙에 안 맞음
+    await userEvent.clear(screen.getByLabelText('새 비밀번호'))
+    await fill('새 비밀번호', 'newpass12')
+    await fill('새 비밀번호 확인', 'newpass12')
+    expect(submit.disabled).toBe(false)
+
+    await userEvent.click(submit)
+    expect((await screen.findByRole('alert')).textContent).toBe('현재 비밀번호가 일치하지 않아요.')
+    expect(pathOf(router)).toBe('/profile/password')
+
+    await userEvent.clear(screen.getByLabelText('현재 비밀번호'))
+    await fill('현재 비밀번호', 'aaaaaaaa')
+    await userEvent.click(submit)
+    expect(await screen.findByText('비밀번호가 변경되었습니다')).toBeTruthy()
+    expect(pathOf(router)).toBe('/profile')
+    expect(state().currentUserId).toBe('u_test')
+
+    await signOut()
+    await expect(signIn('a@naver.com', 'aaaaaaaa')).rejects.toThrow()
+    await signIn('a@naver.com', 'newpass12')
+  })
+
+  it('로그아웃 상태로 들어오면 인트로로 보낸다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/profile/password')
+    expect(await screen.findByAltText('노나내')).toBeTruthy()
+    expect(pathOf(router)).toBe('/welcome')
+  })
+})
+
 describe('14 비밀번호 재설정', () => {
   const linkSentGuide = '입력하신 이메일로 재설정 링크를 보냈어요. 메일함을 확인해주세요.'
 
