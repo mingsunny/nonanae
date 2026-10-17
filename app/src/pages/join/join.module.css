@@ -134,3 +134,9 @@ button.person {
   border-radius: var(--radius-full);
   background: var(--amber);
 }
+
+/* 버튼 아래 가운데 글자 링크 (다른 이름으로 참여, 요청 취소) */
+.linkRow {
+  margin: 14px 0 0;
+  text-align: center;
+}

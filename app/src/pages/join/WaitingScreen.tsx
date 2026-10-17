@@ -109,7 +109,7 @@ export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: 
             </Button>
           </div>
         )}
-        <p className={styles.authLinks}>
+        <p className={styles.linkRow}>
           <button type="button" className={fields.textLink} disabled={busy} onClick={cancel}>
             요청 취소하기
           </button>

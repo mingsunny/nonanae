@@ -736,6 +736,38 @@ describe('06·07 초대코드로 참여', () => {
     expect(state().viewAsMemberId).toBe('m_minji')
   })
 
+  it('개인 초대 링크에서 "다른 이름으로 참여"를 누르면 멤버 목록으로 가서 다른 자리를 고르거나 새 이름으로 참여할 수 있다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/join?code=TEST42-m_minji')
+    await userEvent.click(await screen.findByRole('button', { name: '김민지님이 아니거나 다른 이름으로 참여할래요' }))
+    expect(await screen.findByText(/본인이 누구인지 골라주세요/)).toBeTruthy()
+    expect(urlOf(router)).toBe('/join?code=TEST42')
+    expect((await fetchSnapshot()).joinRequests).toEqual([])
+
+    await fill('목록에 없으면 이름을 입력해주세요', '이서준')
+    await click('이 이름으로 참여 요청하기')
+    expect(await screen.findByText('승인 요청중')).toBeTruthy()
+    expect((await fetchSnapshot()).joinRequests).toEqual([expect.objectContaining({ name: '이서준', memberId: null })])
+  })
+
+  it('개인 초대 링크 화면(비로그인)에서 로그인하면 같은 링크로 돌아와 내 계정으로 참여를 요청할 수 있다', async () => {
+    await boot({ loggedIn: false })
+    const router = renderApp('/join?code=TEST42-m_minji')
+    await screen.findByText('초대코드 테스트방')
+    await click('로그인')
+    await fill('이메일', 'a@naver.com')
+    await fill('비밀번호', 'aaaaaaaa')
+    await userEvent.click(screen.getByRole('button', { name: '로그인' }))
+
+    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    expect(await screen.findByText('승인 요청중')).toBeTruthy()
+    expect(urlOf(router)).toBe('/join?code=TEST42-m_minji')
+    expect((await fetchSnapshot()).joinRequests).toEqual([
+      expect.objectContaining({ memberId: 'm_minji', isGuest: false, mine: true }),
+    ])
+    expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
+  })
+
   it('요청을 취소하면 코드 입력으로 돌아가고, 방장이 거절하면 거절 안내가 뜬다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
