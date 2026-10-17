@@ -2,6 +2,7 @@ import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { BackIcon, BarsIcon, KakaoIcon, ReceiptIcon, TransferIcon } from '../components/common/icons'
 import AccountPromoCard from '../components/common/AccountPromoCard'
 import Avatar from '../components/common/Avatar'
+import JoinRequestBanner from '../components/joinRequests/JoinRequestBanner'
 import { groupTotal } from '../domain/settlement'
 import type { GroupDetail } from '../domain/types'
 import { copyText } from '../lib/clipboard'
@@ -114,6 +115,8 @@ function GroupShell({ group }: { group: GroupDetail }) {
         {guestMemberId && (
           <AccountPromoCard onLogin={() => connectAccount('login')} onSignup={() => connectAccount('signup')} />
         )}
+        {/* 그룹장에게만: 승인을 기다리는 참여 요청 */}
+        <JoinRequestBanner groupId={group.id} />
         <Outlet />
       </main>
 

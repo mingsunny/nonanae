@@ -1009,6 +1009,27 @@ describe('12 참여 요청 승인 (방장)', () => {
     expect(state().groups.find((g) => g.id === 'g_jeju')!.members).toHaveLength(4)
   })
 
+  it('그룹장은 그룹 목록의 카드에서 "참여 요청 N" 배지를 본다', async () => {
+    await bootWithGuestRequest()
+    renderApp('/groups')
+    const card = (await screen.findByText('제주도 여행')).closest('a')!
+    expect(card.textContent).toContain('참여 요청 1')
+  })
+
+  it('그룹 화면 맨 위에 참여 요청 안내가 뜨고, "확인하기"를 누르면 승인할 수 있는 멤버 화면으로 간다. 승인하면 사라진다', async () => {
+    await bootWithGuestRequest()
+    const router = renderApp('/groups/g_jeju/expenses')
+    await userEvent.click(await screen.findByRole('link', { name: /이서준님이 참여를 요청했어요/ }))
+    expect(pathOf(router)).toBe('/groups/g_jeju/members')
+    await click('승인')
+    await screen.findByText('이서준님의 참여를 승인했어요')
+    cleanup()
+
+    renderApp('/groups/g_jeju/expenses')
+    await screen.findByRole('link', { name: '그룹 목록으로' })
+    expect(screen.queryByText(/참여를 요청했어요/)).toBeNull()
+  })
+
   it('참여 요청 알림을 누르면 승인할 수 있는 멤버 화면으로 간다', async () => {
     await bootWithGuestRequest()
     const router = renderApp('/groups')
@@ -1031,6 +1052,15 @@ describe('12 참여 요청 승인 (방장)', () => {
     await screen.findByText('멤버 목록')
     expect(screen.getByText('테스트 (나)')).toBeTruthy()
     expect(screen.queryByText(/참여 요청/)).toBeNull()
+    cleanup()
+    // 그룹 화면의 안내와 그룹 목록의 배지도 없다
+    renderApp('/groups/g_test42/expenses')
+    await screen.findByRole('link', { name: '그룹 목록으로' })
+    expect(screen.queryByText(/참여를 요청했어요/)).toBeNull()
+    cleanup()
+    renderApp('/groups')
+    await screen.findByText('초대코드 테스트방')
+    expect(screen.queryByText(/참여 요청 \d/)).toBeNull()
     expect(state().joinRequests).toEqual([])
   })
 })
