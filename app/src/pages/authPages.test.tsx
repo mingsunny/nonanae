@@ -999,6 +999,24 @@ describe('12 참여 요청 승인 (방장)', () => {
     expect(state().groups.find((g) => g.id === 'g_jeju')!.members.some((m) => m.name === '이서준')).toBe(true)
   })
 
+  it('기존 자리로 들어온 참여 요청은 "참여 요청"에만 보이고, 멤버 목록에는 승인 전까지 그 자리가 빠진다', async () => {
+    // 로그인 없이 TEST42의 김민지 자리로 요청 → 방장데모로 로그인
+    await signOut()
+    await resolveInviteCode('TEST42-m_minji')
+    await joinAsExistingMember('g_test42', 'm_minji')
+    await signIn('owner.demo@example.com', 'owner1234')
+    useAppStore.setState({ status: 'idle' })
+    await useAppStore.getState().init()
+
+    renderApp('/groups/g_test42/members')
+    expect(await screen.findByText('참여 요청 1')).toBeTruthy()
+    expect(screen.getAllByText('김민지')).toHaveLength(1) // 요청에만 한 번
+    await click('승인')
+    await screen.findByText('김민지님의 참여를 승인했어요')
+    expect(screen.getAllByText('김민지')).toHaveLength(1) // 이제 멤버 목록에 한 번
+    expect(screen.queryByText(/참여 요청 \d/)).toBeNull()
+  })
+
   it('거절하면 요청만 사라지고 멤버는 그대로다', async () => {
     await bootWithGuestRequest()
     renderApp('/groups/g_jeju/members')
