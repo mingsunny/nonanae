@@ -775,17 +775,17 @@ describe('06·07 초대코드로 참여', () => {
     expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
   })
 
-  it('요청을 취소하면 코드 입력으로 돌아가고, 방장이 거절하면 거절 안내가 뜬다', async () => {
+  it('승인 대기 화면에는 요청 취소가 없다. 뒤로 가면 요청은 남은 채 코드 입력으로, 방장이 거절하면 거절 안내가 뜬다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
     await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
     await screen.findByText(/그룹장에게 참여를 요청했어요/)
-    await click('요청 취소하기')
-    expect(await screen.findByText('참여 요청을 취소했어요')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '요청 취소하기' })).toBeNull()
+    await click('뒤로가기')
     // 코드 입력으로 돌아가면 긴 개인 링크 꼬리 없이 그룹 코드만 남는다
     expect(((await screen.findByLabelText('초대코드')) as HTMLInputElement).value).toBe('TEST42')
     expect(urlOf(router)).toBe('/join')
-    expect((await fetchSnapshot()).joinRequests).toEqual([])
+    expect((await fetchSnapshot()).joinRequests).toHaveLength(1)
     cleanup()
 
     await boot({ loggedIn: false })
