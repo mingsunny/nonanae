@@ -801,10 +801,11 @@ describe('06·07 초대코드로 참여', () => {
     expect(screen.queryByLabelText('초대코드')).toBeNull()
   })
 
-  it('개인 초대 링크의 자리가 이미 가입돼 있고 로그인하지 않았으면 "본인이면 로그인"을 권한다', async () => {
+  it('개인 초대 링크의 자리가 이미 가입돼 있고(승인 완료) 로그인하지 않았으면 로그인을 권한다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_owner42')
-    expect(await screen.findByText(/방장데모님 자리는 이미 가입돼 있어요/)).toBeTruthy()
+    expect(await screen.findByText(/승인이 완료됐어요/)).toBeTruthy()
+    expect(screen.getByText(/로그인하고 사용해요/)).toBeTruthy()
     expect(screen.queryByLabelText('이름')).toBeNull()
     await click('로그인')
     expect(pathOf(router)).toBe('/login')

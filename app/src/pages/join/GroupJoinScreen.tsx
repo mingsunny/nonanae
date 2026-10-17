@@ -27,7 +27,7 @@ interface Props {
 /**
  * 그룹 공용 코드(`/join?code=ABCDEF`)로 들어왔을 때. 멤버 목록에서 나를 고르는 단계 없이(누구인지는 그룹장이 승인하며 확인한다)
  * 그룹 이름과 참여 버튼만 보여준다: 로그인했으면 "{내 이름}님으로 참여하기", 아니면 이름 입력 + 로그인 / 회원가입.
- * 개인 초대 링크인데 그 자리가 이미 계정으로 가입돼 있으면, 본인일 가능성이 높으니 로그인을 권한다.
+ * 개인 초대 링크인데 그 자리가 이미 계정으로 가입돼 있으면(승인 완료), 본인일 가능성이 높으니 로그인을 권한다.
  */
 export default function GroupJoinScreen({ pick, code, onBack, onRequested }: Props) {
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
@@ -72,9 +72,9 @@ export default function GroupJoinScreen({ pick, code, onBack, onRequested }: Pro
         <div className={styles.body}>
           {groupCard}
           <Callout>
-            {takenSeat.name}님 자리는 이미 가입돼 있어요.
+            승인이 완료됐어요.
             <br />
-            본인이면 로그인해주세요.
+            로그인하고 사용해요.
           </Callout>
           <Button onClick={login}>로그인</Button>
         </div>
