@@ -33,7 +33,8 @@ export function useGroupView(group: GroupDetail): GroupView {
       nameOf: (memberId) => names.get(memberId) ?? '알 수 없음',
       me,
       isMe: (memberId) => me?.id === memberId,
-      isPending: (member) => member.userId === null && member.id !== me?.id,
+      // 계정도, 승인받은 게스트도 없는 자리만 대기 중
+      isPending: (member) => member.userId === null && !member.guestJoined && member.id !== me?.id,
     }
   }, [group.members, usersById, currentUserId, viewAsMemberId])
 }

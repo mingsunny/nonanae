@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import type { JoinResolution } from '../api'
 import Topbar from '../components/common/Topbar'
 import { parseInviteCode } from '../domain/inviteCode'
 import { paths } from '../routes/paths'
@@ -10,6 +11,7 @@ import type { InviteResolution } from './join/InviteScreen'
 import styles from './join/join.module.css'
 import LookupScreen from './join/LookupScreen'
 import PickScreen from './join/PickScreen'
+import RejectedScreen from './join/RejectedScreen'
 import type { PickResolution } from './join/PickScreen'
 import WaitingScreen from './join/WaitingScreen'
 
@@ -42,6 +44,7 @@ function JoinFlow() {
   // 링크로 들어와 첫 확인이 끝나기 전 — 코드 입력 화면(긴 코드)을 잠깐 보여주지 않도록
   const [linkPending, setLinkPending] = useState(codeFromLink !== '')
   const [waiting, setWaiting] = useState<{ groupId: string; groupName: string } | null>(null)
+  const [rejected, setRejected] = useState<Extract<JoinResolution, { kind: 'rejected' }> | null>(null)
   // 개발 모드의 StrictMode는 effect를 두 번 실행하므로, 링크로 들어왔을 때 자동 확인이 두 번(=두 번 참여) 돌지 않게 막음
   const autoRan = useRef(false)
 
@@ -62,6 +65,7 @@ function JoinFlow() {
   // 코드 입력으로 돌아갈 때는 개인 초대 링크의 긴 꼬리를 떼고 그룹 코드만 남긴다
   const backToLookup = useCallback(() => {
     setWaiting(null)
+    setRejected(null)
     setPick(null)
     setInvite(null)
     setCode((prev) => parseInviteCode(prev).code)
@@ -80,6 +84,8 @@ function JoinFlow() {
           enterGroup(result.groupId)
         } else if (result.kind === 'requested') {
           startWaiting(result, raw)
+        } else if (result.kind === 'rejected') {
+          setRejected(result)
         } else if (result.kind === 'invite') {
           setInvite(result)
         } else {
@@ -109,6 +115,25 @@ function JoinFlow() {
         groupName={waiting.groupName}
         onJoined={enterGroup}
         onBack={backToLookup}
+        onEnded={() => {
+          // 대기 중에 거절됨 → 같은 코드로 다시 확인하면 거절 화면(또는 요청 전 화면)이 나온다
+          setWaiting(null)
+          void lookup(code)
+        }}
+      />
+    )
+  }
+
+  if (rejected) {
+    return (
+      <RejectedScreen
+        groupName={rejected.groupName}
+        onBack={backToLookup}
+        onRetry={() => {
+          setRejected(null)
+          if (rejected.retry.kind === 'invite') setInvite(rejected.retry)
+          else setPick(rejected.retry)
+        }}
       />
     )
   }

@@ -148,3 +148,7 @@ button.person {
   gap: 10px;
   margin-top: 10px;
 }
+
+.statusRejected .statusDot {
+  background: var(--brick);
+}

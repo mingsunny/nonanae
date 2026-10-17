@@ -814,6 +814,28 @@ describe('resolveInviteCode', () => {
     expect(mocks.rpc).not.toHaveBeenCalledWith('join_group', expect.anything())
   })
 
+  it('내 요청이 거절됐으면 rejected — 다시 요청하기로 갈 화면(retry)을 함께 준다. status가 없는 예전 응답은 대기 중으로 본다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({
+      lookup_group_by_code: () => ok(lookupResult),
+      list_join_requests: () => ok([joinRequestRow({ group_id: 'g-join', mine: true, status: 'rejected' })]),
+    })
+    mockTables({ members: ok([]) })
+    expect(await resolveInviteCode(`JEJU26-${memberUuid}`)).toEqual({
+      kind: 'rejected',
+      groupId: 'g-join',
+      groupName: '제주도 여행',
+      retry: { kind: 'invite', groupId: 'g-join', groupName: '제주도 여행', memberId: memberUuid, memberName: '김민지' },
+    })
+    expect(await checkJoinRequest('g-join')).toBe('rejected')
+
+    mockRpc({
+      lookup_group_by_code: () => ok(lookupResult),
+      list_join_requests: () => ok([joinRequestRow({ group_id: 'g-join', mine: true })]),
+    })
+    expect((await resolveInviteCode('JEJU26')).kind).toBe('requested')
+  })
+
   it('개인 초대 링크의 자리를 이미 다른 사람이 차지했으면 공용 코드처럼 07로 넘긴다', async () => {
     const claimed = '22222222-2222-2222-2222-222222222222'
     mocks.auth.getSession.mockResolvedValue(signedInSession)
@@ -1260,7 +1282,7 @@ describe('renameGuestMember (12)', () => {
 
     expect(mocks.rpc).toHaveBeenCalledWith('rename_guest_member', { p_member_id: 'm-a', p_name: ' 고친이름 ' })
     expect(made.members[0].eq).toHaveBeenCalledWith('id', 'm-a')
-    expect(member).toEqual({ id: 'm-a', userId: null, groupId: 'g-1', role: 'member', name: '고친이름', joinedAt: '2026-09-21T01:00:00Z' })
+    expect(member).toEqual({ id: 'm-a', userId: null, groupId: 'g-1', role: 'member', name: '고친이름', joinedAt: '2026-09-21T01:00:00Z', guestJoined: true })
   })
 
   it('본인 자리가 아니면(다른 사람의 memberId) 서버가 거부한다', async () => {

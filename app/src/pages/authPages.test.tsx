@@ -803,6 +803,15 @@ describe('06·07 초대코드로 참여', () => {
     await signOut()
     await act(() => vi.advanceTimersByTimeAsync(5000))
     expect(await screen.findByText(/그룹장이 참여 요청을 거절했어요/)).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('거절됨')
+    cleanup()
+
+    // 같은 링크를 다시 열어도 거절됨. "다시 요청하기" → 참여하기 → 다시 승인 요청중
+    renderApp('/join?code=TEST42-m_minji')
+    expect(await screen.findByText('거절됨')).toBeTruthy()
+    await click('다시 요청하기')
+    await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
+    expect(await screen.findByText('승인 요청중')).toBeTruthy()
   })
 
   it('공용 링크(?code=코드)로 들어오면 코드를 채우고 바로 확인해 멤버 목록을 보여준다', async () => {
@@ -1014,6 +1023,9 @@ describe('12 참여 요청 승인 (방장)', () => {
     await click('승인')
     await screen.findByText('김민지님의 참여를 승인했어요')
     expect(screen.getAllByText('김민지')).toHaveLength(1) // 이제 멤버 목록에 한 번
+    // 게스트로 승인된 자리는 더 이상 초대 대기 중이 아니다
+    expect(screen.queryByText('초대 대기 중')).toBeNull()
+    expect(screen.queryByRole('button', { name: '초대 보내기' })).toBeNull()
     expect(screen.queryByText(/참여 요청 \d/)).toBeNull()
   })
 

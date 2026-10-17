@@ -33,6 +33,8 @@ export interface MockJoinRequest {
   name: string
   /** ISO 8601 */
   createdAt: string
+  /** 거절된 요청은 지우지 않고 남긴다. 예전에 저장된 데이터에는 없으므로 없으면 pending */
+  status?: 'pending' | 'rejected'
 }
 
 export interface MockDb {

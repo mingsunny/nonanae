@@ -37,6 +37,8 @@ export interface Member {
   /** userId가 null일 때만 사용하는 표시 이름 */
   name: string | null
   joinedAt: string
+  /** 로그인 없이(게스트로) 이 자리에 승인받아 들어온 사람이 있음. userId가 null이어도 "초대 대기 중"이 아니다 */
+  guestJoined?: boolean
 }
 
 export interface Expense {
@@ -103,6 +105,8 @@ export interface JoinRequest {
   isGuest: boolean
   /** 내가 보낸 요청이면 true, 내가 방장인 그룹에 들어온 요청이면 false */
   mine: boolean
+  /** pending: 방장 승인 대기, rejected: 방장이 거절함 (요청한 사람에게만 보인다 — 다시 요청하면 pending으로) */
+  status: 'pending' | 'rejected'
   /** ISO 8601 */
   createdAt: string
 }
