@@ -1014,6 +1014,9 @@ describe('12 참여 요청 승인 (방장)', () => {
     await click('승인')
     await screen.findByText('김민지님의 참여를 승인했어요')
     expect(screen.getAllByText('김민지')).toHaveLength(1) // 이제 멤버 목록에 한 번
+    // 게스트로 승인된 자리는 더 이상 초대 대기 중이 아니다
+    expect(screen.queryByText('초대 대기 중')).toBeNull()
+    expect(screen.queryByRole('button', { name: '초대 보내기' })).toBeNull()
     expect(screen.queryByText(/참여 요청 \d/)).toBeNull()
   })
 

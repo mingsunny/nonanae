@@ -63,7 +63,9 @@ export async function fetchSnapshot(): Promise<Snapshot> {
     .filter((g) => myGroupIds.has(g.id))
     .map((g) => ({
       ...g,
-      members: d.members.filter((m) => m.groupId === g.id),
+      members: d.members
+        .filter((m) => m.groupId === g.id)
+        .map((m) => (d.guestSeats[m.id] ? { ...m, guestJoined: true } : m)),
       expenses: d.expenses
         .filter((e) => e.groupId === g.id)
         .map((e) => ({

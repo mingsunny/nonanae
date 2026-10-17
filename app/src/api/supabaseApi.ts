@@ -188,6 +188,7 @@ const toMember = (r: MemberRow): Member => ({
   role: r.role,
   name: r.name,
   joinedAt: r.joined_at,
+  ...(r.guest_uid !== null ? { guestJoined: true } : {}),
 })
 const toNotification = (r: NotificationRow): Notification => ({
   id: r.id,

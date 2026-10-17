@@ -1260,7 +1260,7 @@ describe('renameGuestMember (12)', () => {
 
     expect(mocks.rpc).toHaveBeenCalledWith('rename_guest_member', { p_member_id: 'm-a', p_name: ' 고친이름 ' })
     expect(made.members[0].eq).toHaveBeenCalledWith('id', 'm-a')
-    expect(member).toEqual({ id: 'm-a', userId: null, groupId: 'g-1', role: 'member', name: '고친이름', joinedAt: '2026-09-21T01:00:00Z' })
+    expect(member).toEqual({ id: 'm-a', userId: null, groupId: 'g-1', role: 'member', name: '고친이름', joinedAt: '2026-09-21T01:00:00Z', guestJoined: true })
   })
 
   it('본인 자리가 아니면(다른 사람의 memberId) 서버가 거부한다', async () => {
