@@ -688,7 +688,8 @@ interface JoinRequestRow {
 async function listJoinRequests(): Promise<JoinRequest[]> {
   const { data, error } = await getSupabase().rpc('list_join_requests')
   if (error) {
-    console.warn('[supabase] 참여 요청을 불러오지 못함', error.code)
+    // 화면은 "요청 없음"으로 계속 쓰되, 원인은 콘솔에 남긴다 (그룹장 화면에서 요청이 안 보일 때 이걸 확인)
+    console.error('[supabase] 참여 요청을 불러오지 못함', error.code, error.message)
     return []
   }
   return ((data as JoinRequestRow[] | null) ?? []).map((r) => ({

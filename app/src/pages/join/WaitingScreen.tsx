@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
-import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
@@ -17,7 +16,7 @@ interface Props {
   groupName: string
   /** 방장이 승인해 그룹 안으로 들어갈 때 */
   onJoined: (groupId: string) => void
-  /** 코드 입력 화면으로 돌아감 (요청은 그대로 남는다 — 취소는 "요청 취소하기"로만) */
+  /** 코드 입력 화면으로 돌아감 (요청은 그대로 남는다) */
   onBack: () => void
 }
 
@@ -30,16 +29,11 @@ export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: 
   const navigate = useNavigate()
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   const checkJoinRequest = useAppStore((s) => s.checkJoinRequest)
-  const cancelJoinRequest = useAppStore((s) => s.cancelJoinRequest)
   const [rejected, setRejected] = useState(false)
-  const [busy, setBusy] = useState(false)
-  // 취소 중에는 확인 결과(none)를 "거절됨"으로 보여주지 않도록
-  const leaving = useRef(false)
 
   const check = useCallback(async () => {
     try {
       const status = await checkJoinRequest(groupId)
-      if (leaving.current) return
       if (status === 'joined') {
         showToast('참여가 승인됐어요')
         onJoined(groupId)
@@ -56,21 +50,6 @@ export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: 
     const timer = setInterval(() => void check(), JOIN_CHECK_INTERVAL_MS)
     return () => clearInterval(timer)
   }, [check, rejected])
-
-  async function cancel() {
-    if (busy) return
-    setBusy(true)
-    leaving.current = true
-    try {
-      await cancelJoinRequest(groupId)
-      showToast('참여 요청을 취소했어요')
-      onBack()
-    } catch (err) {
-      leaving.current = false
-      showToast(err instanceof Error ? err.message : '취소하지 못했어요')
-      setBusy(false)
-    }
-  }
 
   if (rejected) {
     return (
@@ -106,11 +85,6 @@ export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: 
             </Button>
           </div>
         )}
-        <p className={styles.linkRow}>
-          <button type="button" className={fields.textLink} disabled={busy} onClick={cancel}>
-            요청 취소하기
-          </button>
-        </p>
       </div>
     </div>
   )
