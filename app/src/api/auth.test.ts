@@ -398,16 +398,27 @@ describe('참여 요청 (07)', () => {
     expect(titles).toHaveLength(1)
   })
 
-  it('방장이 거절하면 요청이 사라지고 요청한 쪽은 none으로 확인된다', async () => {
+  it('방장이 거절하면 방장 화면에선 사라지고, 요청한 쪽에는 "거절됨"으로 남는다. 다시 요청하면 대기 중으로 바뀌고 방장에게 다시 알린다', async () => {
     await joinAsNewAccountMember('g_test42')
     await signIn('owner.demo@example.com', 'owner1234')
     const request = (await fetchSnapshot()).joinRequests[0]
     await rejectJoinRequest(request.id)
     expect((await fetchSnapshot()).joinRequests).toEqual([])
+    await expect(approveJoinRequest(request.id)).rejects.toThrow('이미 처리된 요청이에요')
 
     await signIn('a@naver.com', 'aaaaaaaa')
-    expect(await checkJoinRequest('g_test42')).toBe('none')
+    expect(await checkJoinRequest('g_test42')).toBe('rejected')
+    expect((await fetchSnapshot()).joinRequests).toEqual([expect.objectContaining({ status: 'rejected', mine: true })])
+    const again = await resolveInviteCode('TEST42')
+    expect(again).toMatchObject({ kind: 'rejected', groupName: '초대코드 테스트방', retry: { kind: 'pick' } })
     expect((await fetchSnapshot()).groups.map((g) => g.id)).toEqual(['g_jeju'])
+
+    await joinAsNewAccountMember('g_test42')
+    expect(await checkJoinRequest('g_test42')).toBe('pending')
+    await signIn('owner.demo@example.com', 'owner1234')
+    const owner = await fetchSnapshot()
+    expect(owner.joinRequests).toEqual([expect.objectContaining({ status: 'pending' })])
+    expect(owner.notifications.filter((n) => n.type === 'join_request')).toHaveLength(2)
   })
 
   it('요청한 사람은 요청을 취소할 수 있다', async () => {

@@ -496,13 +496,19 @@ export type JoinResolution =
   | { kind: 'joined'; groupId: string }
   /** 참여 요청을 보냈고 방장 승인을 기다리는 중 */
   | { kind: 'requested'; groupId: string; groupName: string }
+  /** 방장이 내 요청을 거절함. "다시 요청하기"를 누르면 retry(초대/멤버 고르기) 화면으로 */
+  | { kind: 'rejected'; groupId: string; groupName: string; retry: JoinStart }
+  | JoinStart
+
+/** 아직 요청 전: 개인 초대 링크(invite) 또는 공용 코드(pick) */
+export type JoinStart =
   /** 개인 초대 링크 → 그룹 이름과 "참여하기"를 보여주고, 누르면 그 자리(memberId)로 참여 요청 */
   | { kind: 'invite'; groupId: string; groupName: string; memberId: string; memberName: string }
   /** 공용 코드 → 07 화면에서 본인을 고르거나 새로 참여 */
   | { kind: 'pick'; groupId: string; groupName: string; candidates: JoinCandidate[] }
 
-/** 승인 대기 화면이 확인하는 내 요청 상태. none: 요청이 없음(거절됐거나 취소됨) */
-export type JoinRequestStatus = 'joined' | 'pending' | 'none'
+/** 승인 대기 화면이 확인하는 내 요청 상태. rejected: 방장이 거절, none: 요청이 없음(취소됨) */
+export type JoinRequestStatus = 'joined' | 'pending' | 'rejected' | 'none'
 
 /** 이 그룹에서 내 자리 — 정식 회원은 계정으로, 게스트는 지금 보는 자리 또는 이 브라우저가 승인받은 자리로 찾는다 */
 function findMyMember(d: MockDb, groupId: string): Member | undefined {
@@ -521,9 +527,12 @@ function isMyRequest(d: MockDb, r: MockJoinRequest): boolean {
   return userId !== null ? r.userId === userId : d.guestKey !== null && r.guestKey === d.guestKey
 }
 
+/** 이 그룹에 내가 보낸 요청 (대기 중이든 거절됐든) */
 function findMyRequest(d: MockDb, groupId: string): MockJoinRequest | undefined {
   return d.joinRequests.find((r) => r.groupId === groupId && isMyRequest(d, r))
 }
+
+const statusOf = (r: MockJoinRequest) => r.status ?? 'pending'
 
 function isGroupOwner(d: MockDb, groupId: string): boolean {
   const { userId } = d.session
@@ -534,7 +543,8 @@ function isGroupOwner(d: MockDb, groupId: string): boolean {
 function visibleJoinRequests(d: MockDb): JoinRequest[] {
   const users = usersById(d)
   return d.joinRequests
-    .filter((r) => isMyRequest(d, r) || isGroupOwner(d, r.groupId))
+    // 방장에게는 대기 중인 요청만 (거절한 요청은 요청한 사람에게만 남는다)
+    .filter((r) => isMyRequest(d, r) || (isGroupOwner(d, r.groupId) && statusOf(r) === 'pending'))
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
     .map((r) => {
       const slot = r.memberId ? d.members.find((m) => m.id === r.memberId) : undefined
@@ -547,6 +557,7 @@ function visibleJoinRequests(d: MockDb): JoinRequest[] {
         memberName: slot ? memberDisplayName(slot, users) : null,
         isGuest: r.guestKey !== null,
         mine: isMyRequest(d, r),
+        status: statusOf(r),
         createdAt: r.createdAt,
       }
     })
@@ -573,7 +584,9 @@ function addJoinRequest(d: MockDb, group: Group, memberId: string | null, guestN
     d.guestKey ??= uid('guest')
   }
 
-  const hadRequest = findMyRequest(d, group.id) !== undefined
+  // 대기 중인 요청을 바꾸는 경우만 알림을 또 만들지 않는다 (거절된 뒤 다시 요청하면 방장에게 다시 알린다)
+  const previous = findMyRequest(d, group.id)
+  const hadRequest = previous !== undefined && statusOf(previous) === 'pending'
   d.joinRequests = d.joinRequests.filter((r) => !(r.groupId === group.id && isMyRequest(d, r)))
   d.joinRequests.push({
     id: uid('jr'),
@@ -583,6 +596,7 @@ function addJoinRequest(d: MockDb, group: Group, memberId: string | null, guestN
     memberId,
     name,
     createdAt: nowIso(),
+    status: 'pending',
   })
   if (!hadRequest) {
     d.notifications.push({
@@ -623,8 +637,15 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
     return { kind: 'joined', groupId: group.id }
   }
 
-  if (findMyRequest(d, group.id)) return { kind: 'requested', groupId: group.id, groupName: group.name }
+  const request = findMyRequest(d, group.id)
+  if (request && statusOf(request) === 'pending') return { kind: 'requested', groupId: group.id, groupName: group.name }
 
+  const start = joinStart(d, group, targetMemberId)
+  return request ? { kind: 'rejected', groupId: group.id, groupName: group.name, retry: start } : start
+}
+
+/** 요청 전 화면: 개인 초대 링크(invite) 또는 공용 코드의 멤버 고르기(pick) */
+function joinStart(d: MockDb, group: Group, targetMemberId: string | null): JoinStart {
   const members = d.members.filter((m) => m.groupId === group.id)
   const users = usersById(d)
   // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 참여를 권한다. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
@@ -699,7 +720,8 @@ export async function checkJoinRequest(groupId: string): Promise<JoinRequestStat
     }
     return 'joined'
   }
-  return findMyRequest(d, groupId) ? 'pending' : 'none'
+  const request = findMyRequest(d, groupId)
+  return request ? statusOf(request) : 'none'
 }
 
 /** 요청한 사람이 참여 요청을 취소 */
@@ -712,7 +734,7 @@ export async function cancelJoinRequest(groupId: string): Promise<void> {
 
 function requireReviewableRequest(d: MockDb, requestId: string): MockJoinRequest {
   const request = d.joinRequests.find((r) => r.id === requestId)
-  if (!request) throw new Error('이미 처리된 요청이에요')
+  if (!request || statusOf(request) !== 'pending') throw new Error('이미 처리된 요청이에요')
   requireSessionUser(d)
   if (!isGroupOwner(d, request.groupId)) throw new Error('방장만 참여 요청을 처리할 수 있어요')
   return request
@@ -783,12 +805,14 @@ export async function approveJoinRequest(requestId: string): Promise<void> {
   commit()
 }
 
-/** 방장 거절 → 요청 삭제. 요청한 사람의 대기 화면은 "거절됐어요"로 바뀐다. */
+/**
+ * 방장 거절 → 요청을 지우지 않고 "거절됨"으로 남긴다. 요청한 사람은 대기 화면이나 같은 링크에서 "거절됐어요"를 보고,
+ * 다시 요청하면 새 요청으로 바뀐다. 방장 화면에서는 사라진다.
+ */
 export async function rejectJoinRequest(requestId: string): Promise<void> {
   if (USE_SUPABASE) return remote.rejectJoinRequest(requestId)
   const d = getDb()
-  requireReviewableRequest(d, requestId)
-  d.joinRequests = d.joinRequests.filter((r) => r.id !== requestId)
+  requireReviewableRequest(d, requestId).status = 'rejected'
   commit()
 }
 

@@ -105,6 +105,8 @@ export interface JoinRequest {
   isGuest: boolean
   /** 내가 보낸 요청이면 true, 내가 방장인 그룹에 들어온 요청이면 false */
   mine: boolean
+  /** pending: 방장 승인 대기, rejected: 방장이 거절함 (요청한 사람에게만 보인다 — 다시 요청하면 pending으로) */
+  status: 'pending' | 'rejected'
   /** ISO 8601 */
   createdAt: string
 }

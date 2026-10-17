@@ -24,7 +24,7 @@ import { CURRENT_PASSWORD_MISMATCH, ProfileIncomplete, SignUpConfirmationRequire
 import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
-import type { JoinRequestStatus, JoinResolution, ProfileInput, SignUpInput, Snapshot } from './index'
+import type { JoinRequestStatus, JoinResolution, JoinStart, ProfileInput, SignUpInput, Snapshot } from './index'
 
 /**
  * 다른 회원도 읽을 수 있는 프로필 컬럼 (DB는 snake_case). 은행·계좌번호는 일부러 뺐다 —
@@ -680,6 +680,8 @@ interface JoinRequestRow {
   is_guest: boolean
   mine: boolean
   created_at: string
+  /** 20261017000000_join_request_status.sql 적용 전에는 없다 → pending으로 본다 */
+  status?: 'pending' | 'rejected'
 }
 
 /**
@@ -702,12 +704,14 @@ async function listJoinRequests(): Promise<JoinRequest[]> {
     memberName: r.member_name,
     isGuest: r.is_guest,
     mine: r.mine,
+    status: r.status ?? 'pending',
     createdAt: r.created_at,
   }))
 }
 
-async function hasMyJoinRequest(groupId: string): Promise<boolean> {
-  return (await listJoinRequests()).some((r) => r.mine && r.groupId === groupId)
+/** 이 그룹에 내가 보낸 요청 (대기 중이든 거절됐든) */
+async function findMyJoinRequest(groupId: string): Promise<JoinRequest | undefined> {
+  return (await listJoinRequests()).find((r) => r.mine && r.groupId === groupId)
 }
 
 /** 06: 코드 확인. 재입장이면 바로 들어가고, 이미 보낸 요청이 있으면 대기, 개인 초대 링크면 그 자리로 요청, 아니면 07로 넘긴다. */
@@ -730,8 +734,15 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
     return { kind: 'joined', groupId: group.id }
   }
 
-  if (await hasMyJoinRequest(group.id)) return { kind: 'requested', groupId: group.id, groupName: group.name }
+  const request = await findMyJoinRequest(group.id)
+  if (request?.status === 'pending') return { kind: 'requested', groupId: group.id, groupName: group.name }
 
+  const start = joinStart(group, targetMemberId)
+  return request ? { kind: 'rejected', groupId: group.id, groupName: group.name, retry: start } : start
+}
+
+/** 요청 전 화면: 개인 초대 링크(invite) 또는 공용 코드의 멤버 고르기(pick) */
+function joinStart(group: LookupResult, targetMemberId: string | null): JoinStart {
   // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 참여를 권한다. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
   const target = targetMemberId ? group.members.find((m) => m.id === targetMemberId && !m.claimed) : undefined
   if (target) {
@@ -787,7 +798,7 @@ export async function checkJoinRequest(groupId: string): Promise<JoinRequestStat
     rememberIfGuest(authUser, myMemberId)
     return 'joined'
   }
-  return (await hasMyJoinRequest(groupId)) ? 'pending' : 'none'
+  return (await findMyJoinRequest(groupId))?.status ?? 'none'
 }
 
 /** 요청한 사람이 참여 요청을 취소 */

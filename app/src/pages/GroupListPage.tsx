@@ -59,7 +59,9 @@ export default function GroupListPage() {
           <span className={`${styles.thumb} ${styles.thumbPending}`}>{r.groupName.slice(0, 1)}</span>
           <span className={styles.meta}>
             <span className={styles.name}>{r.groupName}</span>
-            <span className={styles.sum}>그룹장 승인을 기다리고 있어요</span>
+            <span className={styles.sum}>
+              {r.status === 'rejected' ? '그룹장이 참여 요청을 거절했어요' : '그룹장 승인을 기다리고 있어요'}
+            </span>
           </span>
         </div>
       ))}
