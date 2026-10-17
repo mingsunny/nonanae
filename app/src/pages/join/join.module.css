@@ -107,7 +107,7 @@ button.person {
 }
 
 .inviteGroup {
-  margin: 0 0 4px;
+  margin: 0;
   font-family: var(--font-display);
   font-size: var(--fs-display-l);
   color: var(--ink);
@@ -139,4 +139,12 @@ button.person {
 .linkRow {
   margin: 14px 0 0;
   text-align: center;
+}
+
+/* 개인 초대 링크: 로그인 / 회원가입 나란히 */
+.authRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
 }

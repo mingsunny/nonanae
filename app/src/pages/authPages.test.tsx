@@ -703,7 +703,7 @@ describe('06·07 초대코드로 참여', () => {
       vi.useRealTimers()
     })
     const router = renderApp('/join?code=TEST42-m_minji')
-    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
     await screen.findByText(/그룹장에게 참여를 요청했어요/)
     await approveAsOwner42('guest')
     await act(() => vi.advanceTimersByTimeAsync(5000))
@@ -715,11 +715,14 @@ describe('06·07 초대코드로 참여', () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
     expect(await screen.findByText('초대코드 테스트방')).toBeTruthy()
-    expect(screen.getByText('김민지님으로 참여해요')).toBeTruthy()
     expect(screen.queryByLabelText('초대코드')).toBeNull()
+    // 비로그인이면 아래에 로그인 / 회원가입 버튼만 (안내 카드 없이)
+    expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '회원가입' })).toBeTruthy()
+    expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
     expect((await fetchSnapshot()).joinRequests).toEqual([]) // 링크를 열기만 해서는 요청하지 않는다
 
-    await click('참여하기')
+    await click('김민지님으로 참여하기')
     expect(await screen.findByText(/\[초대코드 테스트방\] 그룹장에게 참여를 요청했어요/)).toBeTruthy()
     expect(screen.getByText('승인 요청중')).toBeTruthy()
     expect(urlOf(router)).toBe('/join?code=TEST42-m_minji')
@@ -739,7 +742,7 @@ describe('06·07 초대코드로 참여', () => {
   it('개인 초대 링크에서 "다른 이름으로 참여"를 누르면 멤버 목록으로 가서 다른 자리를 고르거나 새 이름으로 참여할 수 있다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
-    await userEvent.click(await screen.findByRole('button', { name: '김민지님이 아니거나 다른 이름으로 참여할래요' }))
+    await userEvent.click(await screen.findByRole('button', { name: '다른 이름으로 참여하기' }))
     expect(await screen.findByText(/본인이 누구인지 골라주세요/)).toBeTruthy()
     expect(urlOf(router)).toBe('/join?code=TEST42')
     expect((await fetchSnapshot()).joinRequests).toEqual([])
@@ -759,7 +762,9 @@ describe('06·07 초대코드로 참여', () => {
     await fill('비밀번호', 'aaaaaaaa')
     await userEvent.click(screen.getByRole('button', { name: '로그인' }))
 
-    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    expect(await screen.findByRole('button', { name: '김민지님으로 참여하기' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '회원가입' })).toBeNull() // 로그인했으니 로그인 / 회원가입은 사라짐
+    await click('김민지님으로 참여하기')
     expect(await screen.findByText('승인 요청중')).toBeTruthy()
     expect(urlOf(router)).toBe('/join?code=TEST42-m_minji')
     expect((await fetchSnapshot()).joinRequests).toEqual([
@@ -771,7 +776,7 @@ describe('06·07 초대코드로 참여', () => {
   it('요청을 취소하면 코드 입력으로 돌아가고, 방장이 거절하면 거절 안내가 뜬다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join?code=TEST42-m_minji')
-    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
     await screen.findByText(/그룹장에게 참여를 요청했어요/)
     await click('요청 취소하기')
     expect(await screen.findByText('참여 요청을 취소했어요')).toBeTruthy()
@@ -787,7 +792,7 @@ describe('06·07 초대코드로 참여', () => {
       vi.useRealTimers()
     })
     renderApp('/join?code=TEST42-m_minji')
-    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
     await screen.findByText(/그룹장에게 참여를 요청했어요/)
     // 방장데모가 거절
     await signIn('owner.demo@example.com', 'owner1234')
@@ -877,7 +882,7 @@ describe('06·07 초대코드로 참여', () => {
     await userEvent.click(screen.getByRole('button', { name: '로그인' }))
 
     // 로그인한 계정은 아직 이 그룹 멤버가 아니므로 그 자리로 다시 승인을 받는다
-    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
     expect(await screen.findByText(/그룹장에게 참여를 요청했어요/)).toBeTruthy()
     await approveAsOwner42(testAccount)
     const reloaded = reload(router)
@@ -906,7 +911,7 @@ describe('06·07 초대코드로 참여', () => {
     await fill('계좌번호', '1000-1234-5678')
     await click('가입 완료')
 
-    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
     expect(await screen.findByText(/그룹장에게 참여를 요청했어요/)).toBeTruthy()
     await approveAsOwner42({ email: 'guest@example.com', password: 'pw-12345' })
     const reloaded = reload(router)
@@ -918,7 +923,7 @@ describe('06·07 초대코드로 참여', () => {
   it('가입 확인 메일을 거쳐 그룹 목록으로 들어와도, 저장해 둔 초대 링크로 이어간다', async () => {
     useAuthFlowStore.getState().setReturnTo('/join?code=TEST42-m_minji')
     const router = renderApp('/groups')
-    expect(await screen.findByRole('button', { name: '참여하기' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '김민지님으로 참여하기' })).toBeTruthy()
     expect(pathOf(router)).toBe('/join')
     expect(useAuthFlowStore.getState().returnTo).toBeNull()
   })

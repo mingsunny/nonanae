@@ -3,7 +3,7 @@ import type { JoinResolution } from '../../api'
 import Button from '../../components/common/Button'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
-import AuthLinks from './AuthLinks'
+import { useAuthReturnActions } from './useAuthReturnActions'
 import { useAppStore } from '../../store/appStore'
 import { showToast } from '../../store/toastStore'
 import styles from './join.module.css'
@@ -22,12 +22,14 @@ interface Props {
 }
 
 /**
- * 개인 초대 링크(`/join?code=코드-멤버ID`)로 들어왔을 때. 긴 코드 대신 그룹 이름과 "참여하기"만 보여주고,
- * 누르면 그 자리로 그룹장에게 참여를 요청한다 (링크를 여는 것만으로는 요청하지 않는다).
- * 본인이 아니거나 다른 이름으로 참여하려면 07 멤버 고르기로, 로그인·가입하려면 아래 카드로 (돌아오면 이 화면).
+ * 개인 초대 링크(`/join?code=코드-멤버ID`)로 들어왔을 때. 긴 코드 대신 그룹 이름과 "김민지님으로 참여하기"만
+ * 크게 보여주고, 누르면 그 자리로 그룹장에게 참여를 요청한다 (링크를 여는 것만으로는 요청하지 않는다).
+ * 비로그인이면 그 아래 로그인 / 회원가입 (마치면 이 화면으로 돌아온다). 본인이 아니면 07 멤버 고르기로.
  */
 export default function InviteScreen({ invite, code, onBack, onRequested, onNotMe }: Props) {
+  const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   const joinAsExistingMember = useAppStore((s) => s.joinAsExistingMember)
+  const { login, signup } = useAuthReturnActions(code)
   const [busy, setBusy] = useState(false)
 
   async function join() {
@@ -49,20 +51,25 @@ export default function InviteScreen({ invite, code, onBack, onRequested, onNotM
         <div className={styles.inviteCard}>
           <p className={styles.inviteLabel}>초대받은 그룹</p>
           <p className={styles.inviteGroup}>{invite.groupName}</p>
-          {invite.memberName !== '' && <p className={styles.sub}>{invite.memberName}님으로 참여해요</p>}
         </div>
         <Button disabled={busy} onClick={() => void join()}>
-          참여하기
+          {invite.memberName !== '' ? `${invite.memberName}님으로 참여하기` : '참여하기'}
         </Button>
-        <p className={styles.notice}>그룹장이 승인하면 바로 시작할 수 있어요.</p>
+        {!isLoggedIn && (
+          <div className={styles.authRow}>
+            <Button variant="outline" disabled={busy} onClick={login}>
+              로그인
+            </Button>
+            <Button variant="outline" disabled={busy} onClick={signup}>
+              회원가입
+            </Button>
+          </div>
+        )}
         <p className={styles.linkRow}>
           <button type="button" className={fields.textLink} disabled={busy} onClick={onNotMe}>
-            {invite.memberName !== '' ? `${invite.memberName}님이 아니거나 ` : ''}다른 이름으로 참여할래요
+            다른 이름으로 참여하기
           </button>
         </p>
-        <div className={styles.addButton}>
-          <AuthLinks code={code} />
-        </div>
       </div>
     </div>
   )
