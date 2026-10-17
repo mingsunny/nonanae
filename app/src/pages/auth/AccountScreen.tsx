@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
+import { resolveInviteCode } from '../../api'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { BANKS } from '../../domain/constants'
+import { parseInviteCode } from '../../domain/inviteCode'
 import { NAME_MAX_LENGTH } from '../../domain/name'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
@@ -15,6 +17,13 @@ import styles from './auth.module.css'
 /** 앱 안의 경로만 허용한다 (`/`로 시작하고 `//`로 시작하지 않는 것). 메일 링크의 `next`가 다른 사이트로 보내지 못하게 막는다. */
 function safeInternalPath(value: string | null): string | null {
   return value && value.startsWith('/') && !value.startsWith('//') ? value : null
+}
+
+/** 마친 뒤 갈 곳이 개인 초대 링크(`/join?code=코드-멤버ID`)면 그 초대코드 */
+function personalInviteCode(path: string): string | null {
+  const url = new URL(path, window.location.origin)
+  const code = url.searchParams.get('code')
+  return url.pathname === paths.join && code && parseInviteCode(code).targetMemberId ? code : null
 }
 
 /**
@@ -38,6 +47,23 @@ export default function AccountScreen() {
   const [account, setAccount] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // 개인 초대 링크에서 가입하러 왔으면 초대받은 자리의 이름을 기본값으로 채운다. 바꾸면 그 이름으로 참여한다.
+  useEffect(() => {
+    const code = personalInviteCode(nextPath)
+    if (!code) return
+    let cancelled = false
+    resolveInviteCode(code)
+      .then((result) => {
+        if (!cancelled && result.kind === 'invite') setName((prev) => (prev === '' ? result.memberName : prev))
+      })
+      .catch(() => {
+        // 기본값을 못 채워도 직접 입력하면 된다
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [nextPath])
 
   // 세 필드가 모두 채워져야 진행 가능 (필드별 에러 메시지는 없음). 계좌번호 형식 검증은 하지 않는다(02 예외처리).
   const canSubmit = name.trim() !== '' && bank !== '' && account.trim() !== ''
