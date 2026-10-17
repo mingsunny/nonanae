@@ -794,16 +794,21 @@ describe('resolveInviteCode', () => {
     expect(mocks.rpc).not.toHaveBeenCalledWith('request_join', expect.anything())
   })
 
-  it('개인 초대 링크로 비어 있는 자리를 가리키면 바로 들어가지 않고 그 자리로 참여 요청을 보낸다', async () => {
+  it('개인 초대 링크로 비어 있는 자리를 가리키면 요청하지 않고 그룹 이름과 그 자리를 알려준다. 참여하기를 누르면 그 자리로 요청한다', async () => {
     mocks.auth.getSession.mockResolvedValue(signedInSession)
     mockRpc({ lookup_group_by_code: () => ok(lookupResult), request_join: () => ok(null) })
     mockTables({ members: ok([]) })
 
     expect(await resolveInviteCode(`JEJU26-${memberUuid}`)).toEqual({
-      kind: 'requested',
+      kind: 'invite',
       groupId: 'g-join',
       groupName: '제주도 여행',
+      memberId: memberUuid,
+      memberName: '김민지',
     })
+    expect(mocks.rpc).not.toHaveBeenCalledWith('request_join', expect.anything())
+
+    await joinAsExistingMember('g-join', memberUuid)
     expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: memberUuid, p_name: null })
     expect(mocks.rpc).not.toHaveBeenCalledWith('join_group', expect.anything())
   })

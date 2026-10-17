@@ -22,8 +22,9 @@ interface Props {
 }
 
 /**
- * 참여 요청을 보낸 뒤 방장 승인을 기다리는 화면. 몇 초마다 승인됐는지 확인해 승인되면 바로 그룹으로 들어간다.
- * 요청이 사라졌으면(방장이 거절) 거절 안내로 바뀐다.
+ * 참여 요청을 보낸 뒤 방장 승인을 기다리는 화면("승인 요청중"). 승인돼도 알림이 가지 않으므로, 새로고침하거나
+ * 같은 초대 링크를 다시 열면 들어갈 수 있다고 안내한다. 화면이 열려 있는 동안에는 몇 초마다 조용히 확인해
+ * 승인되면 바로 그룹으로 들어간다. 요청이 사라졌으면(방장이 거절) 거절 안내로 바뀐다.
  */
 export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: Props) {
   const navigate = useNavigate()
@@ -35,29 +36,24 @@ export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: 
   // 취소 중에는 확인 결과(none)를 "거절됨"으로 보여주지 않도록
   const leaving = useRef(false)
 
-  const check = useCallback(
-    async (manual: boolean) => {
-      try {
-        const status = await checkJoinRequest(groupId)
-        if (leaving.current) return
-        if (status === 'joined') {
-          showToast('참여가 승인됐어요')
-          onJoined(groupId)
-        } else if (status === 'none') {
-          setRejected(true)
-        } else if (manual) {
-          showToast('아직 승인을 기다리고 있어요')
-        }
-      } catch (err) {
-        if (manual) showToast(err instanceof Error ? err.message : '확인하지 못했어요')
+  const check = useCallback(async () => {
+    try {
+      const status = await checkJoinRequest(groupId)
+      if (leaving.current) return
+      if (status === 'joined') {
+        showToast('참여가 승인됐어요')
+        onJoined(groupId)
+      } else if (status === 'none') {
+        setRejected(true)
       }
-    },
-    [checkJoinRequest, groupId, onJoined],
-  )
+    } catch {
+      // 다음 확인 때 다시 시도
+    }
+  }, [checkJoinRequest, groupId, onJoined])
 
   useEffect(() => {
     if (rejected) return
-    const timer = setInterval(() => void check(false), JOIN_CHECK_INTERVAL_MS)
+    const timer = setInterval(() => void check(), JOIN_CHECK_INTERVAL_MS)
     return () => clearInterval(timer)
   }, [check, rejected])
 
@@ -96,15 +92,16 @@ export default function WaitingScreen({ groupId, groupName, onJoined, onBack }: 
         <Callout>
           [{groupName}] 그룹장에게 참여를 요청했어요.
           <br />
-          그룹장이 승인하면 바로 들어갈 수 있어요.
+          그룹장이 승인하면 바로 시작할 수 있어요.
         </Callout>
+        <div className={styles.status} role="status">
+          <span className={styles.statusDot} aria-hidden="true" />
+          승인 요청중
+        </div>
         <p className={styles.plain}>
-          승인되면 이 화면에서 저절로 그룹으로 이동해요. 화면을 닫아도 요청은 남아 있어서, 같은 초대 링크로 다시
-          들어오면 이어서 확인할 수 있어요.
+          승인돼도 따로 알림이 가지 않아요. 그룹장에게 승인을 부탁한 뒤, 이 화면을 새로고침하거나 같은 초대 링크를
+          다시 열면 바로 들어갈 수 있어요.
         </p>
-        <Button variant="outline" disabled={busy} onClick={() => void check(true)}>
-          승인됐는지 확인하기
-        </Button>
         {isLoggedIn && (
           <div className={styles.addButton}>
             <Button variant="outline" onClick={() => navigate(paths.groups)}>

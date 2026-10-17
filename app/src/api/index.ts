@@ -492,8 +492,10 @@ export type JoinResolution =
   | { kind: 'not-found' }
   /** 이미 그 그룹 멤버(재입장) → 그룹 안으로 */
   | { kind: 'joined'; groupId: string }
-  /** 참여 요청을 보냈고 방장 승인을 기다리는 중 (개인 초대 링크로 들어오면 그 자리로 바로 요청한다) */
+  /** 참여 요청을 보냈고 방장 승인을 기다리는 중 */
   | { kind: 'requested'; groupId: string; groupName: string }
+  /** 개인 초대 링크 → 그룹 이름과 "참여하기"를 보여주고, 누르면 그 자리(memberId)로 참여 요청 */
+  | { kind: 'invite'; groupId: string; groupName: string; memberId: string; memberName: string }
   /** 공용 코드 → 07 화면에서 본인을 고르거나 새로 참여 */
   | { kind: 'pick'; groupId: string; groupName: string; candidates: JoinCandidate[] }
 
@@ -622,15 +624,19 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
   if (findMyRequest(d, group.id)) return { kind: 'requested', groupId: group.id, groupName: group.name }
 
   const members = d.members.filter((m) => m.groupId === group.id)
-  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 바로 요청. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
+  const users = usersById(d)
+  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 참여를 권한다. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
   const target = targetMemberId ? members.find((m) => m.id === targetMemberId && m.userId === null) : undefined
   if (target) {
-    addJoinRequest(d, group, target.id, null)
-    commit()
-    return { kind: 'requested', groupId: group.id, groupName: group.name }
+    return {
+      kind: 'invite',
+      groupId: group.id,
+      groupName: group.name,
+      memberId: target.id,
+      memberName: memberDisplayName(target, users),
+    }
   }
 
-  const users = usersById(d)
   return {
     kind: 'pick',
     groupId: group.id,

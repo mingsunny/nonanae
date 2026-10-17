@@ -730,11 +730,10 @@ export async function resolveInviteCode(raw: string): Promise<JoinResolution> {
 
   if (await hasMyJoinRequest(group.id)) return { kind: 'requested', groupId: group.id, groupName: group.name }
 
-  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 바로 요청. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
+  // 개인 초대 링크: 그 자리가 아직 비어 있을 때만 그 자리로 참여를 권한다. 이미 누가 차지했으면 공용 코드처럼 07로 넘김(06 예외처리)
   const target = targetMemberId ? group.members.find((m) => m.id === targetMemberId && !m.claimed) : undefined
   if (target) {
-    await requestJoin(parsed.code, target.id, null)
-    return { kind: 'requested', groupId: group.id, groupName: group.name }
+    return { kind: 'invite', groupId: group.id, groupName: group.name, memberId: target.id, memberName: target.name ?? '' }
   }
 
   return {
