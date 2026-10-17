@@ -37,6 +37,9 @@ function MemberInvite({ group }: { group: GroupDetail }) {
   const allJoinRequests = useAppStore((s) => s.joinRequests)
   // 방장에게만 온다(내가 보낸 요청은 빼고 이 그룹 것만)
   const joinRequests = allJoinRequests.filter((r) => r.groupId === group.id && !r.mine)
+  // 참여 요청이 들어온 자리는 위 "참여 요청"에만 보여준다 (멤버 목록에도 있으면 사람이 한 명 더 있는 것처럼 보임)
+  const requestedSeatIds = new Set(joinRequests.flatMap((r) => (r.memberId ? [r.memberId] : [])))
+  const listedMembers = group.members.filter((m) => !requestedSeatIds.has(m.id))
   const [reviewing, setReviewing] = useState<string | null>(null)
   const { me, nameOf, isMe, isPending } = useGroupView(group)
   const [name, setName] = useState('')
@@ -158,7 +161,7 @@ function MemberInvite({ group }: { group: GroupDetail }) {
         )}
 
         <div className={styles.card}>
-          {group.members.map((m) => {
+          {listedMembers.map((m) => {
             const pending = isPending(m)
             // 게스트로 참여한 본인 자리만 이름을 고칠 수 있다. userId가 있으면 정식 회원이라 04 프로필에서 고친다.
             const canRenameSelf = isMe(m.id) && m.userId === null
