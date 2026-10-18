@@ -19,6 +19,8 @@ export default function SettlePage() {
 
 function Settle({ group }: { group: GroupDetail }) {
   const usersById = useAppStore((s) => s.usersById)
+  // 게스트(로그인 없이 참여)에겐 계좌번호를 보여주지 않는다 — 링크만 있으면 들어올 수 있어서. 서버(get_payee_accounts)도 막혀 있다
+  const isGuest = useAppStore((s) => s.currentUserId === null)
   const { nameOf, me, isMe } = useGroupView(group)
   const [pressed, setPressed] = useState<string | null>(null)
 
@@ -77,7 +79,12 @@ function Settle({ group }: { group: GroupDetail }) {
         </div>
 
         {/* 계좌는 내가 보낼 송금에만 노출. 다른 사람 간 송금은 복사할 필요가 없어 아예 렌더링하지 않음 */}
-        {showAccount && bankAccount && (
+        {showAccount && isGuest && (
+          <div className={`${styles.account} ${styles.noAccount}`}>
+            <span className={styles.locked}>로그인하면 계좌번호를 볼 수 있어요</span>
+          </div>
+        )}
+        {showAccount && !isGuest && bankAccount && (
           <button
             type="button"
             className={styles.account}
@@ -90,7 +97,7 @@ function Settle({ group }: { group: GroupDetail }) {
           </button>
         )}
         {/* 대기 중 멤버·게스트는 계좌가 없어 정상적으로 발생 — 복사 UI 비활성화 (09 §6) */}
-        {showAccount && !bankAccount && (
+        {showAccount && !isGuest && !bankAccount && (
           <div className={`${styles.account} ${styles.noAccount}`}>
             <span className={styles.missing}>
               등록된 계좌가 없어요. {nameOf(t.to)}님에게 직접 확인해주세요
@@ -104,8 +111,9 @@ function Settle({ group }: { group: GroupDetail }) {
   return (
     <>
       <p className={styles.guide}>
-        가장 적은 횟수로 정산할 수 있도록 계산했어요. 내가 보낼 계좌는 탭하면 복사돼요. 지출을
-        등록하면 정산 결과도 실시간으로 바로 반영돼요.
+        가장 적은 횟수로 정산할 수 있도록 계산했어요.{' '}
+        {isGuest ? '계좌번호는 로그인하면 볼 수 있어요.' : '내가 보낼 계좌는 탭하면 복사돼요.'} 지출을 등록하면 정산
+        결과도 실시간으로 바로 반영돼요.
       </p>
       {mine.map((t) => renderRow(t, true))}
       {others.map((t) => renderRow(t, false))}
