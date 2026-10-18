@@ -867,7 +867,7 @@ describe('06·07 초대코드로 참여', () => {
     expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
   })
 
-  it('게스트로 참여한 뒤 그룹 화면에서 "로그인"하면 그 자리로 내 계정 참여를 요청하고, 승인되면 연결된다', async () => {
+  it('게스트로 참여한 뒤 그룹 화면에서 "로그인"하면 승인 없이 그 자리가 내 계정에 연결된다', async () => {
     await bootApprovedGuest()
     const router = renderApp('/join?code=TEST42-m_minji')
     await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
@@ -879,18 +879,15 @@ describe('06·07 초대코드로 참여', () => {
     await fill('비밀번호', 'aaaaaaaa')
     await userEvent.click(screen.getByRole('button', { name: '로그인' }))
 
-    // 로그인한 계정은 아직 이 그룹 멤버가 아니므로 그 자리로 다시 승인을 받는다
+    // 이미 승인된 게스트 자리라 다시 승인받지 않고 바로 들어간다
     await userEvent.click(await screen.findByRole('button', { name: '테스트님으로 참여하기' }))
-    expect(await screen.findByText(/그룹장에게 참여를 요청했어요/)).toBeTruthy()
-    await approveAsOwner42(testAccount)
-    const reloaded = reload(router)
-    await waitFor(() => expect(pathOf(reloaded)).toBe('/groups/g_test42/expenses'))
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
     const minji = state().groups.find((g) => g.id === 'g_test42')!.members.find((m) => m.id === 'm_minji')!
     expect(minji.userId).toBe('u_test')
     expect(screen.queryByText('계정으로 더 편리하게 이용하세요')).toBeNull()
   })
 
-  it('게스트로 참여한 뒤 그룹 화면에서 "회원가입"하면 가입을 마치고 그 자리로 참여를 요청한다', async () => {
+  it('게스트로 참여한 뒤 그룹 화면에서 "회원가입"하면 가입을 마치고 승인 없이 그 자리로 들어간다', async () => {
     await bootApprovedGuest()
     const router = renderApp('/join?code=TEST42-m_minji')
     await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
@@ -902,7 +899,7 @@ describe('06·07 초대코드로 참여', () => {
     await fill('비밀번호 확인', 'pw-12345')
     await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
     await click('다음')
-    // 가입 → (이메일 확인) → 이름·계좌 등록 → 자기 자리의 초대 링크로 돌아와 그 자리로 참여를 요청한다
+    // 가입 → (이메일 확인) → 이름·계좌 등록 → 자기 자리의 초대 링크로 돌아와 그 자리로 들어간다
     await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
     // 초대받은 자리의 이름이 기본값으로 들어가 있다
     await waitFor(() => expect((screen.getByLabelText('이름') as HTMLInputElement).value).toBe('김민지'))
@@ -911,10 +908,7 @@ describe('06·07 초대코드로 참여', () => {
     await click('가입 완료')
 
     await userEvent.click(await screen.findByRole('button', { name: '김민지님으로 참여하기' }))
-    expect(await screen.findByText(/그룹장에게 참여를 요청했어요/)).toBeTruthy()
-    await approveAsOwner42({ email: 'guest@example.com', password: 'pw-12345' })
-    const reloaded = reload(router)
-    await waitFor(() => expect(pathOf(reloaded)).toBe('/groups/g_test42/expenses'))
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
     const minji = state().groups.find((g) => g.id === 'g_test42')!.members.find((m) => m.id === 'm_minji')!
     expect(minji.userId).toBe(state().currentUserId)
   })

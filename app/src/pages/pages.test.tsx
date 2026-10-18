@@ -188,6 +188,14 @@ describe('09 정산', () => {
     expect(withAccount.length).toBeGreaterThan(0)
   })
 
+  it('게스트에겐 계좌번호 대신 로그인 안내', () => {
+    useAppStore.setState({ currentUserId: null, viewAsMemberId: 'm_me' })
+    renderAt('/groups/g_jeju/settle')
+    expect(text()).toContain('로그인하면 계좌번호를 볼 수 있어요')
+    expect(text()).not.toContain('탭해서 계좌번호 복사')
+    expect(text()).not.toContain('등록된 계좌가 없어요')
+  })
+
   it('지출이 없으면 빈 상태', () => {
     patchGroup(() => ({ expenses: [] }))
     renderAt('/groups/g_jeju/settle')

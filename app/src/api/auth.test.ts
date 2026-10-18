@@ -421,6 +421,17 @@ describe('참여 요청 (07)', () => {
     expect(owner.notifications.filter((n) => n.type === 'join_request')).toHaveLength(2)
   })
 
+  it('승인된 게스트 자리의 개인 초대 링크로 로그인한 사람이 오면 승인 없이 그 자리를 계정에 연결한다', async () => {
+    await signOut()
+    await joinAsExistingMember('g_test42', 'm_minji')
+    await approveAsOwner42()
+
+    await signIn('a@naver.com', 'aaaaaaaa')
+    await joinAsExistingMember('g_test42', 'm_minji')
+    const group = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')!
+    expect(group.members.find((m) => m.id === 'm_minji')).toMatchObject({ userId: 'u_test', name: null })
+  })
+
   it('요청한 사람은 요청을 취소할 수 있다', async () => {
     await joinAsNewAccountMember('g_test42')
     await cancelJoinRequest('g_test42')

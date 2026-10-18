@@ -575,6 +575,20 @@ function addJoinRequest(d: MockDb, group: Group, memberId: string | null, guestN
   if (slot && slot.userId !== null) throw new Error('이미 가입된 멤버예요')
 
   const { userId } = d.session
+  // 이미 승인된 게스트 자리의 개인 초대 링크: 승인은 한 번이면 충분 — 다른 기기·브라우저여도 바로 그 자리로 들어간다
+  if (slot && d.guestSeats[slot.id] !== undefined) {
+    d.joinRequests = d.joinRequests.filter((r) => !(r.groupId === group.id && isMyRequest(d, r)))
+    if (userId !== null) {
+      delete d.guestSeats[slot.id]
+      slot.userId = userId
+      slot.name = null
+    } else {
+      d.guestKey ??= uid('guest')
+      d.guestSeats[slot.id] = d.guestKey
+      d.session.viewAsMemberId = slot.id
+    }
+    return
+  }
   let name: string
   if (userId !== null) {
     name = requireSessionUser(d).name

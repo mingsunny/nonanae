@@ -144,7 +144,8 @@ function JoinFlow() {
         invite={invite}
         code={code}
         onBack={backToLookup}
-        onRequested={() => startWaiting(invite, code)}
+        // 이미 승인된 자리면 바로 멤버가 되므로, 같은 코드로 다시 확인해 그룹(또는 대기 화면)으로 보낸다
+        onRequested={() => void lookup(code)}
       />
     )
   }

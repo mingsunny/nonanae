@@ -23,7 +23,7 @@ export default function AccountPromoCard({ onLogin, onSignup }: Props) {
       </span>
       <div className={styles.text}>
         <p className={styles.title}>계정으로 더 편리하게 이용하세요</p>
-        <p className={styles.sub}>기존 계정으로 로그인하거나 새로 가입해 보세요.</p>
+        <p className={styles.sub}>로그인하거나 가입하면 계좌번호도 볼 수 있어요.</p>
       </div>
       <div className={styles.actions}>
         <button type="button" className={`${styles.button} ${styles.login}`} onClick={onLogin}>
