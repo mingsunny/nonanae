@@ -384,10 +384,28 @@ export async function signOut(): Promise<void> {
  * 회원 탈퇴. User와 로그인 정보를 지우고, 그 사람의 Member와 지출은 그대로 둔다.
  * 이름은 Member.name으로 옮겨서 "이름 있는 미가입 멤버"로 남긴다 (schema.md "삭제 시 동작", DB의 preserve_member_name 트리거와 같은 규칙).
  */
+/**
+ * 그룹장 넘기기: 지금 그룹장을 내리고, leavingUserId를 뺀 회원 중 가장 먼저 들어온 사람을 그룹장으로.
+ * 회원이 없으면 그룹장 없는 그룹이 되고(바로 참여), 승인을 기다리던 요청은 지운다.
+ */
+function handOverOwner(d: MockDb, groupId: string, leavingUserId: string | null): void {
+  const members = d.members.filter((m) => m.groupId === groupId)
+  const next = members
+    .filter((m) => m.userId !== null && m.userId !== leavingUserId)
+    .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0]
+  for (const m of members) if (m.role === 'owner') m.role = 'member'
+  if (next) next.role = 'owner'
+  else d.joinRequests = d.joinRequests.filter((r) => !(r.groupId === groupId && statusOf(r) === 'pending'))
+}
+
 export async function deleteAccount(): Promise<void> {
   if (USE_SUPABASE) return remote.deleteAccount()
   const d = getDb()
   const user = requireSessionUser(d)
+  // 내가 그룹장인 그룹은 먼저 넘긴다 (DB의 delete_my_account → hand_over_owner와 같은 규칙)
+  for (const member of d.members) {
+    if (member.userId === user.id && member.role === 'owner') handOverOwner(d, member.groupId, user.id)
+  }
   for (const member of d.members) {
     if (member.userId !== user.id) continue
     member.name = user.name
@@ -596,6 +614,26 @@ function addJoinRequest(d: MockDb, group: Group, memberId: string | null, guestN
     name = slot?.name ?? (guestName ?? '').trim()
     if (!name) throw new Error('이름을 입력해주세요')
     d.guestKey ??= uid('guest')
+  }
+
+  // 그룹장이 없는 그룹(그룹장이 탈퇴했고 남은 회원도 없음): 승인할 사람이 없으니 바로 참여. 회원이 들어오면 새 그룹장
+  if (!d.members.some((m) => m.groupId === group.id && m.role === 'owner')) {
+    d.joinRequests = d.joinRequests.filter((r) => !(r.groupId === group.id && isMyRequest(d, r)))
+    let member = slot
+    if (!member) {
+      member = { id: uid('m'), userId: null, groupId: group.id, role: 'member', name, joinedAt: nowIso() }
+      d.members.push(member)
+    }
+    if (userId !== null) {
+      member.userId = userId
+      member.name = null
+      handOverOwner(d, group.id, null)
+    } else {
+      d.guestSeats[member.id] = d.guestKey!
+      d.session.viewAsMemberId = member.id
+    }
+    addMemberJoinedNotification(d, group, member)
+    return
   }
 
   // 대기 중인 요청을 바꾸는 경우만 알림을 또 만들지 않는다 (거절된 뒤 다시 요청하면 방장에게 다시 알린다)
