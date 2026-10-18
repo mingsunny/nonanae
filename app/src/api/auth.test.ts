@@ -464,6 +464,35 @@ describe('참여 요청 (07)', () => {
   })
 })
 
+describe('그룹장 탈퇴', () => {
+  it('그룹장이 탈퇴하면 남은 회원 중 가장 먼저 들어온 사람이 그룹장이 된다', async () => {
+    await signIn('a@naver.com', 'aaaaaaaa')
+    await joinAsNewAccountMember('g_test42')
+    await approveAsOwner42() // 방장으로 로그인한 상태
+    await deleteAccount()
+    await signIn('a@naver.com', 'aaaaaaaa')
+    const group = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')!
+    expect(group.members.filter((m) => m.role === 'owner').map((m) => m.userId)).toEqual(['u_test'])
+  })
+
+  it('남은 회원이 없으면 그룹장 없는 그룹이 되고, 승인 없이 바로 참여한다. 회원이 들어오면 그 사람이 그룹장', async () => {
+    await signIn('a@naver.com', 'aaaaaaaa')
+    const group = await createGroup('혼자 방')
+    await deleteAccount()
+
+    await resolveInviteCode(group.inviteCode)
+    await joinAsNewGuest(group.id, '손님')
+    expect(await resolveInviteCode(group.inviteCode)).toEqual({ kind: 'joined', groupId: group.id })
+
+    await signUpAndComplete()
+    await resolveInviteCode(group.inviteCode)
+    await joinAsNewAccountMember(group.id)
+    const joined = (await fetchSnapshot()).groups.find((g) => g.id === group.id)!
+    const me = joined.members.find((m) => m.userId !== null)!
+    expect(me.role).toBe('owner')
+  })
+})
+
 describe('비밀번호 재설정 (14)', () => {
   /** 목업은 메일을 못 보내서 개발 중엔 콘솔에 링크를 찍는다 — 거기서 토큰을 꺼냄 */
   async function requestAndGetToken(email: string): Promise<string | null> {

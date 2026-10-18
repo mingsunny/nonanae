@@ -156,7 +156,8 @@ function JoinFlow() {
         pick={pick}
         code={code}
         onBack={() => setPick(null)}
-        onRequested={() => startWaiting(pick, code)}
+        // 그룹장 없는 그룹이면 바로 멤버가 되므로, 같은 코드로 다시 확인해 그룹(또는 대기 화면)으로 보낸다
+        onRequested={() => void lookup(code)}
       />
     )
   }
