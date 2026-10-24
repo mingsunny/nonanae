@@ -421,13 +421,19 @@ describe('참여 요청 (07)', () => {
     expect(owner.notifications.filter((n) => n.type === 'join_request')).toHaveLength(2)
   })
 
-  it('승인된 게스트 자리의 개인 초대 링크로 로그인한 사람이 오면 승인 없이 그 자리를 계정에 연결한다', async () => {
+  it('이미 승인된 게스트 자리라도 그 자리를 지정해 로그인한 사람이 오면 승인 없이 가져갈 수 없다 (초대코드만 아는 사람의 자리 가로채기 방지)', async () => {
     await signOut()
     await joinAsExistingMember('g_test42', 'm_minji')
     await approveAsOwner42()
 
     await signIn('a@naver.com', 'aaaaaaaa')
     await joinAsExistingMember('g_test42', 'm_minji')
+    const mine = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')
+    expect(mine).toBeUndefined() // 아직 멤버가 아니다
+    expect(await checkJoinRequest('g_test42')).toBe('pending')
+
+    await approveAsOwner42()
+    await signIn('a@naver.com', 'aaaaaaaa')
     const group = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')!
     expect(group.members.find((m) => m.id === 'm_minji')).toMatchObject({ userId: 'u_test', name: null })
   })
@@ -475,21 +481,61 @@ describe('그룹장 탈퇴', () => {
     expect(group.members.filter((m) => m.role === 'owner').map((m) => m.userId)).toEqual(['u_test'])
   })
 
-  it('남은 회원이 없으면 그룹장 없는 그룹이 되고, 승인 없이 바로 참여한다. 회원이 들어오면 그 사람이 그룹장', async () => {
-    await signIn('a@naver.com', 'aaaaaaaa')
-    const group = await createGroup('혼자 방')
-    await deleteAccount()
+  describe('그룹장 없는 그룹 (그룹장이 탈퇴했고 남은 정식 회원이 없음)', () => {
+    async function ownerlessGroup() {
+      await signIn('a@naver.com', 'aaaaaaaa')
+      const group = await createGroup('혼자 방')
+      await deleteAccount()
+      return group
+    }
 
-    await resolveInviteCode(group.inviteCode)
-    await joinAsNewGuest(group.id, '손님')
-    expect(await resolveInviteCode(group.inviteCode)).toEqual({ kind: 'joined', groupId: group.id })
+    it('정식 회원은 승인 없이 바로 들어오고, 그 사람이 새 그룹장이 된다', async () => {
+      const group = await ownerlessGroup()
+      await signUpAndComplete()
+      await resolveInviteCode(group.inviteCode)
+      await joinAsNewAccountMember(group.id)
+      const joined = (await fetchSnapshot()).groups.find((g) => g.id === group.id)!
+      const me = joined.members.find((m) => m.userId !== null)!
+      expect(me.role).toBe('owner')
+    })
 
-    await signUpAndComplete()
-    await resolveInviteCode(group.inviteCode)
-    await joinAsNewAccountMember(group.id)
-    const joined = (await fetchSnapshot()).groups.find((g) => g.id === group.id)!
-    const me = joined.members.find((m) => m.userId !== null)!
-    expect(me.role).toBe('owner')
+    it('게스트는 바로 들어올 수 없다 — 요청만 남기고, 그룹장이 생긴 뒤 승인받는다', async () => {
+      const group = await ownerlessGroup()
+      await resolveInviteCode(group.inviteCode)
+      await joinAsNewGuest(group.id, '손님')
+      expect(await resolveInviteCode(group.inviteCode)).toMatchObject({ kind: 'requested' })
+      expect((await fetchSnapshot()).groups).toEqual([])
+
+      // 정식 회원이 들어와 그룹장이 되면, 기다리던 게스트 요청을 그 사람이 승인할 수 있다
+      await signUpAndComplete()
+      await joinAsNewAccountMember(group.id)
+      const owner = await fetchSnapshot()
+      const request = owner.joinRequests.find((r) => r.groupId === group.id && !r.mine)!
+      expect(request).toMatchObject({ name: '손님' })
+      await approveJoinRequest(request.id)
+    })
+
+    it('이미 게스트가 차지한 자리는 정식 회원도 바로 가져갈 수 없다 — 요청만 남는다', async () => {
+      await signOut()
+      await joinAsExistingMember('g_test42', 'm_minji')
+      await approveAsOwner42() // 이 시점에 방장(u_owner)으로 로그인
+      await deleteAccount() // 방장 탈퇴 → 남은 정식 회원이 없어 그룹장 없는 그룹, 게스트 자리 m_minji는 게스트가 차지한 상태
+
+      await signIn('a@naver.com', 'aaaaaaaa')
+      await joinAsExistingMember('g_test42', 'm_minji')
+      expect((await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')).toBeUndefined()
+      expect(await checkJoinRequest('g_test42')).toBe('pending')
+    })
+
+    it('아직 아무도 차지하지 않은 대기 중 자리는 정식 회원이 바로 이어받는다', async () => {
+      await signIn('owner.demo@example.com', 'owner1234')
+      await deleteAccount() // g_test42: 방장 탈퇴, 대기 중 멤버(m_minji)만 남음
+
+      await signIn('a@naver.com', 'aaaaaaaa')
+      await joinAsExistingMember('g_test42', 'm_minji')
+      const group = (await fetchSnapshot()).groups.find((g) => g.id === 'g_test42')!
+      expect(group.members.find((m) => m.id === 'm_minji')).toMatchObject({ userId: 'u_test', role: 'owner' })
+    })
   })
 })
 
