@@ -17,6 +17,7 @@ const RESEND_COOLDOWN_SECONDS = 60
  * 01 이메일 확인 안내 (`/signup/confirm`). 회원가입 1단계에서 확인 메일을 보낸 뒤 보여준다.
  * 메일의 링크를 누르면 로그인된 채로 계좌 등록(`/signup/account`)으로 돌아온다 — 이 화면은 그때까지의 대기 화면이다.
  * 입력했던 이메일은 1단계 입력값(draft)에서 가져온다. 새로고침 등으로 없어졌다면 1단계로 돌려보낸다.
+ * 계정은 이미 만들어졌으므로 이메일을 고치러 1단계로 돌아가는 길은 두지 않는다 — 뒤로가기는 1단계가 아니라 처음 온 곳(인트로 또는 초대 화면)으로 간다.
  */
 export default function CheckEmailScreen() {
   const navigate = useNavigate()
@@ -49,7 +50,7 @@ export default function CheckEmailScreen() {
 
   return (
     <div>
-      <Topbar title="이메일 확인" onBack={() => navigate(paths.signup, { replace: true })} />
+      <Topbar title="이메일 확인" onBack={() => navigate(returnTo ?? paths.welcome, { replace: true })} />
       <div className={styles.body}>
         <Callout>
           <span className={styles.confirmEmail}>{email}</span>

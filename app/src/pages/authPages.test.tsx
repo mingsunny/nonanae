@@ -379,6 +379,15 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy()
   })
 
+  it('확인 화면의 뒤로가기는 1단계(이메일 다시 입력)가 아니라 인트로로 간다', async () => {
+    await boot({ loggedIn: false })
+    useAuthFlowStore.getState().patchDraft({ email: 'new@example.com' })
+    const router = renderApp('/signup/confirm')
+    await screen.findByRole('button', { name: /메일 다시 보내기/ })
+    await click('뒤로가기')
+    expect(pathOf(router)).toBe('/welcome')
+  })
+
   it('이메일 없이 /signup/confirm으로 들어오면 1단계로 돌려보낸다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/signup/confirm')
