@@ -74,10 +74,15 @@ function MemberInvite({ group }: { group: GroupDetail }) {
 
   /** 방장이 초대코드를 새로 만든다 — 이전 코드와 그 코드로 만든 초대 링크는 즉시 못 쓰고, 이미 참여한 멤버는 그대로다. */
   async function rotateCode() {
-    if (!window.confirm('초대코드를 새로 만들까요?\n이전 코드와 초대 링크는 더 이상 쓸 수 없어요.')) return
+    if (
+      !window.confirm(
+        '초대코드를 새로 만들까요?\n이전 코드와 초대 링크는 더 이상 쓸 수 없어요.\n이미 참여한 멤버는 쓰던 기기에서 계속 쓸 수 있지만, 새 기기나 브라우저에서 다시 들어오려면 새 코드가 필요해요.',
+      )
+    )
+      return
     try {
       await rotateInviteCode(group.id)
-      showToast('초대코드를 새로 만들었어요')
+      showToast('초대코드를 새로 만들었어요. 멤버들에게 새 코드를 알려주세요')
     } catch (error) {
       showToast(error instanceof Error ? error.message : '새로 만들지 못했어요')
     }
@@ -249,8 +254,9 @@ function MemberInvite({ group }: { group: GroupDetail }) {
               초대코드 새로 만들기
             </button>
             <p className={styles.rotateHint}>
-              초대코드가 원치 않는 사람에게 알려졌다면 새로 만드세요. 이전 코드와 초대 링크는 더 이상 쓸 수 없고,
-              이미 참여한 멤버는 그대로예요.
+              초대코드가 원치 않는 사람에게 알려졌다면 새로 만드세요. 이전 코드와 초대 링크는 더 이상 쓸 수 없어요.
+              이미 참여한 멤버는 쓰던 기기에서 계속 쓸 수 있지만, 새 기기나 브라우저에서 다시 들어오려면 새 코드를
+              전달해야 해요.
             </p>
           </div>
         )}

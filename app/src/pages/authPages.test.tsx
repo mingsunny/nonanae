@@ -650,6 +650,36 @@ describe('06·07 초대코드로 참여', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('일치하는 그룹을 찾을 수 없어요. 코드를 다시 확인해주세요.')
   })
 
+  it('없는 코드면 "초대코드가 바뀌었을 수 있다"는 안내를 더 보여준다 (참여 중인 그룹이 없으면 이동 버튼은 없다)', async () => {
+    await boot({ loggedIn: false })
+    renderApp('/join')
+    await fill('초대코드', 'CD99')
+    await userEvent.click(await screen.findByRole('button', { name: '다음' }))
+    expect(await screen.findByText(/방장이 초대코드를 새로 만들었다면 이전 코드와 초대 링크는 더 이상 쓸 수 없어요/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /그룹으로 가기/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: '내 그룹 목록으로 가기' })).toBeNull()
+  })
+
+  it('이미 참여 중인 게스트가 이전 코드로 오면, 자기 그룹으로 가는 버튼을 보여준다', async () => {
+    await bootApprovedGuest()
+    await resolveInviteCode('TEST42-m_minji') // 승인된 자리로 이미 한 번 들어온 게스트
+    useAppStore.setState({ status: 'idle' })
+    await useAppStore.getState().init()
+    const router = renderApp('/join')
+    await fill('초대코드', 'CD99')
+    await userEvent.click(await screen.findByRole('button', { name: '다음' }))
+    await userEvent.click(await screen.findByRole('button', { name: '이미 참여 중인 [초대코드 테스트방] 그룹으로 가기' }))
+    await waitFor(() => expect(pathOf(router)).toBe('/groups/g_test42/expenses'))
+  })
+
+  it('로그인한 회원이 이전 코드로 오면, 내 그룹 목록으로 가는 버튼을 보여준다', async () => {
+    const router = renderApp('/join')
+    await fill('초대코드', 'CD99')
+    await userEvent.click(await screen.findByRole('button', { name: '다음' }))
+    await userEvent.click(await screen.findByRole('button', { name: '내 그룹 목록으로 가기' }))
+    await waitFor(() => expect(pathOf(router)).toBe('/groups'))
+  })
+
   it('공용 코드(비로그인)는 멤버 목록 없이 그룹 이름과 이름 입력만 보여주고, 이름으로 참여하면 승인을 기다린다. 승인되면 그 자리로 들어간다', async () => {
     await boot({ loggedIn: false })
     const router = renderApp('/join')

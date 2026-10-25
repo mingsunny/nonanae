@@ -396,6 +396,17 @@ describe('12 멤버 초대', () => {
     expect((screen.getByRole('button', { name: '추가' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('방장이 초대코드를 새로 만들려 하면, 새 기기에서 들어오려면 새 코드가 필요하다는 안내를 확인창에 보여준다', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    confirm.mockClear()
+    renderAt('/groups/g_jeju/members')
+    await userEvent.click(screen.getByRole('button', { name: '초대코드 새로 만들기' }))
+    const message = String(confirm.mock.calls.at(-1)?.[0])
+    expect(message).toContain('이전 코드와 초대 링크는 더 이상 쓸 수 없어요')
+    expect(message).toContain('새 기기나 브라우저에서 다시 들어오려면 새 코드가 필요해요')
+    expect(text()).toContain('새 기기나 브라우저에서 다시 들어오려면 새 코드를')
+  })
+
   it('하단 "그룹으로 가기"는 항상 보이고, 누르면 08로 간다', async () => {
     renderAt('/groups/g_jeju/members')
     expect(screen.getByRole('link', { name: '그룹으로' })).toBeTruthy() // 상단 back
