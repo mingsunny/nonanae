@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
@@ -10,7 +10,7 @@ import { isEmailTaken } from '../../api'
 import { SignUpConfirmationRequired } from '../../api/errors'
 import { PASSWORD_RULE_HINT, passwordProblem } from '../../domain/password'
 import { PRIVACY_SUMMARY } from '../../domain/privacyPolicy'
-import { usePrefetchCaptcha } from '../../lib/captcha'
+import { prefetchCaptchaToken, usePrefetchCaptcha } from '../../lib/captcha'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
@@ -43,6 +43,21 @@ export default function SignupScreen() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   usePrefetchCaptcha()
+  // 이메일 중복 확인은 입력칸을 벗어날 때 미리 시작해 두고, "다음"을 누르면 같은 이메일이면 그 결과를 쓴다
+  const emailCheck = useRef<{ email: string; taken: Promise<boolean> } | null>(null)
+
+  function checkEmail(email: string): Promise<boolean> {
+    const key = email.trim()
+    if (emailCheck.current?.email !== key) {
+      const taken = isEmailTaken(key)
+      // 미리 확인이 실패하면 버리고 제출 때 다시 확인한다
+      taken.catch(() => {
+        if (emailCheck.current?.taken === taken) emailCheck.current = null
+      })
+      emailCheck.current = { email: key, taken }
+    }
+    return emailCheck.current.taken
+  }
 
   const confirmed = draft.passwordConfirm.length > 0
   const matches = draft.password === draft.passwordConfirm
@@ -66,7 +81,7 @@ export default function SignupScreen() {
     if (!canSubmit || busy) return
     setBusy(true)
     try {
-      if (await isEmailTaken(draft.email)) {
+      if (await checkEmail(draft.email)) {
         setError('이미 가입된 이메일이에요. 로그인해주세요.')
         return
       }
@@ -81,6 +96,8 @@ export default function SignupScreen() {
         return
       }
       setError(err instanceof Error ? err.message : '가입하지 못했어요')
+      // 다시 시도할 때 기다리지 않도록 다음 봇 확인을 바로 받아 둔다
+      prefetchCaptchaToken()
     } finally {
       setBusy(false)
     }
@@ -101,6 +118,9 @@ export default function SignupScreen() {
           placeholder="예) nonanae@gmail.com"
           value={draft.email}
           onChange={(e) => edit({ email: e.target.value })}
+          onBlur={() => {
+            if (draft.email.trim().includes('@')) void checkEmail(draft.email).catch(() => {})
+          }}
         />
         <label className={fields.label} htmlFor="signup-password">
           비밀번호

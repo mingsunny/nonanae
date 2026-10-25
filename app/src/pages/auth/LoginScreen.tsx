@@ -6,7 +6,7 @@ import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import PasswordInput from '../../components/common/PasswordInput'
 import Topbar from '../../components/common/Topbar'
-import { usePrefetchCaptcha } from '../../lib/captcha'
+import { prefetchCaptchaToken, usePrefetchCaptcha } from '../../lib/captcha'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
@@ -49,6 +49,8 @@ export default function LoginScreen() {
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인하지 못했어요')
       setBusy(false)
+      // 다시 시도할 때 기다리지 않도록 다음 봇 확인을 바로 받아 둔다
+      prefetchCaptchaToken()
     }
   }
 

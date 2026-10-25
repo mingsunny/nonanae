@@ -3,6 +3,7 @@ import Button from '../../components/common/Button'
 import PrivacyLink, { TermsLink } from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import logoUrl from '../../assets/logo.png'
+import { usePrefetchCaptcha } from '../../lib/captcha'
 import { paths } from '../../routes/paths'
 import { useAuthFlowStore } from '../../store/authFlowStore'
 import styles from './auth.module.css'
@@ -13,6 +14,8 @@ export default function IntroScreen() {
   const startSignup = useAuthFlowStore((s) => s.startSignup)
   // 초대 링크에서 로그인하러 갔다가 인트로로 빠져나온 경우, 이후 로그인은 다시 그룹 목록으로 가야 한다
   const setReturnTo = useAuthFlowStore((s) => s.setReturnTo)
+  // 로그인·회원가입 버튼을 누르기 전부터 봇 확인을 받아 둔다 — 다음 화면에서 그 토큰을 그대로 쓴다
+  usePrefetchCaptcha()
 
   function openSignup() {
     setReturnTo(null)
