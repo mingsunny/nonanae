@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import * as api from '../api'
-import { ProfileIncomplete } from '../api/errors'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -152,12 +151,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   signIn: async (email, password) => {
-    try {
-      await api.signIn(email, password)
-    } catch (err) {
-      // 가입 확인은 했지만 이름·계좌 등록을 마치지 않은 계정: 로그인 자체는 됐으니 상태를 읽어 계좌 등록으로 이어가게 한다
-      if (!(err instanceof ProfileIncomplete)) throw err
-    }
+    // 이름·계좌 등록을 마치지 않은 계정이면 아래 refresh가 needsProfile을 켜서 화면이 계좌 등록으로 보낸다
+    await api.signIn(email, password)
     set({ leavingToLogin: false })
     await get().refresh()
   },

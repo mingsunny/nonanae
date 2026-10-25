@@ -38,7 +38,7 @@ vi.mock('../lib/captcha', async (importOriginal) => ({
 
 import { PRIVACY_VERSION } from '../domain/privacyPolicy'
 import { TERMS_VERSION } from '../domain/termsOfService'
-import { ProfileIncomplete, SignUpConfirmationRequired } from './errors'
+import { SignUpConfirmationRequired } from './errors'
 import {
   addPendingMember,
   approveJoinRequest,
@@ -215,24 +215,13 @@ describe('authErrorMessage', () => {
 })
 
 describe('signIn', () => {
-  it('로그인하고 auth 계정 + 프로필을 합친 User를 돌려준다', async () => {
+  it('로그인만 하고 프로필은 따로 읽지 않는다 (로그인 뒤 fetchSnapshot이 함께 읽는다)', async () => {
     mocks.auth.signInWithPassword.mockResolvedValue({ error: null })
-    mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockMyProfile(profileRow)
 
-    const user = await signIn(' me@example.com ', 'pw-12345')
+    await expect(signIn(' me@example.com ', 'pw-12345')).resolves.toBeUndefined()
 
     expect(mocks.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'me@example.com', password: 'pw-12345', options: {} })
-    expect(user).toEqual({
-      id: 'user-1',
-      authProvider: 'email',
-      email: 'me@example.com',
-      emailVerified: true,
-      name: '민선',
-      bank: '카카오뱅크',
-      account: '3333-01-1',
-      seenGroupCreateCoach: false,
-    })
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
   it('봇 확인 토큰이 있으면 captchaToken으로 함께 보낸다', async () => {
@@ -250,13 +239,6 @@ describe('signIn', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     mocks.auth.signInWithPassword.mockResolvedValue({ error: authError('captcha_failed') })
     await expect(signIn('me@example.com', 'pw-12345')).rejects.toThrow('보안 확인을 하지 못했어요')
-  })
-
-  it('로그인은 됐지만 이름·계좌(프로필)를 아직 등록하지 않은 계정이면 ProfileIncomplete로 알린다', async () => {
-    mocks.auth.signInWithPassword.mockResolvedValue({ error: null })
-    mocks.auth.getSession.mockResolvedValue(signedInSession)
-    mockMyProfile(null)
-    await expect(signIn('me@example.com', 'pw-12345')).rejects.toBeInstanceOf(ProfileIncomplete)
   })
 
   it('잘못된 비밀번호면 한국어 에러로 던진다', async () => {

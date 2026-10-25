@@ -5,7 +5,7 @@ import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
 import { assertNameLength } from '../domain/name'
 import { expenseAddedTitle, expenseDeletedTitle, joinRequestTitle } from '../domain/notifications'
-import { CURRENT_PASSWORD_MISMATCH, ProfileIncomplete } from './errors'
+import { CURRENT_PASSWORD_MISMATCH } from './errors'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -299,7 +299,8 @@ export async function isEmailTaken(email: string): Promise<boolean> {
   return getDb().users.some((u) => u.email === normalizeEmail(email))
 }
 
-export async function signIn(email: string, password: string): Promise<User> {
+/** 로그인만 한다. 이름·계좌 등록을 마치지 않은 계정인지는 로그인 뒤 fetchSnapshot의 needsProfile로 알 수 있다. */
+export async function signIn(email: string, password: string): Promise<void> {
   if (USE_SUPABASE) return remote.signIn(email, password)
   const d = getDb()
   const user = d.users.find((u) => u.email === normalizeEmail(email))
@@ -309,9 +310,6 @@ export async function signIn(email: string, password: string): Promise<User> {
   }
   d.session = { userId: user.id, viewAsMemberId: null }
   commit()
-  // 이름·계좌 등록을 마치지 않은 계정은 로그인은 되었지만 계좌 등록으로 이어가야 한다
-  if (user.name === '') throw new ProfileIncomplete()
-  return structuredClone(user)
 }
 
 export interface SignUpInput {

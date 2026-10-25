@@ -1226,7 +1226,7 @@ describe('14 비밀번호 재설정', () => {
     expect(pathOf(router)).toBe('/login')
     expect(await screen.findByLabelText('비밀번호')).toBeTruthy()
     await signOut()
-    await expect(signIn('a@naver.com', 'brand-new1')).resolves.toMatchObject({ id: 'u_test' })
+    await expect(signIn('a@naver.com', 'brand-new1')).resolves.toBeUndefined() // 새 비밀번호로 로그인된다
   })
 
   it('확인 값이 다르면 변경할 수 없다', async () => {

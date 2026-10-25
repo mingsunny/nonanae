@@ -22,7 +22,7 @@ import type {
   SplitType,
   User,
 } from '../domain/types'
-import { CURRENT_PASSWORD_MISMATCH, ProfileIncomplete, SignUpConfirmationRequired } from './errors'
+import { CURRENT_PASSWORD_MISMATCH, SignUpConfirmationRequired } from './errors'
 import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
@@ -295,7 +295,19 @@ async function readSnapshot(): Promise<Snapshot> {
   const isGuest = authUser.is_anonymous === true
   if (!isGuest) await dropAccountCopyIfPresent(authUser)
 
-  const [groupsRes, membersRes, expensesRes, participantsRes, notificationsRes, joinRequests] = await Promise.all([
+  // 서버 왕복을 한 번으로 끝내려고 모두 한꺼번에 요청한다. 프로필은 RLS가 "나 + 같은 그룹 멤버"만 돌려주므로
+  // 멤버 목록을 먼저 받아 id로 거를 필요가 없다(아래에서 지금 보이는 그룹의 멤버로 한 번 더 거른다).
+  const [
+    groupsRes,
+    membersRes,
+    expensesRes,
+    participantsRes,
+    notificationsRes,
+    joinRequests,
+    profilesRes,
+    myProfileRes,
+    payeesRes,
+  ] = await Promise.all([
     supabase.from('groups').select('id, name, invite_code'),
     supabase.from('members').select(MEMBER_COLUMNS).order('joined_at'),
     supabase.from('expenses').select(EXPENSE_COLUMNS).order('created_at'),
@@ -305,6 +317,9 @@ async function readSnapshot(): Promise<Snapshot> {
       .select('id, group_id, member_id, type, title, created_at, read')
       .order('created_at', { ascending: false }),
     listJoinRequests(),
+    supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS),
+    isGuest ? Promise.resolve({ data: null, error: null }) : supabase.rpc('get_my_profile').maybeSingle<MyProfileRow>(),
+    supabase.rpc('get_payee_accounts'),
   ])
   const allGroups = rowsOrThrow<GroupRow>(groupsRes, '그룹')
   const allMembers = rowsOrThrow<MemberRow>(membersRes, '멤버')
@@ -333,14 +348,7 @@ async function readSnapshot(): Promise<Snapshot> {
   const members = allMembers.filter((m) => visibleGroupIds.has(m.group_id))
   const profileIds = new Set(members.flatMap((m) => (m.user_id ? [m.user_id] : [])))
   if (userId) profileIds.add(userId)
-  const [profilesRes, myProfileRes, payeesRes] = await Promise.all([
-    profileIds.size === 0
-      ? Promise.resolve({ data: [], error: null })
-      : supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).in('id', [...profileIds]),
-    userId ? supabase.rpc('get_my_profile').maybeSingle<MyProfileRow>() : Promise.resolve({ data: null, error: null }),
-    supabase.rpc('get_payee_accounts'),
-  ])
-  const profiles = rowsOrThrow<PublicProfileRow>(profilesRes, '프로필')
+  const profiles = rowsOrThrow<PublicProfileRow>(profilesRes, '프로필').filter((p) => profileIds.has(p.id))
   if (myProfileRes.error) throw new Error(`프로필을 불러오지 못했어요: ${myProfileRes.error.message}`)
   const payees = rowsOrThrow<PayeeAccountRow>(payeesRes, '받을 사람 계좌')
   // 로그인은 됐는데 프로필이 없다: 가입 확인만 마치고 이름·계좌를 아직 등록하지 않았거나(또는 탈퇴 직후). 화면이 계좌 등록으로 보낸다.
@@ -381,7 +389,11 @@ async function readSnapshot(): Promise<Snapshot> {
   }
 }
 
-export async function signIn(email: string, password: string): Promise<User> {
+/**
+ * 로그인만 한다. 프로필(이름·계좌)은 따로 읽지 않는다 — 로그인 뒤 화면이 바로 부르는 fetchSnapshot이 함께 읽고,
+ * 등록을 마치지 않은 계정이면 needsProfile로 알려 준다. 서버 왕복을 한 번 줄이려고 여기서는 다시 읽지 않는다.
+ */
+export async function signIn(email: string, password: string): Promise<void> {
   const supabase = getSupabase()
   const captchaToken = await getCaptchaToken()
   const { error } = await supabase.auth.signInWithPassword({
@@ -390,10 +402,6 @@ export async function signIn(email: string, password: string): Promise<User> {
     options: captchaOptions(captchaToken),
   })
   if (error) throw new Error(authErrorMessage(error))
-  const user = await loadSessionUser()
-  // 가입 확인은 했지만 이름·계좌 등록을 마치지 않은 계정: 로그인은 되었으니 계좌 등록으로 이어가게 한다
-  if (!user) throw new ProfileIncomplete()
-  return user
 }
 
 /**
