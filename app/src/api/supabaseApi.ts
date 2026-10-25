@@ -5,6 +5,8 @@ import type { AuthError, PostgrestError, User as AuthUser } from '@supabase/supa
 import { parseInviteCode } from '../domain/inviteCode'
 import { NAME_TOO_LONG_MESSAGE, assertNameLength } from '../domain/name'
 import { PASSWORD_RULE_HINT } from '../domain/password'
+import { PRIVACY_VERSION } from '../domain/privacyPolicy'
+import { TERMS_VERSION } from '../domain/termsOfService'
 import type {
   Category,
   Expense,
@@ -434,6 +436,8 @@ export async function signUp(input: SignUpInput): Promise<void> {
     password: input.password,
     options: {
       emailRedirectTo: signupConfirmRedirect(input.redirectPath),
+      // 가입 화면은 필수 동의를 모두 해야 제출된다. 가입 트리거가 이 값으로 동의 기록(user_consents)을 남긴다
+      data: { consent: { terms: TERMS_VERSION, privacy: PRIVACY_VERSION, age14: true } },
       ...captchaOptions(captchaToken),
     },
   })
@@ -763,9 +767,20 @@ function requireInviteCode(groupId: string): string {
   return code
 }
 
+/**
+ * 게스트가 참여할 때 이용약관·처리방침 동의를 남긴다(참여 화면의 안내 문구가 동의 고지다).
+ * 기록 함수(record_consents)가 아직 서버에 없거나 실패해도 참여는 막지 않는다 — 콘솔에만 남긴다.
+ */
+async function recordGuestConsents(authUser: AuthUser): Promise<void> {
+  if (!authUser.is_anonymous) return
+  const { error } = await getSupabase().rpc('record_consents', { p_terms: TERMS_VERSION, p_privacy: PRIVACY_VERSION })
+  if (error) console.warn('[supabase] 동의 기록을 건너뜀', error.code)
+}
+
 /** 07: 목록에서 "이게 나예요" → 그 자리로 참여 요청. */
 export async function joinAsExistingMember(groupId: string, memberId: string): Promise<void> {
   const authUser = await ensureSession()
+  await recordGuestConsents(authUser)
   const joinedId = await requestJoin(requireInviteCode(groupId), memberId, null)
   if (joinedId) rememberIfGuest(authUser, joinedId)
 }
@@ -777,6 +792,7 @@ export async function joinAsNewGuest(groupId: string, name: string): Promise<voi
   assertNameLength(trimmed)
   const authUser = await ensureSession()
   if (!authUser.is_anonymous) throw new Error('로그인한 상태에서는 이름만으로 참여할 수 없어요')
+  await recordGuestConsents(authUser)
 
   const joinedId = await requestJoin(requireInviteCode(groupId), null, trimmed)
   if (joinedId) rememberIfGuest(authUser, joinedId)

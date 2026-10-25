@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import fields from '../../components/common/Field.module.css'
 import PasswordInput from '../../components/common/PasswordInput'
-import PrivacyLink from '../../components/common/PrivacyLink'
+import PrivacyLink, { TermsLink } from '../../components/common/PrivacyLink'
 import Topbar from '../../components/common/Topbar'
 import { isEmailTaken } from '../../api'
 import { SignUpConfirmationRequired } from '../../api/errors'
@@ -17,7 +17,8 @@ import type { SignupDraft } from '../../store/authFlowStore'
 import styles from './auth.module.css'
 
 /**
- * 01 회원가입 1단계 (`/signup`, 이메일 / 비밀번호 / 개인정보 수집·이용 동의).
+ * 01 회원가입 1단계 (`/signup`, 이메일 / 비밀번호 / 만 14세 이상·이용약관·개인정보 수집·이용 동의).
+ * 동의한 약관·처리방침 버전은 가입 요청에 실려 서버가 동의 시각과 함께 기록한다(user_consents).
  * 순서는 "이메일·비밀번호 → 이메일 확인 → 이름·계좌 등록(02)"이다. 여기서 "다음"을 누르면 이메일·비밀번호로 계정만 만들고
  * 확인 메일을 보낸다(`/signup/confirm`). 메일의 링크를 누르면 로그인된 채로 계좌 등록 화면으로 돌아온다.
  * 이메일 확인이 꺼져 있으면(목업 포함) 바로 계좌 등록으로 넘어간다.
@@ -28,7 +29,16 @@ export default function SignupScreen() {
   const patchDraft = useAuthFlowStore((s) => s.patchDraft)
   const returnTo = useAuthFlowStore((s) => s.returnTo)
   const signUp = useAppStore((s) => s.signUp)
-  const [consent, setConsent] = useState(false)
+  const [age14, setAge14] = useState(false)
+  const [terms, setTerms] = useState(false)
+  const [privacy, setPrivacy] = useState(false)
+  const consent = age14 && terms && privacy
+
+  function agreeAll(checked: boolean) {
+    setAge14(checked)
+    setTerms(checked)
+    setPrivacy(checked)
+  }
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -117,8 +127,24 @@ export default function SignupScreen() {
           </p>
         )}
         <div className={styles.consent}>
+          <label className={`${styles.consentRow} ${styles.consentAll}`}>
+            <input type="checkbox" checked={consent} onChange={(e) => agreeAll(e.target.checked)} />
+            <span>전체 동의</span>
+          </label>
           <label className={styles.consentRow}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <input type="checkbox" checked={age14} onChange={(e) => setAge14(e.target.checked)} />
+            <span>[필수] 만 14세 이상입니다</span>
+          </label>
+          <label className={styles.consentRow}>
+            <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+            <span>[필수] 이용약관에 동의합니다</span>
+          </label>
+          <p className={styles.consentDetail}>
+            노나내는 정산 금액을 계산해 주는 도구이고, 송금은 이용자끼리 직접 해요.{' '}
+            <TermsLink className={styles.consentLink}>전체 보기</TermsLink>
+          </p>
+          <label className={styles.consentRow}>
+            <input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} />
             <span>[필수] 개인정보 수집·이용에 동의합니다</span>
           </label>
           <p className={styles.consentDetail}>

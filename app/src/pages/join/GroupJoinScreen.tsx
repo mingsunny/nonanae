@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import type { JoinResolution } from '../../api'
 import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
-import PrivacyLink from '../../components/common/PrivacyLink'
+import PrivacyLink, { TermsLink } from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
 import { parseInviteCode } from '../../domain/inviteCode'
@@ -121,7 +121,8 @@ export default function GroupJoinScreen({ pick, code, onBack, onRequested }: Pro
               </Button>
             </div>
             <p className={styles.notice}>
-              참여하면 입력한 이름이 이 그룹 멤버로 저장돼요. <PrivacyLink className={styles.noticeLink} />
+              참여하면 입력한 이름이 이 그룹 멤버로 저장되고, <TermsLink className={styles.noticeLink} />과{' '}
+              <PrivacyLink className={styles.noticeLink} />에 동의한 것으로 봐요. 만 14세 이상만 참여할 수 있어요.
             </p>
           </>
         )}

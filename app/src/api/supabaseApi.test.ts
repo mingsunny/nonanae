@@ -36,6 +36,8 @@ vi.mock('../lib/captcha', async (importOriginal) => ({
   getCaptchaToken: mocks.getCaptchaToken,
 }))
 
+import { PRIVACY_VERSION } from '../domain/privacyPolicy'
+import { TERMS_VERSION } from '../domain/termsOfService'
 import { ProfileIncomplete, SignUpConfirmationRequired } from './errors'
 import {
   addPendingMember,
@@ -280,16 +282,19 @@ describe('isEmailRegistered (가입 1단계 중복 확인)', () => {
 describe('signUp (가입 1단계: 이메일·비밀번호만)', () => {
   const input = { email: ' new@example.com ', password: 'pw-12345' }
 
-  it('이름·계좌 없이 이메일·비밀번호만 보내고, 확인 메일 링크는 계좌 등록 화면으로 돌아오게 한다', async () => {
+  it('이름·계좌 없이 이메일·비밀번호와 동의한 약관 버전만 보내고, 확인 메일 링크는 계좌 등록 화면으로 돌아오게 한다', async () => {
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
     await expect(signUp(input)).rejects.toBeInstanceOf(SignUpConfirmationRequired)
     expect(mocks.auth.signUp).toHaveBeenCalledWith({
       email: 'new@example.com',
       password: 'pw-12345',
-      options: { emailRedirectTo: `${window.location.origin}/signup/account` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/signup/account`,
+        data: { consent: { terms: TERMS_VERSION, privacy: PRIVACY_VERSION, age14: true } },
+      },
     })
-    // 계좌 정보를 로그인 정보(메타데이터)에 실어 보내지 않는다
-    expect(mocks.auth.signUp.mock.calls[0][0].options.data).toBeUndefined()
+    // 계좌 정보를 로그인 정보(메타데이터)에 실어 보내지 않는다 — 메타데이터에는 동의 기록만 있다
+    expect(Object.keys(mocks.auth.signUp.mock.calls[0][0].options.data)).toEqual(['consent'])
   })
 
   it('세션이 없으면(이메일 확인 대기) 확인 메일 안내로 던진다', async () => {
@@ -306,7 +311,7 @@ describe('signUp (가입 1단계: 이메일·비밀번호만)', () => {
     mocks.getCaptchaToken.mockResolvedValue('tok-2')
     mocks.auth.signUp.mockResolvedValue({ data: { user: { ...authUser, identities: [{}] }, session: null }, error: null })
     await expect(signUp(input)).rejects.toThrow()
-    expect(mocks.auth.signUp.mock.calls[0][0].options).toEqual({
+    expect(mocks.auth.signUp.mock.calls[0][0].options).toMatchObject({
       emailRedirectTo: `${window.location.origin}/signup/account`,
       captchaToken: 'tok-2',
     })
@@ -880,6 +885,7 @@ describe('참여 요청 (07)', () => {
     mockRpc({
       lookup_group_by_code: () => ok(lookup),
       request_join: () => ok(null),
+      record_consents: () => ok(null),
     })
     mockTables({ members: ok([]) })
     await resolveInviteCode('JEJU26')
@@ -891,8 +897,19 @@ describe('참여 요청 (07)', () => {
 
     await joinAsNewGuest(groupId, ' 새게스트 ')
 
+    expect(mocks.rpc).toHaveBeenCalledWith('record_consents', { p_terms: TERMS_VERSION, p_privacy: PRIVACY_VERSION })
     expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: null, p_name: '새게스트' })
     expect(localStorage.getItem('nonanae:guest-member')).toBeNull()
+  })
+
+  it('게스트 동의 기록이 실패해도(서버에 함수가 아직 없음) 참여 요청은 그대로 보낸다', async () => {
+    await afterLookup(guestSession)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockRpc({ record_consents: () => ({ data: null, error: { code: 'PGRST202', message: 'not found' } }) })
+
+    await joinAsNewGuest(groupId, '새게스트')
+
+    expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: null, p_name: '새게스트' })
   })
 
   it('로그인한 상태에서는 이름만으로 참여할 수 없다', async () => {
@@ -927,9 +944,10 @@ describe('참여 요청 (07)', () => {
     await expect(joinAsExistingMember(groupId, 'm-target')).rejects.toThrow('이미 가입된 멤버예요')
   })
 
-  it('로그인한 회원이 목록에 없는 새 멤버로 참여를 요청한다', async () => {
+  it('로그인한 회원이 목록에 없는 새 멤버로 참여를 요청한다 (동의는 가입 때 기록했으므로 다시 남기지 않는다)', async () => {
     await afterLookup(signedInSession)
     await joinAsNewAccountMember(groupId)
+    expect(mocks.rpc).not.toHaveBeenCalledWith('record_consents', expect.anything())
     expect(mocks.rpc).toHaveBeenCalledWith('request_join', { p_code: 'JEJU26', p_member_id: null, p_name: null })
   })
 

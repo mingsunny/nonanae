@@ -199,10 +199,10 @@ describe('01·02 회원가입 (2단계)', () => {
     await fill('비밀번호 확인', password)
   }
 
-  /** 가입 1단계 입력 + 개인정보 동의 + "다음" */
+  /** 가입 1단계 입력 + 전체 동의 + "다음" */
   async function submitStep1(email = 'new@example.com', password = 'pw-12345') {
     await fillStep1(email, password)
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await userEvent.click(screen.getByLabelText('전체 동의'))
     await click('다음')
   }
 
@@ -262,7 +262,7 @@ describe('01·02 회원가입 (2단계)', () => {
     await userEvent.clear(screen.getByLabelText('비밀번호 확인'))
     await fill('비밀번호 확인', 'pw-12345')
     expect(screen.getByText('비밀번호가 일치해요.')).toBeTruthy()
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await userEvent.click(screen.getByLabelText('전체 동의'))
     expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -313,21 +313,33 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(screen.queryByText(/이름과 계좌 정보를 등록해주세요/)).toBeNull()
   })
 
-  it('1단계는 개인정보 수집·이용에 동의해야 "다음"이 활성화되고, 수집 항목 요약과 처리방침 링크(새 탭)가 보인다', async () => {
+  it('1단계는 만 14세·이용약관·개인정보 동의를 모두 해야 "다음"이 활성화되고, 요약과 전체 보기 링크(새 탭)가 보인다', async () => {
     await goToSignup()
     await fillStep1()
     const next = screen.getByRole('button', { name: '다음' }) as HTMLButtonElement
     expect(next.disabled).toBe(true) // 동의 전
     expect(screen.getByText(/수집 항목: 이메일, 비밀번호, 이름, 은행·계좌번호/)).toBeTruthy()
-    const link = screen.getByRole('link', { name: '전체 보기' })
-    expect(link.getAttribute('href')).toBe('/privacy')
-    expect(link.getAttribute('target')).toBe('_blank')
-    expect(link.getAttribute('rel')).toContain('noopener')
+    const links = screen.getAllByRole('link', { name: '전체 보기' })
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/terms', '/privacy'])
+    for (const link of links) {
+      expect(link.getAttribute('target')).toBe('_blank')
+      expect(link.getAttribute('rel')).toContain('noopener')
+    }
 
+    // 하나씩 동의: 셋 다 해야 열린다
     await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await userEvent.click(screen.getByLabelText(/이용약관에 동의합니다/))
+    expect(next.disabled).toBe(true)
+    await userEvent.click(screen.getByLabelText(/만 14세 이상입니다/))
     expect(next.disabled).toBe(false)
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
-    expect(next.disabled).toBe(true) // 동의를 거두면 다시 막힌다
+    expect((screen.getByLabelText('전체 동의') as HTMLInputElement).checked).toBe(true)
+
+    // 전체 동의를 끄면 모두 풀리고, 다시 켜면 모두 체크된다
+    await userEvent.click(screen.getByLabelText('전체 동의'))
+    expect(next.disabled).toBe(true)
+    expect((screen.getByLabelText(/이용약관에 동의합니다/) as HTMLInputElement).checked).toBe(false)
+    await userEvent.click(screen.getByLabelText('전체 동의'))
+    expect(next.disabled).toBe(false)
   })
 
   it('이메일 확인이 필요한 가입이면 "메일을 확인하세요" 화면으로 가고, 비밀번호는 메모리에서 비운다', async () => {
@@ -459,6 +471,17 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(screen.getByText('1. 개인정보의 처리 목적과 근거')).toBeTruthy()
     expect(screen.getByText(/nonanae.info@gmail.com/)).toBeTruthy()
     expect(pathOf(router)).toBe('/privacy') // 로그아웃 상태여도 인트로로 튕기지 않는다
+  })
+
+  it('이용약관도 로그인 없이 볼 수 있다 (인트로에 링크가 있다)', async () => {
+    await boot({ loggedIn: false })
+    renderApp('/welcome')
+    expect(screen.getByRole('link', { name: '이용약관' }).getAttribute('href')).toBe('/terms')
+    cleanup()
+    const router = renderApp('/terms')
+    expect(await screen.findByRole('heading', { name: '이용약관' })).toBeTruthy()
+    expect(screen.getByText('제6조 (서비스의 성격)')).toBeTruthy()
+    expect(pathOf(router)).toBe('/terms')
   })
 
   it('로그인 화면에 입력해 둔 이메일이 회원가입 1단계로 이어진다', async () => {
@@ -656,12 +679,13 @@ describe('06·07 초대코드로 참여', () => {
     expect(group.members.find((m) => m.name === '이서준')).toMatchObject({ userId: null, role: 'member' })
     expect(state().currentUserId).toBeNull()
   })
-  it('공용 코드(비로그인) 화면: 이름이 비면 참여할 수 없고, 저장 안내와 처리방침 링크, 로그인 / 회원가입이 보인다', async () => {
+  it('공용 코드(비로그인) 화면: 이름이 비면 참여할 수 없고, 저장·동의 안내와 약관·처리방침 링크, 로그인 / 회원가입이 보인다', async () => {
     await boot({ loggedIn: false })
     renderApp('/join?code=TEST42')
     const join = (await screen.findByRole('button', { name: '이 이름으로 참여하기' })) as HTMLButtonElement
     expect(join.disabled).toBe(true)
-    expect(screen.getByText(/입력한 이름이 이 그룹 멤버로 저장돼요/)).toBeTruthy()
+    expect(screen.getByText(/입력한 이름이 이 그룹 멤버로 저장되고/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: '이용약관' }).getAttribute('href')).toBe('/terms')
     expect(screen.getByRole('link', { name: '개인정보 처리방침' }).getAttribute('href')).toBe('/privacy')
     expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '회원가입' })).toBeTruthy()
@@ -900,7 +924,7 @@ describe('06·07 초대코드로 참여', () => {
     await fill('이메일', 'guest@example.com')
     await fill('비밀번호', 'pw-12345')
     await fill('비밀번호 확인', 'pw-12345')
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await userEvent.click(screen.getByLabelText('전체 동의'))
     await click('다음')
     // 가입 → (이메일 확인) → 이름·계좌 등록 → 자기 자리의 초대 링크로 돌아와 그 자리로 참여를 요청한다
     await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
@@ -927,7 +951,7 @@ describe('06·07 초대코드로 참여', () => {
     await fill('이메일', 'new@example.com')
     await fill('비밀번호', 'pw-12345')
     await fill('비밀번호 확인', 'pw-12345')
-    await userEvent.click(screen.getByLabelText(/개인정보 수집·이용에 동의합니다/))
+    await userEvent.click(screen.getByLabelText('전체 동의'))
     await click('다음')
 
     await waitFor(() => expect(pathOf(router)).toBe('/signup/account'))
