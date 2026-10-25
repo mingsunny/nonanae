@@ -6,6 +6,7 @@ import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import PasswordInput from '../../components/common/PasswordInput'
 import Topbar from '../../components/common/Topbar'
+import { usePrefetchCaptcha } from '../../lib/captcha'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
@@ -27,6 +28,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  usePrefetchCaptcha()
 
   // 이메일 형식 검증은 @ 포함 여부만 (01 예외처리: 정식 검증 정책 미정)
   const canSubmit = email.trim().includes('@') && password.length > 0

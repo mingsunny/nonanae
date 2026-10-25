@@ -10,6 +10,7 @@ import { isEmailTaken } from '../../api'
 import { SignUpConfirmationRequired } from '../../api/errors'
 import { PASSWORD_RULE_HINT, passwordProblem } from '../../domain/password'
 import { PRIVACY_SUMMARY } from '../../domain/privacyPolicy'
+import { usePrefetchCaptcha } from '../../lib/captcha'
 import { paths } from '../../routes/paths'
 import { useAppStore } from '../../store/appStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
@@ -41,6 +42,7 @@ export default function SignupScreen() {
   }
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  usePrefetchCaptcha()
 
   const confirmed = draft.passwordConfirm.length > 0
   const matches = draft.password === draft.passwordConfirm

@@ -8,6 +8,7 @@ import fields from '../components/common/Field.module.css'
 import PasswordInput from '../components/common/PasswordInput'
 import Topbar from '../components/common/Topbar'
 import { PASSWORD_RULE_HINT, passwordProblem } from '../domain/password'
+import { usePrefetchCaptcha } from '../lib/captcha'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import styles from './PasswordResetPage.module.css'
@@ -37,6 +38,7 @@ const passwordChangedState = { notice: '비밀번호가 변경되었습니다. �
 /** 1단계: 이메일 입력 → 링크 발송 */
 function RequestStep() {
   const navigate = useNavigate()
+  usePrefetchCaptcha()
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const canSubmit = email.trim().includes('@')
