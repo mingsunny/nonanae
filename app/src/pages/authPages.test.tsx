@@ -356,13 +356,13 @@ describe('01·02 회원가입 (2단계)', () => {
     expect(useAuthFlowStore.getState().draft).toMatchObject({ email: 'new@example.com', password: '', passwordConfirm: '' })
   })
 
-  it('확인 화면: 메일 다시 보내기는 잠깐 기다려야 하고, 이메일 바꾸기는 1단계로 돌아간다', async () => {
+  it('확인 화면: 메일 다시 보내기는 잠깐 기다려야 하고, 이메일 바꾸기 버튼은 없다', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     onTestFinished(() => {
       vi.useRealTimers()
     })
     useAuthFlowStore.getState().patchDraft({ email: 'new@example.com' })
-    const router = renderApp('/signup/confirm')
+    renderApp('/signup/confirm')
     const resend = (await screen.findByRole('button', { name: /메일 다시 보내기/ })) as HTMLButtonElement
     expect(resend.disabled).toBe(true)
     expect(resend.textContent).toContain('60초')
@@ -375,8 +375,8 @@ describe('01·02 회원가입 (2단계)', () => {
     }
     expect((screen.getByRole('button', { name: '메일 다시 보내기' }) as HTMLButtonElement).disabled).toBe(false)
 
-    await click('이메일 바꾸기')
-    expect(pathOf(router)).toBe('/signup')
+    expect(screen.queryByRole('button', { name: '이메일 바꾸기' })).toBeNull()
+    expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy()
   })
 
   it('이메일 없이 /signup/confirm으로 들어오면 1단계로 돌려보낸다', async () => {
