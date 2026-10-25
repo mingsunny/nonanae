@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import type { JoinResolution } from '../api'
 import Topbar from '../components/common/Topbar'
 import { parseInviteCode } from '../domain/inviteCode'
+import { usePrefetchCaptcha } from '../lib/captcha'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import { showToast } from '../store/toastStore'
@@ -34,6 +35,8 @@ function JoinFlow() {
   const [params, setParams] = useSearchParams()
   const codeFromLink = params.get('code') ?? ''
   const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
+  // 로그인하지 않았으면 코드 확인 때 게스트 세션(익명 로그인)을 만들며 봇 확인을 거친다
+  usePrefetchCaptcha(!isLoggedIn)
   const resolveInviteCode = useAppStore((s) => s.resolveInviteCode)
 
   const [code, setCode] = useState(codeFromLink)

@@ -5,6 +5,7 @@ import Button from '../../components/common/Button'
 import Callout from '../../components/common/Callout'
 import fields from '../../components/common/Field.module.css'
 import Topbar from '../../components/common/Topbar'
+import { usePrefetchCaptcha } from '../../lib/captcha'
 import { paths } from '../../routes/paths'
 import { showToast } from '../../store/toastStore'
 import { useAuthFlowStore } from '../../store/authFlowStore'
@@ -25,6 +26,8 @@ export default function CheckEmailScreen() {
   const returnTo = useAuthFlowStore((s) => s.returnTo)
   const [seconds, setSeconds] = useState(RESEND_COOLDOWN_SECONDS)
   const [busy, setBusy] = useState(false)
+  // 메일 다시 보내기도 봇 확인을 거친다
+  usePrefetchCaptcha()
 
   useEffect(() => {
     if (seconds <= 0) return

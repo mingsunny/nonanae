@@ -7,6 +7,7 @@ import fields from '../components/common/Field.module.css'
 import PasswordInput from '../components/common/PasswordInput'
 import Topbar from '../components/common/Topbar'
 import { PASSWORD_RULE_HINT, passwordProblem } from '../domain/password'
+import { usePrefetchCaptcha } from '../lib/captcha'
 import { paths } from '../routes/paths'
 import { showToast } from '../store/toastStore'
 import styles from './PasswordResetPage.module.css'
@@ -22,6 +23,8 @@ export default function ChangePasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // 현재 비밀번호 확인(재로그인)이 봇 확인을 거친다
+  usePrefetchCaptcha()
 
   const confirmed = confirm.length > 0
   const matches = password === confirm
