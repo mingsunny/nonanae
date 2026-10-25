@@ -65,9 +65,6 @@ export default function CheckEmailScreen() {
           </Button>
         </div>
         <div className={styles.confirmLinks}>
-          <button type="button" className={fields.textLink} onClick={() => navigate(paths.signup, { replace: true })}>
-            이메일 바꾸기
-          </button>
           <button type="button" className={fields.textLink} onClick={() => navigate(paths.login)}>
             로그인
           </button>
