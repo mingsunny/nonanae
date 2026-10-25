@@ -8,3 +8,12 @@ export default function PrivacyLink({ className, children }: { className?: strin
     </a>
   )
 }
+
+/** 이용약관 링크. PrivacyLink와 같이 새 탭으로 연다. */
+export function TermsLink({ className, children }: { className?: string; children?: string }) {
+  return (
+    <a href={paths.terms} target="_blank" rel="noopener noreferrer" className={className}>
+      {children ?? '이용약관'}
+    </a>
+  )
+}

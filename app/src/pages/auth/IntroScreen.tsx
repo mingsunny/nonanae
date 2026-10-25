@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
-import PrivacyLink from '../../components/common/PrivacyLink'
+import PrivacyLink, { TermsLink } from '../../components/common/PrivacyLink'
 import fields from '../../components/common/Field.module.css'
 import logoUrl from '../../assets/logo.png'
 import { paths } from '../../routes/paths'
@@ -53,7 +53,7 @@ export default function IntroScreen() {
           </button>
         </div>
         <div className={styles.policyFooter}>
-          <PrivacyLink />
+          <TermsLink /> · <PrivacyLink />
         </div>
       </div>
     </div>

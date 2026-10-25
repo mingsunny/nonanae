@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Avatar from '../components/common/Avatar'
 import Button from '../components/common/Button'
 import fields from '../components/common/Field.module.css'
-import PrivacyLink from '../components/common/PrivacyLink'
+import PrivacyLink, { TermsLink } from '../components/common/PrivacyLink'
 import { BANKS } from '../domain/constants'
 import { NAME_MAX_LENGTH } from '../domain/name'
 import type { User } from '../domain/types'
@@ -124,7 +124,7 @@ function Profile({ user }: { user: User }) {
         </button>
       </div>
       <p className={styles.policy}>
-        <PrivacyLink />
+        <TermsLink /> · <PrivacyLink />
       </p>
     </form>
   )
