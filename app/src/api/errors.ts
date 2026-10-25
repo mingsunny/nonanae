@@ -6,13 +6,5 @@ export class SignUpConfirmationRequired extends Error {
   }
 }
 
-/** 로그인은 됐지만 이름·계좌(프로필)를 아직 등록하지 않은 계정. 화면은 계좌 등록 화면으로 보낸다. */
-export class ProfileIncomplete extends Error {
-  constructor() {
-    super('이름과 계좌를 등록해주세요')
-    this.name = 'ProfileIncomplete'
-  }
-}
-
 /** 비밀번호 변경(04)에서 현재 비밀번호가 틀렸을 때 */
 export const CURRENT_PASSWORD_MISMATCH = '현재 비밀번호가 일치하지 않아요.'

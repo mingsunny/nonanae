@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ProfileIncomplete } from './errors'
 import {
   approveJoinRequest,
   cancelJoinRequest,
@@ -77,14 +76,14 @@ describe('시작 상태', () => {
 describe('signIn', () => {
   it('테스트 계정으로 로그인하면 세션이 그 계정이 된다', async () => {
     await signOut()
-    const user = await signIn('a@naver.com', 'aaaaaaaa')
-    expect(user.id).toBe('u_test')
+    await signIn('a@naver.com', 'aaaaaaaa')
     expect((await fetchSnapshot()).session.userId).toBe('u_test')
   })
 
   it('이메일은 대소문자·앞뒤 공백을 무시한다', async () => {
     await signOut()
-    await expect(signIn('  A@Naver.com ', 'aaaaaaaa')).resolves.toMatchObject({ id: 'u_test' })
+    await signIn('  A@Naver.com ', 'aaaaaaaa')
+    expect((await fetchSnapshot()).session.userId).toBe('u_test')
   })
 
   it('비밀번호가 틀리든 가입 안 된 이메일이든 같은 메시지로 실패한다 (계정 존재 여부 노출 방지)', async () => {
@@ -115,10 +114,10 @@ describe('signUp / completeProfile / isEmailTaken', () => {
     expect(snapshot.users.map((u) => u.id)).toEqual([user.id])
   })
 
-  it('이름·계좌를 등록하기 전에 로그아웃했다가 다시 로그인하면 ProfileIncomplete로 알리고, 로그인 상태는 유지한다', async () => {
+  it('이름·계좌를 등록하기 전에 로그아웃했다가 다시 로그인하면 로그인은 되고 스냅샷이 needsProfile로 알린다', async () => {
     await signUp(newAccount)
     await signOut()
-    await expect(signIn('new@example.com', 'pw-1234')).rejects.toBeInstanceOf(ProfileIncomplete)
+    await signIn('new@example.com', 'pw-1234')
     expect((await fetchSnapshot()).session.needsProfile).toBe(true)
     await completeProfile(newProfile)
     expect((await fetchSnapshot()).session.needsProfile).toBeUndefined()
@@ -127,7 +126,9 @@ describe('signUp / completeProfile / isEmailTaken', () => {
   it('등록을 마친 계정으로 다시 로그인할 수 있다', async () => {
     await signUpAndComplete()
     await signOut()
-    await expect(signIn('new@example.com', 'pw-1234')).resolves.toMatchObject({ name: '신규' })
+    await signIn('new@example.com', 'pw-1234')
+    const snapshot = await fetchSnapshot()
+    expect(snapshot.users.find((u) => u.id === snapshot.session.userId)?.name).toBe('신규')
   })
 
   it('이미 가입된 이메일이면 실패하고, isEmailTaken도 true를 돌려준다', async () => {
@@ -561,7 +562,8 @@ describe('비밀번호 재설정 (14)', () => {
     await resetPassword(token!, 'brand-new')
     await signOut()
     await expect(signIn('a@naver.com', 'aaaaaaaa')).rejects.toThrow()
-    await expect(signIn('a@naver.com', 'brand-new')).resolves.toMatchObject({ id: 'u_test' })
+    await signIn('a@naver.com', 'brand-new')
+    expect((await fetchSnapshot()).session.userId).toBe('u_test')
   })
 
   it('토큰은 1회용이다', async () => {
