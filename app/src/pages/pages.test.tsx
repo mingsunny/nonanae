@@ -75,11 +75,11 @@ describe('그룹 헤더 (08/09/10 공용)', () => {
     for (const tab of ['지출', '정산', '요약']) expect(screen.getByRole('link', { name: tab })).toBeTruthy()
   })
 
-  it('"초대 코드 복사"는 코드를 복사하고 토스트를 띄운다', async () => {
+  it('"초대 링크 복사"는 참여 링크를 복사하고 토스트를 띄운다', async () => {
     renderAt('/groups/g_jeju/expenses')
-    await userEvent.click(screen.getByRole('button', { name: '초대 코드 복사' }))
-    expect(clipboard.writeText).toHaveBeenCalledWith('JEJU26')
-    expect(await screen.findByText('초대코드가 복사되었습니다')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '초대 링크 복사' }))
+    expect(clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/join?code=JEJU26`)
+    expect(await screen.findByText('초대 링크가 복사되었습니다')).toBeTruthy()
   })
 
   it('내가 속하지 않은 그룹/없는 그룹은 그룹 목록으로 보낸다', () => {

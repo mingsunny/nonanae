@@ -60,9 +60,11 @@ function GroupShell({ group }: { group: GroupDetail }) {
     navigate(to === 'login' ? paths.login : paths.signup)
   }
 
-  async function copyInviteCode() {
-    const ok = await copyText(group.inviteCode)
-    showToast(ok ? '초대코드가 복사되었습니다' : '복사하지 못했어요. 코드: ' + group.inviteCode)
+  /** 그룹 공용 초대 링크(`/join?code=ABCDEF`)를 복사. 받은 사람은 링크만 열면 코드 입력 없이 바로 참여 화면으로 간다. */
+  async function copyInviteLink() {
+    const link = `${window.location.origin}${paths.join}?code=${group.inviteCode}`
+    const ok = await copyText(link)
+    showToast(ok ? '초대 링크가 복사되었습니다' : '복사하지 못했어요. 링크: ' + link)
   }
 
   return (
@@ -103,8 +105,8 @@ function GroupShell({ group }: { group: GroupDetail }) {
             <KakaoIcon />
             멤버 초대
           </Link>
-          <button type="button" className={styles.pill} onClick={copyInviteCode}>
-            초대 코드 복사
+          <button type="button" className={styles.pill} onClick={copyInviteLink}>
+            초대 링크 복사
           </button>
         </div>
 
