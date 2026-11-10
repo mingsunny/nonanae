@@ -129,7 +129,7 @@ function MemberInvite({ group }: { group: GroupDetail }) {
         <div className={styles.callout}>
           이 그룹에 참여 중인 멤버예요. 초대는 그룹 화면 상단의
           <br />
-          카카오톡/초대 코드 복사 버튼으로 언제든 할 수 있어요.
+          카카오톡/초대 링크 복사 버튼으로 언제든 할 수 있어요.
         </div>
 
         {joinRequests.length > 0 && (
