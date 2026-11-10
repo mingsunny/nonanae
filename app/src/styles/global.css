@@ -29,6 +29,13 @@ button {
   color: inherit;
 }
 
+/* iOS Safari는 글자가 16px보다 작은 입력칸에 초점이 가면 화면을 확대한다. 입력칸은 항상 16px 이상 */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+
 a {
   color: inherit;
 }

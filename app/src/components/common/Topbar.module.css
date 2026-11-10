@@ -9,6 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   flex-shrink: 0;
   width: 30px;
   height: 30px;
@@ -44,4 +45,11 @@
   margin: 0;
   font-size: 20px;
   font-weight: 700;
+}
+
+/* 보이는 크기는 30px 그대로, 손가락이 닿는 영역만 44px로 */
+.back::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
 }
