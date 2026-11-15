@@ -10,6 +10,7 @@
 }
 
 .back {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -20,6 +21,13 @@
   border-radius: 50%;
   background: var(--card);
   color: var(--ink);
+}
+
+/* 보이는 크기는 30px 그대로, 손가락이 닿는 영역만 44px로 */
+.back::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
 }
 
 .title {
@@ -39,6 +47,7 @@
 }
 
 .chip {
+  min-height: 40px;
   padding: 9px 14px;
   border: 1.5px solid var(--line);
   border-radius: 20px;
@@ -91,6 +100,7 @@
 
 .opt {
   flex: 1;
+  min-height: 40px;
   padding: 8px 0;
   border: 0;
   border-radius: 9px;

@@ -25,6 +25,7 @@
 }
 
 .back {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,6 +38,13 @@
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   cursor: pointer;
+}
+
+/* 보이는 크기는 30px 그대로, 손가락이 닿는 영역만 44px로 */
+.back::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
 }
 
 .groupName {
@@ -62,8 +70,9 @@
 
 .members {
   display: flex;
-  margin-top: 14px;
-  padding: 0;
+  /* 아바타 줄의 보이는 위치는 그대로 두고, 손가락이 닿는 높이만 늘린다 */
+  margin: 7px -4px -7px;
+  padding: 7px 4px;
   border: 0;
   background: none;
   cursor: pointer;
@@ -93,6 +102,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
+  min-height: 40px;
   padding: 9px 12px;
   border: 0;
   border-radius: 20px;

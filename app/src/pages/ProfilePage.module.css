@@ -39,6 +39,9 @@
 }
 
 .policy a {
+  display: inline-block;
+  padding: 14px 10px;
+  margin: -14px -10px;
   color: var(--ink-soft);
   text-decoration: underline;
 }
