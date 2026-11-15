@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="여행에서 함께 쓴 돈을 기록하고, 누가 누구에게 얼마를 보내면 되는지 계산해 주는 노나내를 소개해요.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="노나내">
+<meta property="og:title" content="노나내 - 여행 정산을 가장 간단하게">
+<meta property="og:description" content="그룹을 만들고 쓴 돈을 기록하면, 누가 누구에게 얼마를 보내면 되는지 계산해 줘요.">
+<meta property="og:url" content="https://nonanae.vercel.app/intro">
+<meta property="og:image" content="https://nonanae.vercel.app/intro/og.png">
+<meta property="og:image:width" content="600">
+<meta property="og:image:height" content="600">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>노나내 소개</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃: 앱과 같은 초록·크림 톤. 카드를 한 줄로 쌓고, 넓은 화면에서는 카드 안에서 글(왼쪽)·화면(오른쪽)으로 나눈다 */
+:root {
+  --bg: #f3f5f1;
+  --card: #ffffff;
+  --ink: #182a20;
+  --ink-soft: #55665a;
+  --line: #e4dfcc;
+  --brand: #1f8a50;
+  --brand-deep: #175c38;
+  --brand-light: #dcf3e3;
+  --on-brand: #ffffff;
+  --phone: #182a20;
+  --shadow: 0 6px 16px -6px rgba(23, 92, 56, 0.18);
+  --font-display: 'Do Hyeon', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --font-body: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1a14; --card: #17251c; --ink: #eaf2ec; --ink-soft: #a7b8ac; --line: #2c3d32;
+    --brand: #4ead6d; --brand-deep: #8bd6a3; --brand-light: #1e3a2a; --on-brand: #0f1a14; --phone: #070d09;
+    --shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1a14; --card: #17251c; --ink: #eaf2ec; --ink-soft: #a7b8ac; --line: #2c3d32;
+  --brand: #4ead6d; --brand-deep: #8bd6a3; --brand-light: #1e3a2a; --on-brand: #0f1a14; --phone: #070d09;
+  --shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 40px;
+  -webkit-font-smoothing: antialiased;
+  /* 한글은 단어 중간에서 줄이 바뀌지 않게 하고, 너무 긴 덩어리만 줄바꿈한다 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.page { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; border-radius: 6px; }
+
+/* 소개 */
+.hero { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 12px; }
+.hero img { width: 150px; height: auto; margin-left: -6px; }
+.hero h1 { font-size: clamp(1.7rem, 6.4vw, 2.5rem); line-height: 1.25; letter-spacing: -0.01em; }
+.hero .lead { color: var(--ink-soft); max-width: 34em; }
+.cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 6px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 26px;
+  border-radius: 14px; background: var(--brand); color: var(--on-brand);
+  font-family: var(--font-display); font-size: 1.1rem; text-decoration: none;
+}
+.btn:hover { background: var(--brand-deep); color: var(--on-brand); }
+.hint { font-size: 13px; color: var(--ink-soft); max-width: 24em; }
+
+/* 카드 */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 22px 20px;
+  box-shadow: var(--shadow);
+}
+.card h2 { font-size: 1.35rem; line-height: 1.3; margin-bottom: 8px; }
+.card p, .card li { color: var(--ink-soft); }
+.card strong { color: var(--ink); font-weight: 700; }
+
+/* 사용 순서: 실제로 순서가 있는 내용이라 번호를 붙인다 */
+.steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 16px; grid-template-columns: 1fr; }
+.steps li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; }
+.num {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--brand-light); color: var(--brand-deep);
+  font-family: var(--font-display); font-size: 1.05rem; display: flex; align-items: center; justify-content: center;
+}
+.steps h3 { font-size: 1.05rem; color: var(--ink); margin-bottom: 2px; }
+.steps p { font-size: 14px; }
+
+/* 기능 카드: 글 + 휴대폰 화면 */
+.feature { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); align-items: center; }
+.feature .text { min-width: 0; }
+.phone {
+  width: min(100%, 250px); margin: 0 auto; border: 5px solid var(--phone); border-radius: 26px;
+  overflow: hidden; background: #fff; box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.45);
+}
+.phone img { display: block; width: 100%; height: auto; aspect-ratio: var(--ratio); object-fit: cover; object-position: 50% var(--pos, 0%); }
+.duo { display: flex; gap: 12px; justify-content: center; min-width: 0; }
+.duo .phone { flex: 1 1 0; min-width: 0; max-width: 220px; margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding: 0; list-style: none; }
+.chips li {
+  font-size: 12.5px; padding: 3px 10px; border-radius: 999px;
+  background: var(--brand-light); color: var(--brand-deep); font-weight: 500;
+}
+.wide { grid-template-columns: minmax(0, 1fr); }
+
+@media (min-width: 640px) {
+  .page { gap: 20px; }
+  .card { padding: 28px 30px; }
+  .steps { grid-template-columns: 1fr 1fr; gap: 20px 28px; }
+  .feature { grid-template-columns: minmax(0, 1fr) 250px; gap: 32px; }
+  .wide { grid-template-columns: minmax(0, 1fr); }
+  .wide .duo { margin-top: 6px; }
+}
+
+/* 알아두세요 */
+.notes { margin: 10px 0 0; padding-left: 1.1em; display: grid; gap: 8px; }
+.notes li::marker { color: var(--brand); }
+.notes a { color: var(--brand-deep); }
+
+footer { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px 0; font-size: 13px; color: var(--ink-soft); }
+footer a { color: var(--ink-soft); }
+.mail { user-select: all; font-weight: 500; color: var(--ink); }
+
+@media (prefers-reduced-motion: no-preference) { .btn { transition: background-color .15s ease; } }
+</style>
+</head>
+<body>
+
+<main class="page">
+  <header class="hero">
+    <img src="/intro/img/logo.png" alt="노나내" width="150" height="97">
+    <h1>여행에서 함께 쓴 돈, 가장 간단하게 나눠 정산해요.</h1>
+    <p class="lead">그룹을 만들고 쓴 돈을 기록하면, 누가 누구에게 얼마를 보내면 되는지 계산해 줘요. 앱을 설치하지 않고 웹에서 바로 쓸 수 있어요.</p>
+    <div class="cta-row">
+      <a class="btn" href="https://nonanae.vercel.app/welcome" target="_blank" rel="noopener">노나내 시작하기</a>
+      <p class="hint">초대 링크를 받았다면 링크를 눌러 이름만 입력해도 참여를 요청할 수 있어요.</p>
+    </div>
+  </header>
+
+  <section class="card" aria-labelledby="how">
+    <h2 id="how">이렇게 사용해요</h2>
+    <ol class="steps">
+      <li><span class="num" aria-hidden="true">1</span><div><h3>가입하고 그룹 만들기</h3><p>이메일로 가입하고 확인 메일의 링크를 누르면 이름과 계좌를 등록해요. 그다음 새 그룹을 만들어요.</p></div></li>
+      <li><span class="num" aria-hidden="true">2</span><div><h3>친구 초대하기</h3><p>그룹 화면의 멤버 초대 버튼으로 카카오톡에 초대 링크를 보내요. 그룹장이 참여 요청을 승인하면 입장해요.</p></div></li>
+      <li><span class="num" aria-hidden="true">3</span><div><h3>쓴 돈 기록하기</h3><p>결제한 사람이 금액과 항목을 등록하고, 함께 쓴 사람과 나누는 방식을 골라요.</p></div></li>
+      <li><span class="num" aria-hidden="true">4</span><div><h3>정산하고 송금하기</h3><p>정산 탭에서 보낼 금액을 확인하고, 받는 사람의 계좌를 눌러 복사해 송금해요.</p></div></li>
+    </ol>
+  </section>
+
+  <section class="card feature" aria-labelledby="f-groups">
+    <div class="text">
+      <h2 id="f-groups">내 그룹을 한 화면에서</h2>
+      <p>여행마다 그룹을 만들어 두면 홈에 모여요. 새 지출, 지출 삭제, 참여 요청은 알림 종으로 알려 줘요.</p>
+    </div>
+    <div class="phone"><img src="/intro/img/groups.jpg" alt="그룹 목록 화면: 새 그룹 만들기와 초대코드 입력 버튼, 제주도 여행 그룹" style="--ratio: 750/640"></div>
+  </section>
+
+  <section class="card feature" aria-labelledby="f-expense">
+    <div class="text">
+      <h2 id="f-expense">쓴 돈을 바로 기록해요</h2>
+      <p>항목과 금액, 누가 결제했는지가 날짜별로 정리돼요. 오른쪽 아래 + 버튼으로 새 지출을 추가해요.</p>
+      <ul class="chips" aria-label="기록할 수 있는 것">
+        <li>금액</li><li>항목명</li><li>날짜</li><li>카테고리</li><li>영수증 사진</li><li>결제자</li>
+      </ul>
+    </div>
+    <div class="phone"><img src="/intro/img/expenses.jpg" alt="그룹 지출 내역 화면: 총 사용 금액과 날짜별 지출 목록" style="--ratio: 750/1000"></div>
+  </section>
+
+  <section class="card feature" aria-labelledby="f-split">
+    <div class="text">
+      <h2 id="f-split">나누는 방식을 고르세요</h2>
+      <p><strong>균등</strong>, <strong>비율</strong>, <strong>금액</strong> 중에서 고르고, 일부 인원만 함께 쓴 지출도 선택해서 나눌 수 있어요. 고른 사람 수에 따라 1인당 금액이 바로 계산돼요.</p>
+    </div>
+    <div class="phone"><img src="/intro/img/form.jpg" alt="지출 추가 화면: 카테고리, 결제자, 나누기 방식, 함께 사용한 인원" style="--ratio: 750/1000; --pos: 100%"></div>
+  </section>
+
+  <section class="card feature" aria-labelledby="f-settle">
+    <div class="text">
+      <h2 id="f-settle">누가 누구에게, 얼마를</h2>
+      <p>가장 적은 횟수로 정산할 수 있게 계산해 줘요. 내가 보낼 돈은 받는 사람의 계좌와 함께 보이고, 계좌를 누르면 복사돼요. 지출을 등록하면 정산 결과도 바로 바뀌어요.</p>
+    </div>
+    <div class="phone"><img src="/intro/img/settle.jpg" alt="정산 화면: 민지가 박서연에게 64,500원을 보내는 정산 결과와 받는 계좌" style="--ratio: 750/1080"></div>
+  </section>
+
+  <section class="card feature" aria-labelledby="f-summary">
+    <div class="text">
+      <h2 id="f-summary">어디에 얼마 썼는지 한눈에</h2>
+      <p>숙소, 식비, 교통처럼 카테고리별 비중과, 사람마다 결제한 금액과 받을 돈·보낼 돈을 요약해서 보여 줘요.</p>
+    </div>
+    <div class="phone"><img src="/intro/img/summary.jpg" alt="요약 화면: 카테고리별 지출 비중과 인원별 결제 금액" style="--ratio: 750/1010; --pos: 73%"></div>
+  </section>
+
+  <section class="card feature wide" aria-labelledby="f-invite">
+    <div class="text">
+      <h2 id="f-invite">초대하고, 그룹장이 승인해요</h2>
+      <p>초대 링크로 들어온 친구는 이름만 입력하면 참여를 요청할 수 있어요. 로그인하거나 가입해서 참여할 수도 있어요. 요청은 그룹장의 멤버 목록에 나타나고, <strong>승인</strong>하면 그룹에 들어와요.</p>
+    </div>
+    <div class="duo">
+      <div class="phone"><img src="/intro/img/join.jpg" alt="그룹 초대 화면: 초대받은 그룹 이름과 이름 입력칸" style="--ratio: 750/1100"></div>
+      <div class="phone"><img src="/intro/img/members.jpg" alt="멤버 목록 화면: 그룹장에게 보이는 참여 요청과 승인, 거절 버튼" style="--ratio: 750/1100"></div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="notes">
+    <h2 id="notes">알아두세요</h2>
+    <ul class="notes">
+      <li>로그인하지 않고 참여한 사람에게는 계좌번호가 보이지 않아요. 로그인하면 볼 수 있어요.</li>
+      <li>같은 그룹 멤버는 다른 사람이 등록한 지출도 고치거나 지울 수 있어요. 지출을 지우면 그룹 멤버에게 알림이 가요.</li>
+      <li>그룹장이 초대코드를 새로 만들면 이전 링크는 쓸 수 없어요. 그룹장에게 새 링크를 받아 주세요.</li>
+      <li>만 14세 이상만 이용할 수 있어요.</li>
+      <li>이름, 이메일, 계좌번호 같은 정보는 <a href="https://nonanae.vercel.app/privacy" target="_blank" rel="noopener">개인정보 처리방침</a>에 따라 다뤄요.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <div class="cta-row" style="margin:0 0 6px"><a class="btn" href="https://nonanae.vercel.app/welcome" target="_blank" rel="noopener">노나내 시작하기</a></div>
+    <p>문의 <span class="mail">nonanae.info@gmail.com</span></p>
+    <p><a href="https://nonanae.vercel.app/terms" target="_blank" rel="noopener">이용약관</a> · <a href="https://nonanae.vercel.app/privacy" target="_blank" rel="noopener">개인정보 처리방침</a></p>
+  </footer>
+</main>
+
+</body>
+</html>
