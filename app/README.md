@@ -73,6 +73,15 @@ npm run dev
 - `vercel.json`의 `headers`는 보안 헤더다: 다른 사이트가 이 앱을 `<iframe>`으로 몰래 끼워 넣는 것(클릭 가로채기)을 막고(`X-Frame-Options`, `frame-ancestors`), 브라우저가 파일 형식을 멋대로 추측하지 못하게 하며(`nosniff`), 초대코드가 들어 있는 주소(`/join?code=…`)가 다른 사이트로 넘어가는 요청에 그대로 실리지 않게 하고(`Referrer-Policy`), 쓰지 않는 기기 권한을 끈다. 전체 CSP(스크립트·이미지 출처 제한)는 폰트를 Google Fonts·jsDelivr에서 불러오는 등 허용 목록을 정밀하게 맞춰야 해서 아직 넣지 않았다.
 - Supabase에 연결하려면 Vercel 환경변수에 `VITE_USE_SUPABASE=true`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`를 넣고 다시 배포한다(Vite는 빌드할 때 값을 코드에 넣는다).
 
+## 소개 페이지 (`/intro`)
+
+친구들에게 카카오톡·슬랙으로 보내는 서비스 소개 카드 페이지. 로그인 없이 열리고, 링크를 보내면 제목·설명·이미지가 보이도록 Open Graph 태그가 들어 있다.
+
+- 원본: `public/intro/index.html`(앱과 별개의 정적 페이지), 화면 캡처는 `public/intro/img/`, 미리보기 이미지는 `public/intro/og.png`
+- 공유 주소: `https://nonanae.vercel.app/intro` (`vercel.json`의 `/intro` 규칙이 `public/intro/index.html`로 연결)
+- 캡처는 **목업 데이터**(`VITE_USE_SUPABASE=false`)로 375px 화면에서 찍은 것이라 앱 화면이 바뀌어도 자동으로 갱신되지 않는다. 화면이 바뀌면 다시 찍어 `img/`를 교체한다. 실제 사용자 정보는 들어 있지 않다
+- 카카오톡은 미리보기를 캐시한다. 제목·이미지를 바꾼 뒤에는 카카오 공유 디버거에서 주소의 캐시를 비워야 새 모습이 보인다
+
 ## 화면 구현 현황
 
 | 화면 | 상태 |
