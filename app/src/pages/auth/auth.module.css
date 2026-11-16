@@ -59,9 +59,12 @@
   display: inline-block;
   margin-top: 4px;
   padding: 14px 10px;
+  border: 0;
+  background: none;
   color: var(--ink-soft);
   font-size: var(--fs-caption);
   text-decoration: underline;
+  cursor: pointer;
 }
 
 .actions {
