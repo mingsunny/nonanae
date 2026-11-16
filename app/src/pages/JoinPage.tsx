@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import type { JoinResolution } from '../api'
 import Topbar from '../components/common/Topbar'
 import { parseInviteCode } from '../domain/inviteCode'
 import { usePrefetchCaptcha } from '../lib/captcha'
+import { isTossBuild } from '../lib/platform'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
+import { useAuthFlowStore } from '../store/authFlowStore'
 import { showToast } from '../store/toastStore'
 import InviteScreen from './join/InviteScreen'
 import type { InviteResolution } from './join/InviteScreen'
@@ -26,8 +28,22 @@ import WaitingScreen from './join/WaitingScreen'
 export default function JoinPage() {
   // 이메일 확인은 마쳤지만 이름·계좌를 아직 등록하지 않은 계정은 참여할 수 없다 — 먼저 계좌 등록으로 (마친 뒤 이 주소로 돌아온다)
   const needsProfile = useAppStore((s) => s.needsProfile)
+  const isLoggedIn = useAppStore((s) => s.currentUserId !== null)
   if (needsProfile) return <Navigate to={paths.signupAccount} replace />
+  // 토스 미니앱에는 로그인 없이(게스트로) 참여하는 길이 없다 — 토스 로그인부터 하고 이 초대 주소로 돌아온다
+  if (isTossBuild() && !isLoggedIn) return <TossLoginFirst />
   return <JoinFlow />
+}
+
+/** 지금 주소(초대 링크)를 로그인 뒤 돌아갈 곳으로 남기고 인트로(토스 로그인)로 보낸다 */
+function TossLoginFirst() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  useEffect(() => {
+    useAuthFlowStore.getState().setReturnTo(location.pathname + location.search)
+    navigate(paths.welcome, { replace: true })
+  }, [location.pathname, location.search, navigate])
+  return null
 }
 
 function JoinFlow() {

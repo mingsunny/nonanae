@@ -7,7 +7,7 @@ import fields from '../components/common/Field.module.css'
 import { BackIcon } from '../components/common/icons'
 import { NAME_MAX_LENGTH } from '../domain/name'
 import type { GroupDetail, JoinRequest } from '../domain/types'
-import { copyText } from '../lib/clipboard'
+import { sendInviteLink } from '../lib/inviteLink'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
@@ -109,9 +109,12 @@ function MemberInvite({ group }: { group: GroupDetail }) {
 
   /** 그 멤버 전용 개인화 링크(`{초대코드}-{Member.id}`)를 복사. 이 링크로 들어오면 매칭 화면 없이 그 자리에 연결됨. */
   async function sendInvite(memberId: string) {
-    const link = `${window.location.origin}${paths.join}?code=${group.inviteCode}-${memberId}`
-    const ok = await copyText(link)
-    showToast(ok ? `${nameOf(memberId)}님에게 보낼 초대 링크를 복사했어요` : '복사하지 못했어요. 다시 시도해주세요')
+    const { result } = await sendInviteLink(
+      `${paths.join}?code=${group.inviteCode}-${memberId}`,
+      `${nameOf(memberId)}님, 노나내 '${group.name}' 정산에 초대했어요`,
+    )
+    if (result === 'copied') showToast(`${nameOf(memberId)}님에게 보낼 초대 링크를 복사했어요`)
+    else if (result === 'failed') showToast('초대 링크를 보내지 못했어요. 다시 시도해주세요')
   }
 
   return (

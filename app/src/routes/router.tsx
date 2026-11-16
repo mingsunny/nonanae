@@ -21,6 +21,7 @@ import IntroScreen from '../pages/auth/IntroScreen'
 import LoginScreen from '../pages/auth/LoginScreen'
 import SignupScreen from '../pages/auth/SignupScreen'
 import RequireUser from './RequireUser'
+import WebOnly from './WebOnly'
 import { paths } from './paths'
 
 // 경로 표: docs/spec/conventions.md "URL 경로 (라우팅)"
@@ -28,15 +29,16 @@ import { paths } from './paths'
 export const routes: RouteObject[] = [
   { path: '/', element: <Navigate to={paths.groups} replace /> },
 
-  // 01·02: 인트로 / 로그인 / 회원가입 1단계 / 2단계(계좌 등록)는 화면마다 경로가 따로 있다
+  // 01·02: 인트로 / 로그인 / 회원가입 1단계 / 2단계(계좌 등록)는 화면마다 경로가 따로 있다.
+  // WebOnly: 토스 미니앱에서는 이메일 로그인·가입이 없어서 인트로로 보낸다 (2단계 계좌 등록은 토스 로그인 뒤에도 쓴다)
   { path: 'welcome', element: <IntroScreen /> },
-  { path: 'login', element: <LoginScreen /> },
-  { path: 'signup', element: <SignupScreen /> },
-  { path: 'signup/confirm', element: <CheckEmailScreen /> },
+  { path: 'login', element: <WebOnly><LoginScreen /></WebOnly> },
+  { path: 'signup', element: <WebOnly><SignupScreen /></WebOnly> },
+  { path: 'signup/confirm', element: <WebOnly><CheckEmailScreen /></WebOnly> },
   { path: 'signup/account', element: <AccountScreen /> },
   // 06·07: 초대코드 참여는 한 경로 안의 단계
   { path: 'join', element: <JoinPage /> },
-  { path: 'password-reset', element: <PasswordResetPage /> },
+  { path: 'password-reset', element: <WebOnly><PasswordResetPage /></WebOnly> },
   { path: 'privacy', element: <PrivacyPage /> },
   { path: 'terms', element: <TermsPage /> },
 
@@ -52,7 +54,7 @@ export const routes: RouteObject[] = [
         ],
       },
       { path: 'groups/new', element: <CreateGroupPage /> },
-      { path: 'profile/password', element: <ChangePasswordPage /> },
+      { path: 'profile/password', element: <WebOnly><ChangePasswordPage /></WebOnly> },
     ],
   },
 

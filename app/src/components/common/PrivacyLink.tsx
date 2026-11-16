@@ -1,4 +1,5 @@
 import { FEEDBACK_FORM_URL } from '../../domain/feedback'
+import { isTossBuild } from '../../lib/platform'
 import { paths } from '../../routes/paths'
 
 /** 개인정보 처리방침 링크. 입력 중이던 화면이 사라지지 않도록 새 탭으로 연다. */
@@ -21,7 +22,8 @@ export function TermsLink({ className, children }: { className?: string; childre
 
 /** 베타 테스터 의견 보내기(구글폼) 링크. 폼 주소가 아직 없으면 아무것도 그리지 않는다. 앞에 붙일 구분자(' · ')도 함께 받는다 */
 export function FeedbackLink({ className, separator = '' }: { className?: string; separator?: string }) {
-  if (!FEEDBACK_FORM_URL) return null
+  // 토스 미니앱에서는 외부 사이트로 보내는 링크를 두지 않는다(앱인토스 정책). 문의·신고는 토스 더보기 메뉴가 맡는다
+  if (!FEEDBACK_FORM_URL || isTossBuild()) return null
   return (
     <>
       <a href={FEEDBACK_FORM_URL} target="_blank" rel="noopener noreferrer" className={className}>

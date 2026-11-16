@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 토스 미니앱 번들 (npm run build:toss 결과물)
+*.ait

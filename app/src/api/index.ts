@@ -312,6 +312,35 @@ export async function signIn(email: string, password: string): Promise<void> {
   commit()
 }
 
+/** 목업에서 토스 로그인한 사람으로 쓰는 계정의 이메일(실제 메일 아님) */
+const MOCK_TOSS_EMAIL = 'toss-user@toss.nonanae.invalid'
+
+/**
+ * 토스 로그인(토스 미니앱 전용). 인가 코드로 로그인하고, 처음이면 계정을 만든다.
+ * 목업은 토스 서버가 없어서 인가 코드와 상관없이 "토스 사용자" 한 명으로 로그인한다 — 처음이면 이름·계좌가 비어 있어
+ * 화면이 계좌 등록으로 보낸다(Supabase 모드와 같은 흐름).
+ */
+export async function signInWithToss(authorizationCode: string, referrer: string): Promise<void> {
+  if (USE_SUPABASE) return remote.signInWithToss(authorizationCode, referrer)
+  const d = getDb()
+  let user = d.users.find((u) => u.email === MOCK_TOSS_EMAIL)
+  if (!user) {
+    user = {
+      id: uid('u'),
+      authProvider: 'email',
+      email: MOCK_TOSS_EMAIL,
+      emailVerified: true,
+      name: '',
+      bank: '',
+      account: '',
+      seenGroupCreateCoach: false,
+    }
+    d.users.push(user)
+  }
+  d.session = { userId: user.id, viewAsMemberId: null }
+  commit()
+}
+
 export interface SignUpInput {
   email: string
   password: string

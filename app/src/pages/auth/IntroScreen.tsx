@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { isTossBuild } from '../../lib/platform'
+import { useAppStore } from '../../store/appStore'
+import { showToast } from '../../store/toastStore'
 import Button from '../../components/common/Button'
 import PrivacyLink, { FeedbackLink, TermsLink } from '../../components/common/PrivacyLink'
 import OnboardingGuide from '../../components/onboarding/OnboardingGuide'
@@ -11,8 +14,76 @@ import { paths } from '../../routes/paths'
 import { useAuthFlowStore } from '../../store/authFlowStore'
 import styles from './auth.module.css'
 
-/** 01 인트로 (`/welcome`) — 앱을 열면 가장 먼저 보이는 화면. 로그인 / 회원가입 / 초대코드 참여로 갈라진다. */
+/** 01 인트로 (`/welcome`) — 앱을 열면 가장 먼저 보이는 화면. 웹은 로그인 / 회원가입 / 초대코드 참여, 토스 미니앱은 토스 로그인 하나. */
 export default function IntroScreen() {
+  return isTossBuild() ? <TossIntroScreen /> : <WebIntroScreen />
+}
+
+/** 로고와 소개 문구 + "소개 보기" (웹·토스 공통) */
+function Hero({ onOpenGuide }: { onOpenGuide: () => void }) {
+  return (
+    <div className={styles.hero}>
+      <h1 className={styles.logo}>
+        <img src={logoUrl} alt="노나내" />
+      </h1>
+      <p className={styles.tagline}>
+        여행에서 함께 쓴 돈,
+        <br />
+        가장 간단하게 나눠 정산해요.
+      </p>
+      <button type="button" className={styles.introLink} onClick={onOpenGuide}>
+        노나내가 처음이라면? 소개 보기
+      </button>
+    </div>
+  )
+}
+
+/**
+ * 토스 미니앱의 인트로. 앱인토스 정책: 로그인은 토스 로그인만, 들어오자마자 로그인 창을 띄우지 않고 서비스 소개를 먼저 보여 준다.
+ * 초대 링크로 들어왔다가 여기로 온 경우(returnTo)에는 로그인 뒤 그 초대 화면으로 돌아간다.
+ */
+function TossIntroScreen() {
+  const navigate = useNavigate()
+  const signInWithToss = useAppStore((s) => s.signInWithToss)
+  const [guideOpen, setGuideOpen] = useState(() => !hasSeenOnboarding())
+  const [busy, setBusy] = useState(false)
+
+  async function start() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await signInWithToss()
+      // 처음 로그인한 사람(이름·계좌 없음)은 계좌 등록으로. 돌아갈 초대 주소(returnTo)는 계좌 등록이 이어서 쓴다
+      if (useAppStore.getState().needsProfile) {
+        navigate(paths.signupAccount, { replace: true })
+        return
+      }
+      const { returnTo, reset } = useAuthFlowStore.getState()
+      reset()
+      navigate(returnTo ?? paths.groups, { replace: true })
+    } catch (err) {
+      showToast(err instanceof Error && err.message ? err.message : '토스 로그인을 하지 못했어요')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className={styles.intro}>
+      <Hero onOpenGuide={() => setGuideOpen(true)} />
+      <div className={styles.actions}>
+        <Button onClick={() => void start()} disabled={busy}>
+          {busy ? '로그인하는 중…' : '토스로 시작하기'}
+        </Button>
+        <div className={styles.policyFooter}>
+          <TermsLink /> · <PrivacyLink />
+        </div>
+      </div>
+      {guideOpen && <OnboardingGuide onClose={() => setGuideOpen(false)} />}
+    </div>
+  )
+}
+
+function WebIntroScreen() {
   const navigate = useNavigate()
   const startSignup = useAuthFlowStore((s) => s.startSignup)
   // 초대 링크에서 로그인하러 갔다가 인트로로 빠져나온 경우, 이후 로그인은 다시 그룹 목록으로 가야 한다
@@ -30,19 +101,7 @@ export default function IntroScreen() {
 
   return (
     <div className={styles.intro}>
-      <div className={styles.hero}>
-        <h1 className={styles.logo}>
-          <img src={logoUrl} alt="노나내" />
-        </h1>
-        <p className={styles.tagline}>
-          여행에서 함께 쓴 돈,
-          <br />
-          가장 간단하게 나눠 정산해요.
-        </p>
-        <button type="button" className={styles.introLink} onClick={() => setGuideOpen(true)}>
-          노나내가 처음이라면? 소개 보기
-        </button>
-      </div>
+      <Hero onOpenGuide={() => setGuideOpen(true)} />
       <div className={styles.actions}>
         <Button
           onClick={() => {
