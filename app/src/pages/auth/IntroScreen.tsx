@@ -34,6 +34,10 @@ export default function IntroScreen() {
           <br />
           가장 간단하게 나눠 정산해요.
         </p>
+        {/* 소개 페이지는 앱(React) 밖의 정적 페이지(public/intro)라 라우터 Link가 아닌 일반 링크로 연다 */}
+        <a href="/intro" className={styles.introLink}>
+          노나내가 처음이라면? 소개 보기
+        </a>
       </div>
       <div className={styles.actions}>
         <Button

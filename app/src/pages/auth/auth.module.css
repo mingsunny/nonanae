@@ -54,6 +54,16 @@
   line-height: 1.6;
 }
 
+/* 태그라인 아래 "소개 보기" 링크. 글자는 작아도 손가락이 닿는 영역은 넉넉하게(.textLink와 같은 방식) */
+.introLink {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 14px 10px;
+  color: var(--ink-soft);
+  font-size: var(--fs-caption);
+  text-decoration: underline;
+}
+
 .actions {
   padding: 0 20px 96px;
 }
