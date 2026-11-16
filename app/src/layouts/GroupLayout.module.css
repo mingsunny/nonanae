@@ -56,7 +56,16 @@
   white-space: nowrap;
 }
 
-/* 통화 선택: 그룹 이름 바로 옆의 작은 알약. 글자는 작아도 누르는 높이는 확보한다 */
+/* 총액 설명(왼쪽) + 통화 선택(오른쪽) 한 줄 */
+.captionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+/* 통화 선택: 총액 설명 줄 오른쪽 끝의 작은 알약. 글자는 작아도 누르는 높이는 확보한다 */
 .currency {
   flex-shrink: 0;
   min-height: 30px;
@@ -79,7 +88,6 @@
 }
 
 .caption {
-  margin-bottom: var(--space-xs);
   font-size: 13px;
   opacity: 0.7;
 }

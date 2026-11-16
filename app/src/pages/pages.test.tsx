@@ -498,9 +498,12 @@ describe('그룹 통화 (KRW / USD)', () => {
     return group.id
   }
 
-  it('헤더 왼쪽 위(그룹 이름 옆)에 통화 선택이 있고 기본은 KRW', () => {
+  it('"이 여행에서 총 사용한 금액"과 같은 줄에 통화 선택(드롭다운)이 있고 기본은 KRW', () => {
     renderAt('/groups/g_jeju/expenses')
-    expect((screen.getByLabelText('통화') as HTMLSelectElement).value).toBe('KRW')
+    const picker = screen.getByLabelText('통화') as HTMLSelectElement
+    expect(picker.tagName).toBe('SELECT')
+    expect(picker.parentElement?.textContent).toContain('이 여행에서 총 사용한 금액')
+    expect(picker.value).toBe('KRW')
     expect(text()).toContain('₩')
   })
 
