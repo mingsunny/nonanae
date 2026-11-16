@@ -88,6 +88,8 @@ async function requestResetToken(email: string): Promise<string> {
 }
 
 beforeEach(async () => {
+  // 첫 진입 가이드는 아래 '첫 진입 가이드' 묶음에서만 따로 확인한다
+  localStorage.setItem('nonanae.onboardingSeen', '1')
   useToastStore.setState({ message: null })
   useAuthFlowStore.getState().reset()
   await boot({ loggedIn: true })
@@ -96,6 +98,45 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+})
+
+describe('01 인트로: 첫 진입 가이드', () => {
+  it('처음 들어오면 카드 가이드가 뜨고, 다음으로 끝까지 넘긴 뒤 시작하기를 누르면 닫히고 다시 뜨지 않는다', async () => {
+    localStorage.removeItem('nonanae.onboardingSeen')
+    await boot({ loggedIn: false })
+    const router = renderApp('/welcome')
+    const dialog = await screen.findByRole('dialog', { name: '노나내 사용 가이드' })
+    expect(dialog).toBeTruthy()
+    expect(screen.getByText('1 / 7')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '이전' })).toBeNull()
+    for (let i = 2; i <= 7; i++) {
+      await click('다음')
+      expect(screen.getByText(`${i} / 7`)).toBeTruthy()
+    }
+    expect(screen.queryByRole('button', { name: '다음' })).toBeNull()
+    await click('이전')
+    expect(screen.getByText('6 / 7')).toBeTruthy()
+    await click('다음')
+    await click('시작하기')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(localStorage.getItem('nonanae.onboardingSeen')).toBe('1')
+
+    reload(router)
+    expect(await screen.findByRole('button', { name: '로그인' })).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('건너뛰기로 닫을 수 있고, "소개 보기"로 다시 열 수 있다', async () => {
+    localStorage.removeItem('nonanae.onboardingSeen')
+    await boot({ loggedIn: false })
+    renderApp('/welcome')
+    await screen.findByRole('dialog')
+    await click('건너뛰기')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await click(/소개 보기/)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByText('1 / 7')).toBeTruthy()
+  })
 })
 
 describe('01 인트로 / 로그인', () => {

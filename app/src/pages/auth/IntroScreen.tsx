@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
-import PrivacyLink, { TermsLink } from '../../components/common/PrivacyLink'
+import PrivacyLink, { FeedbackLink, TermsLink } from '../../components/common/PrivacyLink'
+import OnboardingGuide from '../../components/onboarding/OnboardingGuide'
 import fields from '../../components/common/Field.module.css'
 import logoUrl from '../../assets/logo.png'
 import { usePrefetchCaptcha } from '../../lib/captcha'
+import { hasSeenOnboarding } from '../../domain/onboarding'
 import { paths } from '../../routes/paths'
 import { useAuthFlowStore } from '../../store/authFlowStore'
 import styles from './auth.module.css'
@@ -16,6 +19,8 @@ export default function IntroScreen() {
   const setReturnTo = useAuthFlowStore((s) => s.setReturnTo)
   // 로그인·회원가입 버튼을 누르기 전부터 봇 확인을 받아 둔다 — 다음 화면에서 그 토큰을 그대로 쓴다
   usePrefetchCaptcha()
+  // 처음 들어온 사람에게는 카드 가이드를 먼저 띄운다. "소개 보기"로 언제든 다시 볼 수 있다
+  const [guideOpen, setGuideOpen] = useState(() => !hasSeenOnboarding())
 
   function openSignup() {
     setReturnTo(null)
@@ -34,6 +39,9 @@ export default function IntroScreen() {
           <br />
           가장 간단하게 나눠 정산해요.
         </p>
+        <button type="button" className={styles.introLink} onClick={() => setGuideOpen(true)}>
+          노나내가 처음이라면? 소개 보기
+        </button>
       </div>
       <div className={styles.actions}>
         <Button
@@ -56,9 +64,11 @@ export default function IntroScreen() {
           </button>
         </div>
         <div className={styles.policyFooter}>
+          <FeedbackLink separator=" · " />
           <TermsLink /> · <PrivacyLink />
         </div>
       </div>
+      {guideOpen && <OnboardingGuide onClose={() => setGuideOpen(false)} />}
     </div>
   )
 }
