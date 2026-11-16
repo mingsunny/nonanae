@@ -83,10 +83,13 @@ function GroupShell({ group }: { group: GroupDetail }) {
             </button>
           )}
           <h1 className={styles.groupName}>{group.name}</h1>
-          <CurrencyPicker group={group} />
         </div>
 
-        <div className={styles.caption}>이 여행에서 총 사용한 금액</div>
+        {/* 총액 설명과 같은 줄, 오른쪽 끝에 통화 선택 */}
+        <div className={styles.captionRow}>
+          <div className={styles.caption}>이 여행에서 총 사용한 금액</div>
+          <CurrencyPicker group={group} />
+        </div>
         <div className={`${styles.total} num`}>{formatMoney(groupTotal(group.expenses), group.currency)}</div>
 
         <button
@@ -141,7 +144,7 @@ function GroupShell({ group }: { group: GroupDetail }) {
 }
 
 /**
- * 그룹 통화 선택 (헤더 왼쪽 위, 그룹 이름 옆). 그룹 전체에 적용되고, 지출이 생긴 뒤에는 바꿀 수 없다
+ * 그룹 통화 선택 (헤더의 "이 여행에서 총 사용한 금액" 줄 오른쪽). 그룹 전체에 적용되고, 지출이 생긴 뒤에는 바꿀 수 없다
  * (금액이 통화의 최소 단위로 저장돼서 통화만 바꾸면 금액 뜻이 달라진다) — 그때 고르면 이유를 알려 주고 그대로 둔다.
  */
 function CurrencyPicker({ group }: { group: GroupDetail }) {
