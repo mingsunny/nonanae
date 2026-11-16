@@ -1,6 +1,8 @@
 // 엔티티 타입. 출처: docs/spec/schema.md (필드가 바뀌면 그쪽과 함께 수정할 것).
 // 서버 전용 필드(User.passwordHash)는 프론트에서 다루지 않으므로 뺐다.
-// id는 모두 문자열이며 금액은 원 단위 정수.
+// id는 모두 문자열이며 금액은 그룹 통화의 최소 단위 정수(KRW 원, USD 센트).
+
+import type { Currency } from './currency'
 
 export const CATEGORIES = ['숙소', '식비', '교통', '액티비티', '쇼핑', '기타'] as const
 export type Category = (typeof CATEGORIES)[number]
@@ -26,6 +28,8 @@ export interface Group {
   id: string
   name: string
   inviteCode: string
+  /** 이 그룹의 모든 금액의 통화. 금액은 최소 단위 정수(KRW 원, USD 센트) */
+  currency: Currency
 }
 
 /** 정식 회원(userId 있음) / 게스트 / 대기 중(placeholder) 모두 이 타입. 후자 둘은 userId가 null. */

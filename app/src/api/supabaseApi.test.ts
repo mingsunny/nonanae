@@ -65,6 +65,7 @@ import {
   changePassword,
   resolveInviteCode,
   rotateInviteCode,
+  setGroupCurrency,
   signIn,
   signOut,
   SIGNUP_RATE_LIMIT_MESSAGE,
@@ -684,7 +685,7 @@ describe('createGroup', () => {
     const group = await createGroup('  새 그룹 ')
 
     expect(mocks.rpc).toHaveBeenCalledWith('create_group', { p_name: '새 그룹' })
-    expect(group).toEqual({ id: 'g-new', name: '새 그룹', inviteCode: 'ABC234' })
+    expect(group).toEqual({ id: 'g-new', name: '새 그룹', inviteCode: 'ABC234', currency: 'KRW' })
   })
 
   it('이름이 비어 있거나 게스트면 서버를 부르기 전에 막는다', async () => {
@@ -1462,6 +1463,23 @@ describe('비밀번호 재설정 (14)', () => {
       await expect(resetPassword('same')).rejects.toThrow('이전과 다른 비밀번호를 입력해주세요.')
       expect(mocks.auth.signOut).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('setGroupCurrency', () => {
+  it('DB 함수로 그룹 통화를 바꾼다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ set_group_currency: () => ok(null) })
+    await setGroupCurrency('g-1', 'USD')
+    expect(mocks.rpc).toHaveBeenCalledWith('set_group_currency', { p_group_id: 'g-1', p_currency: 'USD' })
+  })
+
+  it('지출이 있으면, 또는 서버에 함수가 아직 없으면 알아들을 수 있는 문구로 던진다', async () => {
+    mocks.auth.getSession.mockResolvedValue(signedInSession)
+    mockRpc({ set_group_currency: () => ({ data: null, error: { message: 'group has expenses' } }) })
+    await expect(setGroupCurrency('g-1', 'USD')).rejects.toThrow('지출이 있는 그룹은 통화를 바꿀 수 없어요')
+    mockRpc({ set_group_currency: () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } }) })
+    await expect(setGroupCurrency('g-1', 'USD')).rejects.toThrow('통화 선택은 서버 업데이트 뒤에 쓸 수 있어요')
   })
 })
 

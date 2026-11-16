@@ -3,7 +3,7 @@ import Avatar from '../components/common/Avatar'
 import { CATEGORY_COLORS } from '../domain/constants'
 import { computeBalances, groupTotal, totalsByCategory } from '../domain/settlement'
 import type { Category, GroupDetail } from '../domain/types'
-import { won } from '../lib/format'
+import { formatMoney } from '../domain/currency'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
 import styles from './SummaryPage.module.css'
 
@@ -15,6 +15,8 @@ export default function SummaryPage() {
 }
 
 function Summary({ group }: { group: GroupDetail }) {
+  // 금액 표시는 그룹 통화로 (₩12,000 / $12.34)
+  const money = (minor: number) => formatMoney(minor, group.currency)
   const { nameOf, isMe } = useGroupView(group)
   const isEmpty = group.expenses.length === 0
 
@@ -49,7 +51,7 @@ function Summary({ group }: { group: GroupDetail }) {
               <div key={category} className={styles.legend}>
                 <span className={styles.swatch} style={{ background: CATEGORY_COLORS[category] }} />
                 <span className={styles.legendName}>{category}</span>
-                <span className={`${styles.legendAmount} num`}>{won(amount)}</span>
+                <span className={`${styles.legendAmount} num`}>{money(amount)}</span>
                 <span className={`${styles.pct} num`}>{Math.round((amount / total) * 100)}%</span>
               </div>
             ))}
@@ -73,11 +75,11 @@ function Summary({ group }: { group: GroupDetail }) {
                     {nameOf(member.id)}
                     {isMe(member.id) ? ' (나)' : ''}
                   </div>
-                  <div className={`${styles.personSub} num`}>결제 {won(paid[member.id] ?? 0)}</div>
+                  <div className={`${styles.personSub} num`}>결제 {money(paid[member.id] ?? 0)}</div>
                 </div>
                 <div className={styles.balance}>
                   <div className={`${styles.balanceAmount} ${tone} num`}>
-                    {net === 0 ? '—' : won(Math.abs(net))}
+                    {net === 0 ? '—' : money(Math.abs(net))}
                   </div>
                   <div className={styles.personSub}>
                     {net > 0 ? '받을 돈' : net < 0 ? '보낼 돈' : '정산 완료'}

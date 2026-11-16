@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import Button from '../components/common/Button'
 import { sortGroupsNewestFirst } from '../domain/members'
 import { groupTotal } from '../domain/settlement'
-import { won } from '../lib/format'
+import { formatMoney } from '../domain/currency'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import { useAuthFlowStore } from '../store/authFlowStore'
@@ -78,7 +78,7 @@ export default function GroupListPage() {
                 {requests > 0 && <span className={styles.requestBadge}>참여 요청 {requests}</span>}
               </span>
               <span className={`${styles.sum} num`}>
-                멤버 {group.members.length}명 · 총 {won(groupTotal(group.expenses))}
+                멤버 {group.members.length}명 · 총 {formatMoney(groupTotal(group.expenses), group.currency)}
               </span>
             </span>
             <span className={styles.arrow} aria-hidden="true">

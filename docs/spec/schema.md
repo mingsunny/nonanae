@@ -41,6 +41,7 @@
 | id | string | 내부 식별자 (`uid('g')`로 생성) |
 | name | string | 그룹(여행) 이름 |
 | inviteCode | string | 6자리 초대코드 ([06-join-group.md](06-join-group.md), [12-group-invite.md](12-group-invite.md)에서 사용) |
+| currency | 'KRW' \| 'USD' | 그룹 통화(기본 KRW). 그룹 상세 헤더에서 고르고, 지출이 하나라도 있으면 바꿀 수 없다. 금액은 이 통화의 최소 단위 정수(KRW 원, USD 센트) |
 | members | Member[] | 그룹에 속한 인원 목록 |
 | expenses | Expense[] | 그룹 내 지출 목록 |
 
@@ -73,7 +74,7 @@
 | groupId | string | 소속 Group.id |
 | paidBy | string | 결제자의 Member.id(User.id 아님) — placeholder도 결제자로 지정될 수 있어서 항상 존재하는 Member.id를 참조 |
 | title | string | 항목명 |
-| amount | number | 지출 금액(원) |
+| amount | number | 지출 금액(그룹 통화의 최소 단위 정수: KRW 원, USD 센트) |
 | category | string | 카테고리 6종 중 하나 — [마스터 데이터](#마스터-데이터) 참고 |
 | receiptImageUrl | string \| null | 영수증 사진(선택) |
 | splitType | 'equal' \| 'ratio' \| 'amount' | 나누기 방식 |

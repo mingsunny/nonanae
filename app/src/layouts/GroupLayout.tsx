@@ -3,10 +3,11 @@ import { BackIcon, BarsIcon, KakaoIcon, ReceiptIcon, TransferIcon } from '../com
 import AccountPromoCard from '../components/common/AccountPromoCard'
 import Avatar from '../components/common/Avatar'
 import JoinRequestBanner from '../components/joinRequests/JoinRequestBanner'
+import { CURRENCIES, formatMoney } from '../domain/currency'
+import type { Currency } from '../domain/currency'
 import { groupTotal } from '../domain/settlement'
 import type { GroupDetail } from '../domain/types'
 import { copyText } from '../lib/clipboard'
-import { won } from '../lib/format'
 import { useElementHeight } from '../lib/useElementHeight'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
@@ -82,10 +83,11 @@ function GroupShell({ group }: { group: GroupDetail }) {
             </button>
           )}
           <h1 className={styles.groupName}>{group.name}</h1>
+          <CurrencyPicker group={group} />
         </div>
 
         <div className={styles.caption}>이 여행에서 총 사용한 금액</div>
-        <div className={`${styles.total} num`}>{won(groupTotal(group.expenses))}</div>
+        <div className={`${styles.total} num`}>{formatMoney(groupTotal(group.expenses), group.currency)}</div>
 
         <button
           type="button"
@@ -135,5 +137,42 @@ function GroupShell({ group }: { group: GroupDetail }) {
         ))}
       </nav>
     </div>
+  )
+}
+
+/**
+ * 그룹 통화 선택 (헤더 왼쪽 위, 그룹 이름 옆). 그룹 전체에 적용되고, 지출이 생긴 뒤에는 바꿀 수 없다
+ * (금액이 통화의 최소 단위로 저장돼서 통화만 바꾸면 금액 뜻이 달라진다) — 그때 고르면 이유를 알려 주고 그대로 둔다.
+ */
+function CurrencyPicker({ group }: { group: GroupDetail }) {
+  const setGroupCurrency = useAppStore((s) => s.setGroupCurrency)
+
+  async function pick(next: Currency) {
+    if (next === group.currency) return
+    if (group.expenses.length > 0) {
+      showToast('지출이 있는 그룹은 통화를 바꿀 수 없어요')
+      return
+    }
+    try {
+      await setGroupCurrency(group.id, next)
+      showToast(`통화를 ${next}로 바꿨어요`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '통화를 바꾸지 못했어요')
+    }
+  }
+
+  return (
+    <select
+      className={styles.currency}
+      aria-label="통화"
+      value={group.currency}
+      onChange={(e) => void pick(e.target.value as Currency)}
+    >
+      {CURRENCIES.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+    </select>
   )
 }

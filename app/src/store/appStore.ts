@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import * as api from '../api'
+import type { Currency } from '../domain/currency'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -66,6 +67,8 @@ interface AppState {
   createGroup: (name: string) => Promise<Group>
   /** 12: 초대코드 재발급(방장 전용). 새 코드를 돌려주고, 이전 코드는 즉시 못 쓴다. */
   rotateInviteCode: (groupId: string) => Promise<string>
+  /** 그룹 통화 바꾸기 (지출이 없을 때만) */
+  setGroupCurrency: (groupId: string, currency: Currency) => Promise<void>
 
   // 06/07: 초대코드로 참여. 참여는 요청만 남기고 방장이 승인해야 멤버가 된다.
   // 그룹 안으로 들어가는 결과가 나오면 그 그룹이 스토어에 들어 있도록 refresh까지 마친다.
@@ -198,6 +201,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return group
   },
 
+  setGroupCurrency: async (groupId, currency) => {
+    await api.setGroupCurrency(groupId, currency)
+    await get().refresh()
+  },
   rotateInviteCode: async (groupId) => {
     const code = await api.rotateInviteCode(groupId)
     await get().refresh()
