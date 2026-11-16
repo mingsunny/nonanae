@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import * as api from '../api'
+import { requestTossLogin } from '../lib/toss'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -52,6 +53,8 @@ interface AppState {
 
   // 01/02/04: 로그인·가입·프로필
   signIn: (email: string, password: string) => Promise<void>
+  /** 토스 미니앱 전용: 토스 로그인 창을 띄우고, 받은 인가 코드로 로그인한다 */
+  signInWithToss: () => Promise<void>
   /** 회원가입 1단계(이메일·비밀번호). 이메일 확인이 필요하면 SignUpConfirmationRequired로 던진다. */
   signUp: (input: api.SignUpInput) => Promise<void>
   /** 이메일 확인 뒤 이름·은행·계좌를 처음 등록 (02) */
@@ -150,6 +153,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await get().refresh()
   },
 
+  signInWithToss: async () => {
+    const { authorizationCode, referrer } = await requestTossLogin()
+    await api.signInWithToss(authorizationCode, referrer)
+    set({ leavingToLogin: false })
+    await get().refresh()
+  },
   signIn: async (email, password) => {
     // 이름·계좌 등록을 마치지 않은 계정이면 아래 refresh가 needsProfile을 켜서 화면이 계좌 등록으로 보낸다
     await api.signIn(email, password)

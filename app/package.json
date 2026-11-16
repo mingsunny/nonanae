@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:toss": "vite --mode toss",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:toss": "tsc -b && vite build --mode toss && ait build",
+    "deploy:toss": "ait deploy"
   },
   "dependencies": {
+    "@apps-in-toss/web-framework": "^3.10.0",
     "@supabase/supabase-js": "^2.116.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

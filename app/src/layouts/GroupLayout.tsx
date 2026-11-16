@@ -5,7 +5,7 @@ import Avatar from '../components/common/Avatar'
 import JoinRequestBanner from '../components/joinRequests/JoinRequestBanner'
 import { groupTotal } from '../domain/settlement'
 import type { GroupDetail } from '../domain/types'
-import { copyText } from '../lib/clipboard'
+import { sendInviteLink } from '../lib/inviteLink'
 import { won } from '../lib/format'
 import { useElementHeight } from '../lib/useElementHeight'
 import { paths } from '../routes/paths'
@@ -62,9 +62,12 @@ function GroupShell({ group }: { group: GroupDetail }) {
 
   /** 그룹 공용 초대 링크(`/join?code=ABCDEF`)를 복사. 받은 사람은 링크만 열면 코드 입력 없이 바로 참여 화면으로 간다. */
   async function copyInviteLink() {
-    const link = `${window.location.origin}${paths.join}?code=${group.inviteCode}`
-    const ok = await copyText(link)
-    showToast(ok ? '초대 링크가 복사되었습니다' : '복사하지 못했어요. 링크: ' + link)
+    const { result, link } = await sendInviteLink(
+      `${paths.join}?code=${group.inviteCode}`,
+      `노나내 '${group.name}' 정산에 초대했어요`,
+    )
+    if (result === 'copied') showToast('초대 링크가 복사되었습니다')
+    else if (result === 'failed') showToast(link ? '복사하지 못했어요. 링크: ' + link : '초대 링크를 만들지 못했어요')
   }
 
   return (

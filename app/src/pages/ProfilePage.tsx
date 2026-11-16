@@ -7,6 +7,7 @@ import fields from '../components/common/Field.module.css'
 import PrivacyLink, { FeedbackLink, TermsLink } from '../components/common/PrivacyLink'
 import { BANKS } from '../domain/constants'
 import { NAME_MAX_LENGTH } from '../domain/name'
+import { isTossBuild } from '../lib/platform'
 import type { User } from '../domain/types'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
@@ -113,9 +114,12 @@ function Profile({ user }: { user: User }) {
       </div>
 
       <div className={styles.links}>
-        <button type="button" className={fields.textLink} onClick={() => navigate(paths.profilePassword)}>
-          비밀번호 변경
-        </button>
+        {/* 토스 미니앱은 토스 로그인만 써서 비밀번호가 없다 */}
+        {!isTossBuild() && (
+          <button type="button" className={fields.textLink} onClick={() => navigate(paths.profilePassword)}>
+            비밀번호 변경
+          </button>
+        )}
         <button type="button" className={fields.textLink} onClick={logout}>
           로그아웃
         </button>

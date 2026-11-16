@@ -405,6 +405,31 @@ export async function signIn(email: string, password: string): Promise<void> {
 }
 
 /**
+ * 토스 로그인(토스 미니앱 전용). 토스가 준 인가 코드를 Edge Function `toss-login`에 넘기면,
+ * 함수가 토스 서버(mTLS)에서 사용자 키(userKey)를 받아 그 사람의 Supabase 계정을 찾거나 만들고
+ * 한 번 쓰는 로그인 토큰(token_hash)을 돌려준다. 그 토큰으로 일반 Supabase 세션을 연다.
+ * 처음 로그인한 사람은 이름·계좌가 없어서, 뒤이은 fetchSnapshot이 needsProfile로 계좌 등록 화면에 보낸다.
+ * 이용약관·처리방침 동의는 토스 로그인 동의 화면(콘솔에 등록한 약관)에서 받으므로, 여기서 동의 기록만 남긴다.
+ */
+export async function signInWithToss(authorizationCode: string, referrer: string): Promise<void> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase.functions.invoke<{ tokenHash?: string }>('toss-login', {
+    body: { authorizationCode, referrer },
+  })
+  if (error || !data?.tokenHash) {
+    console.warn('[supabase] 토스 로그인 실패', error?.message)
+    throw new Error('토스 로그인을 하지 못했어요. 잠시 후 다시 시도해주세요.')
+  }
+  const { error: verifyError } = await supabase.auth.verifyOtp({ token_hash: data.tokenHash, type: 'email' })
+  if (verifyError) throw new Error('토스 로그인을 하지 못했어요. 잠시 후 다시 시도해주세요.')
+  const { error: consentError } = await supabase.rpc('record_consents', {
+    p_terms: TERMS_VERSION,
+    p_privacy: PRIVACY_VERSION,
+  })
+  if (consentError) console.warn('[supabase] 동의 기록을 건너뜀', consentError.code)
+}
+
+/**
  * 회원가입 1단계의 이메일 중복 확인. 이메일을 확인하고 이름·계좌를 입력하기 전에 알려주려고 쓴다.
  * DB 함수(20261010000000_email_registered_check.sql)가 아직 적용되지 않았거나 실패하면 false로 넘긴다 —
  * 그래도 가입 제출(signUp) 때 한 번 더 걸러지므로 가입이 막히지는 않는다.
