@@ -12,7 +12,14 @@ describe('expenseAddedTitle', () => {
 })
 
 describe('expenseDeletedTitle', () => {
-  const base = { groupName: '제주도 여행', itemTitle: '점심', amount: 30000, payerName: '박서연', deleterName: '이하준' }
+  const base = {
+    groupName: '제주도 여행',
+    itemTitle: '점심',
+    amount: 30000,
+    currency: 'KRW' as const,
+    payerName: '박서연',
+    deleterName: '이하준',
+  }
 
   it('누가 어떤 내역(금액·결제자)을 지웠는지 채운다', () => {
     expect(expenseDeletedTitle(base)).toBe("[제주도 여행]에서 '점심' 내역(₩30,000, 결제: 박서연)을 이하준님이 삭제했어요")
@@ -21,6 +28,12 @@ describe('expenseDeletedTitle', () => {
   it('이름을 알 수 없으면 대체 문구를 쓴다', () => {
     expect(expenseDeletedTitle({ ...base, payerName: '', deleterName: '' })).toBe(
       "[제주도 여행]에서 '점심' 내역(₩30,000, 결제: 알 수 없음)을 누군가님이 삭제했어요",
+    )
+  })
+
+  it('USD 그룹은 센트 단위 금액을 달러로 쓴다', () => {
+    expect(expenseDeletedTitle({ ...base, currency: 'USD', amount: 123456 })).toBe(
+      "[제주도 여행]에서 '점심' 내역($1,234.56, 결제: 박서연)을 이하준님이 삭제했어요",
     )
   })
 

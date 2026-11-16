@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import CategoryBadge from '../components/common/CategoryBadge'
 import EmptyState from '../components/common/EmptyState'
 import { PlusIcon } from '../components/common/icons'
-import { dateLabel, won } from '../lib/format'
+import { formatMoney } from '../domain/currency'
+import { dateLabel } from '../lib/format'
 import { paths } from '../routes/paths'
 import type { GroupDetail } from '../domain/types'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
@@ -16,6 +17,8 @@ export default function ExpenseListPage() {
 }
 
 function ExpenseList({ group }: { group: GroupDetail }) {
+  // 금액 표시는 그룹 통화로 (₩12,000 / $12.34)
+  const money = (minor: number) => formatMoney(minor, group.currency)
   const { nameOf } = useGroupView(group)
   const isEmpty = group.expenses.length === 0
 
@@ -64,7 +67,7 @@ function ExpenseList({ group }: { group: GroupDetail }) {
                     {partial ? ' (일부)' : ''}
                   </div>
                 </div>
-                <div className={`${styles.amount} num`}>{won(expense.amount)}</div>
+                <div className={`${styles.amount} num`}>{money(expense.amount)}</div>
               </Link>
             )
           })}

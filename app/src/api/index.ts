@@ -1,11 +1,13 @@
 // 데이터 접근 계층. 화면/스토어는 이 파일의 함수만 호출한다.
 // 지금은 목업 DB(localStorage)를 읽고 쓰지만, 시그니처는 서버 호출과 같은 async로 두었다 —
 // Supabase가 붙으면 함수 안쪽만 supabase-js 호출로 바꾸면 되고 호출하는 쪽은 그대로다.
+import { DEFAULT_CURRENCY, toCurrency } from '../domain/currency'
+import type { Currency } from '../domain/currency'
 import { generateInviteCode, parseInviteCode } from '../domain/inviteCode'
 import { memberDisplayName } from '../domain/members'
 import { assertNameLength } from '../domain/name'
 import { expenseAddedTitle, expenseDeletedTitle, joinRequestTitle } from '../domain/notifications'
-import { CURRENT_PASSWORD_MISMATCH } from './errors'
+import { CURRENCY_LOCKED_MESSAGE, CURRENT_PASSWORD_MISMATCH } from './errors'
 import type {
   ExpenseInput,
   ExpenseWithParticipants,
@@ -63,6 +65,8 @@ export async function fetchSnapshot(): Promise<Snapshot> {
     .filter((g) => myGroupIds.has(g.id))
     .map((g) => ({
       ...g,
+      // 통화가 생기기 전에 저장된 목업 데이터는 currency가 없다 → KRW
+      currency: toCurrency(g.currency),
       members: d.members
         .filter((m) => m.groupId === g.id)
         .map((m) => (d.guestSeats[m.id] ? { ...m, guestJoined: true } : m)),
@@ -197,6 +201,7 @@ export async function deleteExpense(expenseId: string): Promise<void> {
         groupName: group.name,
         itemTitle: expense.title,
         amount: expense.amount,
+        currency: toCurrency(group.currency),
         payerName: payer ? memberDisplayName(payer, users) : '',
         deleterName: memberDisplayName(deleter, users),
       }),
@@ -459,7 +464,7 @@ export async function createGroup(name: string): Promise<Group> {
   let inviteCode = generateInviteCode()
   while (d.groups.some((g) => g.inviteCode === inviteCode)) inviteCode = generateInviteCode()
 
-  const group: Group = { id: uid('g'), name: trimmed, inviteCode }
+  const group: Group = { id: uid('g'), name: trimmed, inviteCode, currency: DEFAULT_CURRENCY }
   d.groups.push(group)
   d.members.push({
     id: uid('m'),
@@ -471,6 +476,25 @@ export async function createGroup(name: string): Promise<Group> {
   })
   commit()
   return structuredClone(group)
+}
+
+/**
+ * 그룹 통화 바꾸기 (KRW ↔ USD). 그룹 멤버 누구나 바꿀 수 있지만, 지출이 하나라도 있으면 바꿀 수 없다 —
+ * 금액은 통화의 최소 단위 정수로 저장돼서(₩10,000 = 10000, $100.00 = 10000) 통화만 바꾸면 금액 뜻이 달라진다.
+ */
+export async function setGroupCurrency(groupId: string, currency: Currency): Promise<void> {
+  if (USE_SUPABASE) return remote.setGroupCurrency(groupId, currency)
+  const d = getDb()
+  const group = d.groups.find((g) => g.id === groupId)
+  if (!group) throw new Error('그룹을 찾을 수 없어요')
+  const { userId, viewAsMemberId } = d.session
+  const isMember = d.members.some(
+    (m) => m.groupId === groupId && (userId !== null ? m.userId === userId : m.id === viewAsMemberId),
+  )
+  if (!isMember) throw new Error('그룹 멤버만 바꿀 수 있어요')
+  if (d.expenses.some((e) => e.groupId === groupId)) throw new Error(CURRENCY_LOCKED_MESSAGE)
+  group.currency = currency
+  commit()
 }
 
 /**

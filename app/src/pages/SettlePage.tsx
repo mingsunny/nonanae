@@ -4,7 +4,7 @@ import { memberBankAccount } from '../domain/members'
 import { computeBalances, computeTransfers } from '../domain/settlement'
 import type { GroupDetail, Transfer } from '../domain/types'
 import { copyText } from '../lib/clipboard'
-import { won } from '../lib/format'
+import { formatMoney } from '../domain/currency'
 import { useAppStore } from '../store/appStore'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
 import { showToast } from '../store/toastStore'
@@ -18,6 +18,8 @@ export default function SettlePage() {
 }
 
 function Settle({ group }: { group: GroupDetail }) {
+  // 금액 표시는 그룹 통화로 (₩12,000 / $12.34)
+  const money = (minor: number) => formatMoney(minor, group.currency)
   const usersById = useAppStore((s) => s.usersById)
   // 게스트(로그인 없이 참여)에겐 계좌번호를 보여주지 않는다 — 링크만 있으면 들어올 수 있어서. 서버(get_payee_accounts)도 막혀 있다
   const isGuest = useAppStore((s) => s.currentUserId === null)
@@ -75,7 +77,7 @@ function Settle({ group }: { group: GroupDetail }) {
             {nameOf(t.to)}
             {isMe(t.to) ? ' (나)' : ''}
           </span>
-          <span className={`${styles.amount} num`}>{won(t.amount)}</span>
+          <span className={`${styles.amount} num`}>{money(t.amount)}</span>
         </div>
 
         {/* 계좌는 내가 보낼 송금에만 노출. 다른 사람 간 송금은 복사할 필요가 없어 아예 렌더링하지 않음 */}

@@ -1,3 +1,6 @@
+import { formatMoney } from './currency'
+import type { Currency } from './currency'
+
 // 알림 문구. 출처: docs/spec/13-notifications.md. 알림 문구는 만들 때 이름을 채워 고정 저장한다(이후 이름이 바뀌어도 그대로).
 
 /**
@@ -23,11 +26,12 @@ export function expenseDeletedTitle(input: {
   groupName: string
   itemTitle: string
   amount: number
+  currency: Currency
   payerName: string
   deleterName: string
 }): string {
   const chars = Array.from(input.itemTitle)
   const item = chars.length > ITEM_TITLE_MAX ? `${chars.slice(0, ITEM_TITLE_MAX).join('')}…` : input.itemTitle
-  const amount = Math.round(input.amount).toLocaleString('en-US')
-  return `[${input.groupName}]에서 '${item}' 내역(₩${amount}, 결제: ${input.payerName || '알 수 없음'})을 ${input.deleterName || '누군가'}님이 삭제했어요`
+  const amount = formatMoney(input.amount, input.currency)
+  return `[${input.groupName}]에서 '${item}' 내역(${amount}, 결제: ${input.payerName || '알 수 없음'})을 ${input.deleterName || '누군가'}님이 삭제했어요`
 }

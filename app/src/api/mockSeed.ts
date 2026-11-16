@@ -51,9 +51,9 @@ export function createSeed(now: number = Date.now(), { signedIn = true }: SeedOp
   ]
 
   const groups: Group[] = [
-    { id: 'g_jeju', name: '제주도 여행', inviteCode: 'JEJU26' },
+    { id: 'g_jeju', name: '제주도 여행', inviteCode: 'JEJU26', currency: 'KRW' },
     // 초대코드 테스트방 — 대기 중 멤버 "김민지"가 있어 "나 고르기" 흐름을 테스트할 수 있음. 테스트 계정은 멤버가 아님.
-    { id: 'g_test42', name: '초대코드 테스트방', inviteCode: 'TEST42' },
+    { id: 'g_test42', name: '초대코드 테스트방', inviteCode: 'TEST42', currency: 'KRW' },
   ]
 
   const member = (

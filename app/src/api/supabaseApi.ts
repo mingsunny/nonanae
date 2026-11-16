@@ -2,6 +2,8 @@
 // 로그인은 Supabase Auth, 이름·계좌 같은 프로필은 public.profiles 테이블이 맡는다 (docs/spec/schema.md "DB 구현").
 // 게스트는 Supabase 익명 로그인 세션으로 표현한다 — User(프로필)는 없고, members.guest_uid로 자기 자리를 가리킨다.
 import type { AuthError, PostgrestError, User as AuthUser } from '@supabase/supabase-js'
+import { toCurrency } from '../domain/currency'
+import type { Currency } from '../domain/currency'
 import { parseInviteCode } from '../domain/inviteCode'
 import { NAME_TOO_LONG_MESSAGE, assertNameLength } from '../domain/name'
 import { PASSWORD_RULE_HINT } from '../domain/password'
@@ -22,7 +24,7 @@ import type {
   SplitType,
   User,
 } from '../domain/types'
-import { CURRENT_PASSWORD_MISMATCH, SignUpConfirmationRequired } from './errors'
+import { CURRENCY_LOCKED_MESSAGE, CURRENT_PASSWORD_MISMATCH, SignUpConfirmationRequired } from './errors'
 import { CAPTCHA_FAILED_MESSAGE, captchaOptions, getCaptchaToken } from '../lib/captcha'
 import { getSupabase, openedFromRecoveryLink } from '../lib/supabase'
 import { paths } from '../routes/paths'
@@ -145,6 +147,8 @@ interface GroupRow {
   id: string
   name: string
   invite_code: string
+  /** 20261116100000_group_currency.sql 적용 전에는 컬럼이 없다 → KRW로 본다 */
+  currency?: string | null
 }
 interface MemberRow {
   id: string
@@ -182,7 +186,12 @@ interface NotificationRow {
   read: boolean
 }
 
-const toGroup = (r: GroupRow): Group => ({ id: r.id, name: r.name, inviteCode: r.invite_code })
+const toGroup = (r: GroupRow): Group => ({
+  id: r.id,
+  name: r.name,
+  inviteCode: r.invite_code,
+  currency: toCurrency(r.currency),
+})
 const toMember = (r: MemberRow): Member => ({
   id: r.id,
   userId: r.user_id,
@@ -308,7 +317,8 @@ async function readSnapshot(): Promise<Snapshot> {
     myProfileRes,
     payeesRes,
   ] = await Promise.all([
-    supabase.from('groups').select('id, name, invite_code'),
+    // 컬럼을 나열하지 않고 *로 읽는다 — 통화(currency) 컬럼을 추가하는 SQL이 아직 적용되지 않은 서버에서도 깨지지 않게
+    supabase.from('groups').select('*'),
     supabase.from('members').select(MEMBER_COLUMNS).order('joined_at'),
     supabase.from('expenses').select(EXPENSE_COLUMNS).order('created_at'),
     supabase.from('expense_participants').select('expense_id, member_id, share_amount'),
@@ -602,11 +612,22 @@ export async function createGroup(name: string): Promise<Group> {
 
   const { data: row, error: readError } = await supabase
     .from('groups')
-    .select('id, name, invite_code')
+    .select('*')
     .eq('id', groupId)
     .single<GroupRow>()
   if (readError) throw new Error(`그룹을 불러오지 못했어요: ${readError.message}`)
   return toGroup(row)
+}
+
+/** 그룹 통화 바꾸기. 멤버만, 지출이 없을 때만 (DB 함수 set_group_currency가 확인) */
+export async function setGroupCurrency(groupId: string, currency: Currency): Promise<void> {
+  const { error } = await getSupabase().rpc('set_group_currency', { p_group_id: groupId, p_currency: currency })
+  if (!error) return
+  // 함수가 아직 서버에 없음(20261116100000_group_currency.sql 미적용)
+  if (error.code === 'PGRST202') throw new Error('통화 선택은 서버 업데이트 뒤에 쓸 수 있어요')
+  if (error.message.includes('group has expenses')) throw new Error(CURRENCY_LOCKED_MESSAGE)
+  if (error.message.includes('not a group member')) throw new Error('그룹 멤버만 바꿀 수 있어요')
+  throw new Error(rpcErrorMessage(error))
 }
 
 /**

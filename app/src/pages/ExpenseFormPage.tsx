@@ -16,7 +16,8 @@ import type {
   GroupDetail,
   SplitType,
 } from '../domain/types'
-import { todayIso, won } from '../lib/format'
+import { allowsDecimals, formatMoney, parseMoneyInput, toMoneyInput, UNIT_LABEL } from '../domain/currency'
+import { todayIso } from '../lib/format'
 import { paths } from '../routes/paths'
 import { useAppStore } from '../store/appStore'
 import { useCurrentGroup, useGroupView } from '../store/hooks'
@@ -41,13 +42,16 @@ export default function ExpenseFormPage() {
 }
 
 function ExpenseForm({ group, editing }: { group: GroupDetail; editing: ExpenseWithParticipants | undefined }) {
+  // 금액 표시는 그룹 통화로 (₩12,000 / $12.34)
+  const money = (minor: number) => formatMoney(minor, group.currency)
   const navigate = useNavigate()
   const addExpense = useAppStore((s) => s.addExpense)
   const editExpense = useAppStore((s) => s.editExpense)
   const removeExpense = useAppStore((s) => s.removeExpense)
   const { nameOf, me, isMe, isPending } = useGroupView(group)
 
-  const [amountText, setAmountText] = useState(editing ? String(editing.amount) : '')
+  const currency = group.currency
+  const [amountText, setAmountText] = useState(editing ? toMoneyInput(editing.amount, currency) : '')
   const [title, setTitle] = useState(editing?.title ?? '')
   const [spentAt, setSpentAt] = useState(editing?.spentAt ?? todayIso())
   const [category, setCategory] = useState<Category>(editing?.category ?? '식비')
@@ -60,23 +64,27 @@ function ExpenseForm({ group, editing }: { group: GroupDetail; editing: ExpenseW
   // 비율/금액 입력칸의 원문. 숫자로 바로 바꾸면 입력 중에 칸을 비울 수 없어서 문자열로 들고 있음
   const [shareTexts, setShareTexts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      Object.entries(editing ? customSharesFromExpense(editing) : {}).map(([id, v]) => [id, String(v)]),
+      Object.entries(editing ? customSharesFromExpense(editing) : {}).map(([id, v]) => [
+        id,
+        editing?.splitType === 'amount' ? toMoneyInput(v, currency) : String(v),
+      ]),
     ),
   )
   const [submitting, setSubmitting] = useState(false)
 
-  const amount = parseInt(amountText || '0', 10) || 0
+  // 입력칸은 사람이 읽는 금액(12.34), 계산·저장은 최소 단위 정수(1234센트). KRW는 둘이 같다
+  const amount = parseMoneyInput(amountText, currency)
 
-  // 입력 원문 → 숫자. 금액(원)은 소수가 없으니 즉시 정수로 정리하고, 비율(%)은 소수 허용.
+  // 입력 원문 → 숫자. 금액은 최소 단위 정수로 바꾸고(KRW 원, USD 센트), 비율(%)은 소수 허용.
   const customShares = useMemo<AmountByMember>(
     () =>
       Object.fromEntries(
         participantIds.map((id) => {
-          const parsed = parseFloat(shareTexts[id] ?? '') || 0
-          return [id, splitType === 'amount' ? Math.round(parsed) : parsed]
+          const text = shareTexts[id] ?? ''
+          return [id, splitType === 'amount' ? parseMoneyInput(text, currency) : parseFloat(text) || 0]
         }),
       ),
-    [participantIds, shareTexts, splitType],
+    [participantIds, shareTexts, splitType, currency],
   )
 
   const equalShares = useMemo(() => splitEqual(amount, participantIds), [amount, participantIds])
@@ -86,7 +94,11 @@ function ExpenseForm({ group, editing }: { group: GroupDetail; editing: ExpenseW
   function fillShares(mode: SplitType, ids: string[]) {
     if (mode === 'equal') return
     const prefilled = prefillShares(mode, amount, ids)
-    setShareTexts(Object.fromEntries(Object.entries(prefilled).map(([id, v]) => [id, String(v)])))
+    setShareTexts(
+      Object.fromEntries(
+        Object.entries(prefilled).map(([id, v]) => [id, mode === 'amount' ? toMoneyInput(v, currency) : String(v)]),
+      ),
+    )
   }
 
   function pickSplitType(mode: SplitType) {
@@ -182,9 +194,10 @@ function ExpenseForm({ group, editing }: { group: GroupDetail; editing: ExpenseW
           id="ex-amount"
           className={`${fields.input} num`}
           type="number"
-          inputMode="numeric"
+          inputMode={allowsDecimals(currency) ? 'decimal' : 'numeric'}
           min={0}
-          placeholder="0"
+          step={allowsDecimals(currency) ? '0.01' : '1'}
+          placeholder={allowsDecimals(currency) ? '0.00' : '0'}
           value={amountText}
           onChange={(e) => setAmountText(e.target.value)}
         />
@@ -286,7 +299,7 @@ function ExpenseForm({ group, editing }: { group: GroupDetail; editing: ExpenseW
                 <div className={styles.share}>
                   {splitType === 'equal' ? (
                     <span className={on ? `${styles.readonly} num` : `${styles.readonly} ${styles.off}`}>
-                      {on ? won(equalShares[m.id] ?? 0) : '—'}
+                      {on ? money(equalShares[m.id] ?? 0) : '—'}
                     </span>
                   ) : (
                     <span className={styles.shareInput}>
@@ -299,7 +312,7 @@ function ExpenseForm({ group, editing }: { group: GroupDetail; editing: ExpenseW
                         value={on ? (shareTexts[m.id] ?? '0') : '0'}
                         onChange={(e) => setShareTexts((prev) => ({ ...prev, [m.id]: e.target.value }))}
                       />
-                      <span className={styles.unit}>{splitType === 'ratio' ? '%' : '원'}</span>
+                      <span className={styles.unit}>{splitType === 'ratio' ? '%' : UNIT_LABEL[currency]}</span>
                     </span>
                   )}
                 </div>
@@ -311,8 +324,8 @@ function ExpenseForm({ group, editing }: { group: GroupDetail; editing: ExpenseW
         {/* 비율/금액 모드: 합계가 목표값과 맞는지 실시간 안내 (일치=초록, 불일치=붉은색) */}
         {splitType !== 'equal' && (
           <div className={split.ok ? `${styles.summary} ${styles.ok}` : `${styles.summary} ${styles.bad}`} role="status">
-            합계 {splitType === 'ratio' ? `${split.sum}%` : won(split.sum)} /{' '}
-            {splitType === 'ratio' ? `${split.target}%` : won(split.target)}
+            합계 {splitType === 'ratio' ? `${split.sum}%` : money(split.sum)} /{' '}
+            {splitType === 'ratio' ? `${split.target}%` : money(split.target)}
           </div>
         )}
 

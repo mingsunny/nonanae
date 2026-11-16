@@ -489,3 +489,50 @@ describe('13 알림', () => {
     expect(screen.queryByLabelText('읽지 않은 알림 있음')).toBeNull()
   })
 })
+
+describe('그룹 통화 (KRW / USD)', () => {
+  /** 지출이 없는 새 그룹을 만들고 그 그룹 지출 화면을 띄운다 */
+  async function renderEmptyGroup() {
+    const group = await useAppStore.getState().createGroup('뉴욕 여행')
+    renderAt(`/groups/${group.id}/expenses`)
+    return group.id
+  }
+
+  it('헤더 왼쪽 위(그룹 이름 옆)에 통화 선택이 있고 기본은 KRW', () => {
+    renderAt('/groups/g_jeju/expenses')
+    expect((screen.getByLabelText('통화') as HTMLSelectElement).value).toBe('KRW')
+    expect(text()).toContain('₩')
+  })
+
+  it('지출이 있는 그룹은 통화를 바꿀 수 없다 — 이유를 알려 주고 그대로 둔다', async () => {
+    renderAt('/groups/g_jeju/expenses')
+    await userEvent.selectOptions(screen.getByLabelText('통화'), 'USD')
+    expect(await screen.findByText('지출이 있는 그룹은 통화를 바꿀 수 없어요')).toBeTruthy()
+    expect((screen.getByLabelText('통화') as HTMLSelectElement).value).toBe('KRW')
+    expect(groupState().currency).toBe('KRW')
+  })
+
+  it('지출이 없으면 USD로 바꿀 수 있고, 금액을 센트까지 입력·표시한다', async () => {
+    const groupId = await renderEmptyGroup()
+    await userEvent.selectOptions(screen.getByLabelText('통화'), 'USD')
+    expect(await screen.findByText('통화를 USD로 바꿨어요')).toBeTruthy()
+    expect((screen.getByLabelText('통화') as HTMLSelectElement).value).toBe('USD')
+    expect(text()).toContain('$0.00')
+    cleanup()
+
+    renderAt(`/groups/${groupId}/expenses/new`)
+    await userEvent.type(screen.getByLabelText('사용 금액'), '12.34')
+    await userEvent.type(screen.getByLabelText('항목명'), '피자')
+    expect(text()).toContain('$12.34')
+    await userEvent.click(screen.getByRole('button', { name: '지출 등록하기' }))
+
+    await waitFor(() => {
+      const group = useAppStore.getState().groups.find((g) => g.id === groupId)!
+      expect(group.expenses.map((e) => e.amount)).toEqual([1234])
+    })
+    cleanup()
+    renderAt(`/groups/${groupId}/expenses`)
+    expect(text()).toContain('$12.34')
+    expect(text()).not.toContain('₩')
+  })
+})
